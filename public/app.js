@@ -1256,9 +1256,16 @@ class GraphEditor {
             labelY = midY + Math.sin(perpAngle) * (offset + labelOffset);
         }
         
+        // 构建标签文本：如果有关系事项，显示名称 + 事项数量
+        const tasks = Array.isArray(edge.tasks) ? edge.tasks : [];
+        let displayLabel = edge.label;
+        if (tasks.length > 0) {
+            displayLabel = `${edge.label} (${tasks.length})`;
+        }
+        
         // 绘制标签背景（白色半透明，提高可读性）
         this.ctx.font = '12px Arial';
-        const textMetrics = this.ctx.measureText(edge.label);
+        const textMetrics = this.ctx.measureText(displayLabel);
         const textWidth = textMetrics.width;
         const textHeight = 12;
         
@@ -1274,7 +1281,7 @@ class GraphEditor {
         this.ctx.fillStyle = edge.color;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(edge.label, labelX, labelY);
+        this.ctx.fillText(displayLabel, labelX, labelY);
         
         // 选中效果
         if (this.selectedEdge === edge) {
