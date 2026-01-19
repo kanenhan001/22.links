@@ -51,7 +51,9 @@ async function initDatabase() {
                 radius REAL,
                 name TEXT,
                 type TEXT,
-                color TEXT
+                color TEXT,
+                taskListName TEXT, -- 事项清单名称（如：目标、待办等）
+                tasks TEXT -- 事项清单（JSON 字符串）
             );
             
             CREATE TABLE IF NOT EXISTS edges (
@@ -73,6 +75,22 @@ async function initDatabase() {
         } catch (e) {
             console.log('edges 表的 tasks 列可能已存在:', e.message);
         }
+        
+        // 对于旧数据库，添加 nodes 表的新字段
+        try {
+            db.run('ALTER TABLE nodes ADD COLUMN taskListName TEXT');
+            console.log('成功为 nodes 表添加 taskListName 列');
+        } catch (e) {
+            console.log('nodes 表的 taskListName 列可能已存在:', e.message);
+        }
+        
+        try {
+            db.run('ALTER TABLE nodes ADD COLUMN tasks TEXT');
+            console.log('成功为 nodes 表添加 tasks 列');
+        } catch (e) {
+            console.log('nodes 表的 tasks 列可能已存在:', e.message);
+        }
+        
         console.log('表初始化完成');
         
         saveDatabase();
@@ -198,7 +216,12 @@ function lastInsertRowId() {
 
 app.get('/api/nodes', (req, res) => {
     try {
-        const nodes = queryAll('SELECT * FROM nodes ORDER BY id');
+        const nodesRaw = queryAll('SELECT * FROM nodes ORDER BY id');
+        // 将 tasks 从 JSON 字符串解析为数组
+        const nodes = nodesRaw.map(n => ({
+            ...n,
+            tasks: n.tasks ? JSON.parse(n.tasks) : []
+        }));
         console.log('获取节点:', nodes.length, '个');
         res.json(nodes);
     } catch (error) {
@@ -209,12 +232,12 @@ app.get('/api/nodes', (req, res) => {
 
 app.post('/api/nodes', (req, res) => {
     try {
-        const { x, y, radius, name, type, color } = req.body;
+        const { x, y, radius, name, type, color, taskListName, tasks } = req.body;
         console.log('创建节点:', req.body);
         
         const newId = run(
-            'INSERT INTO nodes (x, y, radius, name, type, color) VALUES (?, ?, ?, ?, ?, ?)',
-            [x, y, radius, name, type, color]
+            'INSERT INTO nodes (x, y, radius, name, type, color, taskListName, tasks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [x, y, radius, name, type, color, taskListName || '', tasks ? JSON.stringify(tasks) : '[]']
         );
         
         console.log('Backend: run function returned ID for new node:', newId);
@@ -240,11 +263,12 @@ app.post('/api/nodes', (req, res) => {
 app.put('/api/nodes/:id', (req, res) => {
     try {
         const { id } = req.params;
-        const { x, y, radius, name, type, color } = req.body;
+        const { x, y, radius, name, type, color, taskListName, tasks } = req.body;
+        const tasksJson = tasks ? JSON.stringify(tasks) : '[]';
         
         run(
-            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ? WHERE id = ?',
-            [x, y, radius, name, type, color, id]
+            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, tasks = ? WHERE id = ?',
+            [x, y, radius, name, type, color, taskListName || '', tasksJson, id]
         );
         
         const node = queryOne('SELECT * FROM nodes WHERE id = ?', [id]);

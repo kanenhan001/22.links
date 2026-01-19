@@ -460,6 +460,77 @@ body {
     overflow-y: auto;
 }
 
+/* 节点事项清单名称样式 */
+.node-task-list-name {
+    margin-bottom: 6px;
+}
+
+.node-task-list-name input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    box-sizing: border-box;
+}
+
+.node-task-list-name input[type="text"]:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* 事项清单头部 - 就地编辑模式 */
+.task-list-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.task-list-title-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    padding: 4px 0;
+}
+
+.task-list-edit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.task-list-edit-btn:hover {
+    background: #f0f0f0;
+    color: #667eea;
+}
+
+.task-list-name-input {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    box-sizing: border-box;
+}
+
+.task-list-name-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
 .outgoing-edge-item {
     padding: 6px 8px;
     background: white;

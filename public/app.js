@@ -210,14 +210,63 @@ class GraphEditor {
         document.getElementById('propertiesContent').addEventListener('change', this.handlePropertyChange.bind(this));
         document.getElementById('propertiesContent').addEventListener('blur', (e) => {
             // 使用 blur 事件保存数据，避免干扰 IME
-            if (e.target.dataset.taskField === 'title') {
+            if (e.target.dataset.taskField === 'title' || e.target.dataset.nodeTaskField === 'title') {
                 this.handlePropertyChange(e);
+            }
+            // 保存清单名称
+            if (e.target.classList.contains('task-list-name-input')) {
+                const newValue = e.target.value.trim();
+                this.selectedNode.taskListName = newValue;
+                this.saveNode(this.selectedNode);
+                this.updatePropertiesPanel();
             }
         }, true); // 使用捕获阶段，确保先触发
         document.getElementById('propertiesContent').addEventListener('click', this.handleTaskClick.bind(this));
+        // 键盘事件处理（Enter 保存，Esc 取消）
+        document.getElementById('propertiesContent').addEventListener('keydown', (e) => {
+            if (e.target.classList.contains('task-list-name-input')) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const newValue = e.target.value.trim();
+                    this.selectedNode.taskListName = newValue;
+                    this.saveNode(this.selectedNode);
+                    this.updatePropertiesPanel();
+                    this.render();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    // 恢复原始值
+                    const originalValue = e.target.dataset.originalValue || '';
+                    this.selectedNode.taskListName = originalValue;
+                    this.updatePropertiesPanel();
+                }
+            }
+        });
     }
     
     handlePropertyChange(e) {
+        // 处理节点的事项清单字段
+        const nodeTaskField = e.target.dataset.nodeTaskField;
+        if (nodeTaskField && this.selectedNode) {
+            if (!Array.isArray(this.selectedNode.tasks)) {
+                this.selectedNode.tasks = [];
+            }
+            const itemEl = e.target.closest('.task-item');
+            if (!itemEl) return;
+            const index = parseInt(itemEl.dataset.nodeTaskIndex, 10);
+            if (Number.isNaN(index) || !this.selectedNode.tasks[index]) return;
+            const task = this.selectedNode.tasks[index];
+
+            if (nodeTaskField === 'title') {
+                task.title = e.target.value;
+            } else if (nodeTaskField === 'done') {
+                task.done = !!e.target.checked;
+            }
+
+            this.saveNode(this.selectedNode);
+            this.render();
+            return;
+        }
+
         // 处理关系的事项清单字段
         const taskField = e.target.dataset.taskField;
         if (taskField && this.selectedEdge) {
@@ -257,6 +306,25 @@ class GraphEditor {
 
     // 处理输入事件（实时更新数据，但不重新渲染，避免干扰 IME）
     handlePropertyInput(e) {
+        // 处理节点的事项清单字段
+        const nodeTaskField = e.target.dataset.nodeTaskField;
+        if (nodeTaskField && this.selectedNode) {
+            if (!Array.isArray(this.selectedNode.tasks)) {
+                this.selectedNode.tasks = [];
+            }
+            const itemEl = e.target.closest('.task-item');
+            if (!itemEl) return;
+            const index = parseInt(itemEl.dataset.nodeTaskIndex, 10);
+            if (Number.isNaN(index) || !this.selectedNode.tasks[index]) return;
+            const task = this.selectedNode.tasks[index];
+
+            if (nodeTaskField === 'title') {
+                task.title = e.target.value;
+            }
+            return;
+        }
+
+        // 处理关系的事项清单字段
         const taskField = e.target.dataset.taskField;
         if (taskField && this.selectedEdge) {
             if (!Array.isArray(this.selectedEdge.tasks)) {
@@ -291,9 +359,73 @@ class GraphEditor {
             return;
         }
 
+        // 点击编辑按钮，切换为编辑模式
+        const editBtn = e.target.closest('[data-action="edit-task-list-name"]');
+        if (editBtn) {
+            const header = editBtn.closest('.task-list-header');
+            if (header) {
+                const currentTitle = this.selectedNode.taskListName || '';
+                header.innerHTML = `
+                    <input type="text" class="task-list-name-input" 
+                        data-prop="taskListName" 
+                        placeholder="请输入清单名称（如：目标、待办等）" 
+                        value="${currentTitle}"
+                        data-original-value="${currentTitle}">
+                `;
+                const input = header.querySelector('.task-list-name-input');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }
+            return;
+        }
+
+        // 新增节点事项
+        if (e.target.id === 'addNodeTaskBtn') {
+            const textarea = document.getElementById('newNodeTaskTitle');
+            if (!textarea) return;
+            const title = textarea.value.trim();
+            if (!title) return;
+
+            if (!Array.isArray(this.selectedNode.tasks)) {
+                this.selectedNode.tasks = [];
+            }
+
+            this.selectedNode.tasks.push({
+                id: Date.now(),
+                title,
+                done: false
+            });
+
+            textarea.value = '';
+            this.saveNode(this.selectedNode);
+            this.updatePropertiesPanel();
+            this.render();
+            return;
+        }
+
+        // 删除节点事项
+        if (e.target.dataset.nodeTaskAction === 'delete') {
+            const itemEl = e.target.closest('.task-item');
+            if (!itemEl) return;
+            const index = parseInt(itemEl.dataset.nodeTaskIndex, 10);
+            if (Number.isNaN(index)) return;
+
+            if (!Array.isArray(this.selectedNode.tasks)) {
+                this.selectedNode.tasks = [];
+            }
+
+            this.selectedNode.tasks.splice(index, 1);
+            this.saveNode(this.selectedNode);
+            this.updatePropertiesPanel();
+            this.render();
+            return;
+        }
+
         if (!this.selectedEdge) return;
 
-        // 新增事项
+        // 新增关系事项
         if (e.target.id === 'addTaskBtn') {
             const input = document.getElementById('newTaskTitle');
             if (!input) return;
@@ -921,6 +1053,9 @@ class GraphEditor {
         if (this.selectedNode) {
             // 找出所有从当前节点发出的关系
             const outgoingEdges = this.edges.filter(e => e.sourceId === this.selectedNode.id);
+            // 获取节点的清单名称和事项
+            const taskListName = this.selectedNode.taskListName || '';
+            const nodeTasks = Array.isArray(this.selectedNode.tasks) ? this.selectedNode.tasks : [];
             
             panel.innerHTML = `
                 <div class="property-group">
@@ -937,7 +1072,34 @@ class GraphEditor {
                     </div>
                 </div>
                 <div class="property-group">
-                    <label>发出的关系 (${outgoingEdges.length}):</label>
+                    <div class="task-list-header">
+                        ${taskListName ? `
+                            <span class="task-list-title-label">${taskListName}</span>
+                            <button type="button" class="task-list-edit-btn" data-action="edit-task-list-name" title="编辑">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                        ` : `
+                            <input type="text" class="task-list-name-input" data-prop="taskListName" placeholder="请输入清单名称（如：目标、待办等）" value="">
+                        `}
+                    </div>
+                    <div class="task-list" id="nodeTaskList">
+                        ${nodeTasks.map((task, index) => `
+                            <div class="task-item" data-node-task-index="${index}">
+                                <textarea class="task-textarea" data-node-task-field="title" placeholder="事项内容">${task.title || ''}</textarea>
+                                <button type="button" class="task-delete-btn" data-node-task-action="delete">删</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="task-add">
+                        <textarea id="newNodeTaskTitle" class="task-textarea task-add-textarea" placeholder="新增事项..."></textarea>
+                        <button type="button" id="addNodeTaskBtn" class="task-add-btn">添加</button>
+                    </div>
+                </div>
+                <div class="property-group">
+                    <label>相关方 (${outgoingEdges.length}):</label>
                     ${outgoingEdges.length > 0 ? `
                         <div class="outgoing-edges-list">
                             ${outgoingEdges.map(edge => {
@@ -965,9 +1127,13 @@ class GraphEditor {
                         </div>
                     ` : '<p style="color: #999; font-size: 13px;">暂无发出的关系</p>'}
                 </div>
-                <p style="color: #666; font-size: 12px; margin-top: 10px;">💡 按 Delete 键删除选中项</p>
                 
             `;
+
+            // 自动调整所有 textarea 的高度
+            panel.querySelectorAll('.task-textarea').forEach(textarea => {
+                this.autoResizeTextarea(textarea);
+            });
         } else if (this.selectedEdge) {
             const source = this.nodes.find(n => n.id === this.selectedEdge.sourceId);
             const target = this.nodes.find(n => n.id === this.selectedEdge.targetId);
