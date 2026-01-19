@@ -1,0 +1,19 @@
+{
+  "name": "graph-editor",
+  "version": "2.0.0",
+  "description": "关系图编辑器 - Node.js 版本",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["graph", "editor", "sqlite", "visualization"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "sql.js": "^1.10.2"
+  }
+}
