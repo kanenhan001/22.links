@@ -151,6 +151,7 @@ class GraphEditor {
     
     setupEventListeners() {
         this.canvas.addEventListener('click', this.handleCanvasClick.bind(this));
+        this.canvas.addEventListener('dblclick', this.handleCanvasDoubleClick.bind(this)); // 新增双击事件
         this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
         this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
         this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
@@ -167,15 +168,26 @@ class GraphEditor {
         // 按钮事件
         document.getElementById('addNodeBtn').addEventListener('click', () => this.showNodeModal());
         document.getElementById('clearBtn').addEventListener('click', this.handleClear.bind(this));
+        document.getElementById('helpBtn').addEventListener('click', () => this.showHelpModal());
         
         this.setupModalListeners();
     }
     
     setupModalListeners() {
-        document.querySelectorAll('.close').forEach(closeBtn => {
-            closeBtn.addEventListener('click', (e) => {
-                e.target.closest('.modal').style.display = 'none';
-            });
+        // 使用事件委托，保证后插入的关闭按钮也能生效（如 helpModal 的关闭按钮）
+        document.addEventListener('click', (e) => {
+            const closeBtn = e.target.closest('.close');
+            if (closeBtn) {
+                const targetModalId = closeBtn.dataset.modalTarget;
+                if (targetModalId) {
+                    const modalEl = document.getElementById(targetModalId);
+                    if (modalEl) {
+                        modalEl.style.display = 'none';
+                    }
+                }
+                e.stopPropagation(); // 阻止事件冒泡到 window，避免重复处理
+                return;
+            }
         });
         
         window.addEventListener('click', (e) => {
@@ -211,17 +223,14 @@ class GraphEditor {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        // 如果正在创建关系，处理点击事件
+        // 如果正在创建关系，处理点击事件 (点击空白处取消，点击节点切换源节点)
         if (this.creatingEdge) {
-            // 检查是否点击在节点上
             for (let node of this.nodes) {
                 if (this.isPointInNode(x, y, node)) {
-                    // 如果点击的是不同的节点，切换源节点
                     if (node !== this.edgeSourceNode) {
                         this.edgeSourceNode = node;
                         this.selectedNode = node;
-                        // 更新鼠标位置为当前点击位置
-                        this.edgeMousePos = { x, y };
+                        this.edgeMousePos = { x, y }; // 更新鼠标位置
                         this.updatePropertiesPanel();
                         this.showStatus(`创建关系模式：已选择源节点"${node.name}"，请拖拽到目标节点（或按ESC取消）`);
                         this.render();
@@ -229,14 +238,7 @@ class GraphEditor {
                     return;
                 }
             }
-            
-            // 如果点击在空白处，取消创建关系模式
-            this.cancelCreatingEdge();
-            // 清除选中状态
-            this.selectedNode = null;
-            this.selectedEdge = null;
-            this.updatePropertiesPanel();
-            this.render();
+            this.cancelCreatingEdge(); // 点击空白处取消
             return;
         }
         
@@ -255,14 +257,7 @@ class GraphEditor {
         
         for (let node of this.nodes) {
             if (this.isPointInNode(x, y, node)) {
-                this.selectedNode = node;
-                // 选中节点后，自动进入创建关系模式，源节点就是选中的节点
-                this.edgeSourceNode = node;
-                this.creatingEdge = true;
-                // 初始化鼠标位置为当前点击位置，避免临时线指向错误方向
-                this.edgeMousePos = { x, y };
-                this.canvas.style.cursor = 'crosshair';
-                this.showStatus(`创建关系模式：已选择源节点"${node.name}"，请拖拽到目标节点（或按ESC取消）`);
+                this.selectedNode = node; // 只选中，不进入创建模式
                 this.updatePropertiesPanel();
                 this.render();
                 return;
@@ -273,12 +268,31 @@ class GraphEditor {
         this.render();
     }
     
+    handleCanvasDoubleClick(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // 检查双击是否发生在节点上
+        for (let node of this.nodes) {
+            if (this.isPointInNode(x, y, node)) {
+                // 双击节点，进入创建关系模式
+                this.selectedNode = node;
+                this.edgeMousePos = { x, y }; // 初始化鼠标位置
+                this.startCreatingEdge(node);
+                this.updatePropertiesPanel();
+                this.render();
+                return;
+            }
+        }
+    }
+    
     handleMouseDown(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        // 如果正在创建关系，不处理拖拽节点（允许拖拽创建关系）
+        // 如果正在创建关系模式，不处理节点拖拽（只处理选择目标节点）
         if (this.creatingEdge) {
             // 更新鼠标位置，用于绘制临时线
             this.edgeMousePos = { x, y };
@@ -341,6 +355,10 @@ class GraphEditor {
             await this.saveNode(this.draggingNode);
         }
         this.draggingNode = null;
+
+        // 如果当前是创建关系模式，且鼠标松开后没有创建成功，但已经选择了源节点，则可以认为是想切换源节点
+        // 但由于双击已经进入了创建模式，所以这里的mouseUp不应该取消，否则会影响双击后的拖拽
+        // 如果需要取消，用户可以使用ESC键或单击空白处
     }
     
     handleKeyDown(e) {
@@ -493,6 +511,11 @@ class GraphEditor {
             console.log('data-node-id 已处理');
         }
         
+        modal.style.display = 'block';
+    }
+    
+    showHelpModal() {
+        const modal = document.getElementById('helpModal');
         modal.style.display = 'block';
     }
     
@@ -821,8 +844,8 @@ class GraphEditor {
                     <label>关系颜色:</label>
                     <input type="color" id="propEdgeColor" value="${this.selectedEdge.color}" data-prop="color">
                 </div>
-                <p style="color: #666; font-size: 12px; margin-top: 10px;">💡 按 Delete 键删除选中项</p>
-                <button class="btn-delete" style="background: #667eea; margin-top: 10px;" onclick="editor.showEdgeModal(editor.selectedEdge)">编辑关系</button>
+                <p style="color: #666; font-size: 12px; margin-top: 10px;">💡 按 Delete 键删除关系</p>
+                
             `;
         } else {
             panel.innerHTML = '<p>请选择一个节点或关系</p>';

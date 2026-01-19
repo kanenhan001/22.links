@@ -1,79 +1,382 @@
 <!DOCTYPE html>
+
+
+
 <html lang="zh-CN">
+
+
+
 <head>
+
+
+
     <meta charset="UTF-8">
+
+
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
     <title>关系图编辑器</title>
+
+
+
     <link rel="stylesheet" href="styles.css">
+
+
+
+    <link rel="shortcut icon" href="favicon.ico">
+
+
+
 </head>
+
+
+
 <body>
+
+
+
     <div class="container">
+
+
+
         <div class="toolbar">
+
+
+
             <button id="addNodeBtn">+ 新增节点</button>
+
+
+
             <button id="clearBtn">🔄 清空画布</button>
-            <div class="status-bar">
+
+
+
+            <div class="status-bar" style="display: none;">
+
+
+
                 <span id="statusText">就绪 (按 Delete 键删除选中项)</span>
+
+
+
             </div>
+
+
+
+            <button id="helpBtn" style="margin-left: auto;">帮助</button>
+
+
+
         </div>
+
+
+
         
+
+
+
         <div class="canvas-container">
+
+
+
             <canvas id="graphCanvas" width="1600" height="1200"></canvas>
+
+
+
         </div>
+
+
+
         
+
+
+
         <div class="properties-panel">
+
+
+
             <h3>属性面板</h3>
+
+
+
             <div id="propertiesContent">
+
+
+
                 <p>请选择一个节点或关系</p>
+
+
+
             </div>
+
+
+
         </div>
+
+
+
     </div>
+
+
+
     
+
+
+
     <div id="nodeModal" class="modal">
+
+
+
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2 id="modalTitle">新增节点</h2>
+
+                <div>
+
+                    <h2 id="modalTitle">新增节点</h2>
+
+                    <span class="close" data-modal-target="nodeModal">&times;</span>
+
+                </div>
+
             <form id="nodeForm">
+
+
+
                 <label for="nodeName">节点名称:</label>
+
+
+
                 <input type="text" id="nodeName" required>
+
+
+
                 
+
+
+
                 <label for="nodeType">节点类型:</label>
+
+
+
                 <select id="nodeType">
+
+
+
                     <option value="person">人物</option>
+
+
+
                     <option value="organization">组织</option>
+
+
+
                     <option value="event">事件</option>
+
+
+
                     <option value="concept">概念</option>
+
+
+
                 </select>
+
+
+
                 
+
+
+
                 <label for="nodeColor">节点颜色:</label>
+
+
+
                 <input type="color" id="nodeColor" value="#3498db">
+
+
+
                 
+
+
+
                 <button type="submit">保存</button>
+
+
+
             </form>
+
+
+
         </div>
+
+
+
     </div>
+
+
+
     
+
+
+
     <div id="edgeModal" class="modal">
+
+
+
         <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2 id="edgeModalTitle">新增关系</h2>
+
+                <div>
+
+                    <h2 id="edgeModalTitle">新增关系</h2>
+
+                    <span class="close" data-modal-target="edgeModal">&times;</span>
+
+                </div>
+
             <form id="edgeForm">
+
+
+
                 <label for="edgeSource">源节点:</label>
+
+
+
                 <select id="edgeSource" required></select>
+
+
+
                 
+
+
+
                 <label for="edgeTarget">目标节点:</label>
+
+
+
                 <select id="edgeTarget" required></select>
+
+
+
                 
+
+
+
                 <label for="edgeLabel">关系标签:</label>
+
+
+
                 <input type="text" id="edgeLabel" required>
+
+
+
                 
+
+
+
                 <label for="edgeColor">关系颜色:</label>
+
+
+
                 <input type="color" id="edgeColor" value="#e74c3c">
+
+
+
                 
+
+
+
                 <button type="submit">保存</button>
+
+
+
             </form>
+
+
+
         </div>
+
+
+
     </div>
+
+
+
     
+
+
+
     <script src="app.js"></script>
+
+
+
+    
+
+
+
+    <div id="helpModal" class="modal">
+
+
+
+        <div class="modal-content">
+
+                <div>
+
+                    <h2>使用帮助</h2>
+
+                    <span class="close" data-modal-target="helpModal">&times;</span>
+
+                </div>
+
+            <div class="help-content">
+
+                <ul>
+                    <li><strong>点击定增节点按钮:</strong> 新增节点。</li>
+                    <li><strong>双击节点:</strong> 进入创建关系模式，该节点作为源节点。</li>
+
+
+
+                    <li><strong>在创建关系模式下拖拽:</strong> 从源节点拖拽到目标节点以创建关系。</li>
+
+
+
+                    <li><strong>选择节点/关系:</strong> 单击节点或关系。选中项的属性将在右侧面板显示。</li>
+
+                    <li><strong>编辑节点/关系:</strong> 可以通过属性面板编辑节点和关系的名称、类型和颜色。</li>
+
+                    <li><strong>移动节点:</strong> 拖拽节点。</li>
+
+
+
+                    <li><strong>删除节点/关系:</strong> 选中节点或关系后，按键盘的 `Delete` 键。</li>
+
+
+
+                    <li><strong>取消创建关系模式:</strong> 按键盘的 `ESC` 键。</li>
+
+                   
+
+                </ul>
+
+
+                <p>享受梳理关系的乐趣！</p>
+
+
+
+            </div>
+
+
+
+        </div>
+
+
+
+    </div>
+
+
+
 </body>
+
+
+
 </html>
