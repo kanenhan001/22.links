@@ -81,17 +81,17 @@ async function initDatabase() {
 // 保存数据库到文件
 function saveDatabase() {
     try {
-        console.info('执行保存');
+        console.info('Backend: Executing saveDatabase...');
         if (!db) {
-            console.error('saveDatabase 失败: db 为空');
+            console.error('Backend: saveDatabase failed: db is null');
             return;
         }
         const data = db.export();
         const buffer = Buffer.from(data);
         fs.writeFileSync(DB_PATH, buffer);
-        console.log('数据库已保存到文件, 大小:', buffer.length, 'bytes');
+        console.log('Backend: Database saved to file, size:', buffer.length, 'bytes');
     } catch (error) {
-        console.error('保存数据库失败:', error);
+        console.error('Backend: Failed to save database:', error);
     }
 }
 
@@ -99,6 +99,10 @@ function saveDatabase() {
 function queryOne(sql, params = []) {
     try {
         const stmt = db.prepare(sql);
+        if (!stmt) {
+            console.error('queryOne 失败: 无法准备 SQL 语句', sql, params);
+            return null;
+        }
         if (params && params.length > 0) {
             stmt.bind(params);
         }
@@ -135,14 +139,36 @@ function queryAll(sql, params = []) {
 
 function run(sql, params = []) {
     try {
-        console.log('执行 SQL:', sql, params);
+        console.log('Backend RUN SQL:', sql, params);
         db.run(sql, params);
         const rowsModified = db.getRowsModified();
-        console.log('影响行数:', rowsModified);
+        console.log('Backend RUN SQL: Affecting rows:', rowsModified);
+
+        let lastId = null;
+        if (sql.toUpperCase().startsWith('INSERT INTO')) {
+            // 对于 INSERT 操作，尝试获取最后插入的ID
+            const result = queryOne('SELECT last_insert_rowid() as id');
+            if (result && result.id !== null && result.id !== 0) { // 检查ID是否有效且非0
+                lastId = result.id;
+                console.log('Backend RUN SQL: last_insert_rowid returned:', lastId);
+            } else {
+                console.warn('Backend RUN SQL: last_insert_rowid() returned 0 or null after INSERT. Attempting MAX(id) fallback.');
+                // 备用方案：如果 last_insert_rowid 失败，尝试查询 MAX(id)
+                const tableName = sql.split(' ')[2]; // 从SQL中提取表名 (e.g., INSERT INTO <table> ...)
+                if (tableName) {
+                    const maxIdResult = queryOne(`SELECT MAX(id) as id FROM ${tableName}`);
+                    if (maxIdResult && maxIdResult.id !== null && maxIdResult.id !== 0) {
+                        lastId = maxIdResult.id;
+                        console.log('Backend RUN SQL: MAX(id) fallback returned:', lastId);
+                    }
+                }
+            }
+        }
+
         saveDatabase();
-        return rowsModified;
+        return lastId || rowsModified; // 对于非INSERT操作，返回影响行数；对于INSERT，返回lastId (如果获取到)
     } catch (error) {
-        console.error('执行 SQL 失败:', sql, params, error);
+        console.error('Backend RUN SQL: Failed:', sql, params, error);
         throw error;
     }
 }
@@ -177,22 +203,24 @@ app.post('/api/nodes', (req, res) => {
         const { x, y, radius, name, type, color } = req.body;
         console.log('创建节点:', req.body);
         
-        run(
+        const newId = run(
             'INSERT INTO nodes (x, y, radius, name, type, color) VALUES (?, ?, ?, ?, ?, ?)',
             [x, y, radius, name, type, color]
         );
         
-        // sql.js 的 last_insert_rowid() 有时返回 0，改用查询最大 ID
-        const maxNode = queryOne('SELECT * FROM nodes WHERE id = (SELECT MAX(id) FROM nodes)');
-        console.log('查询最大节点:', maxNode);
-        
-        if (maxNode) {
-            res.json(maxNode);
+        console.log('Backend: run function returned ID for new node:', newId);
+
+        if (newId === null || newId === 0) {
+            console.error('Backend: Failed to get valid ID after node insert.');
+            return res.status(500).json({ error: '创建节点失败: 无法获取新创建的节点ID' });
+        }
+
+        const node = queryOne('SELECT * FROM nodes WHERE id = ?', [newId]);
+        if (node) {
+            res.json(node);
         } else {
-            // 如果查询失败，返回输入数据（ID 由前端临时生成）
-            const tempNode = { x, y, radius, name, type, color };
-            console.log('返回临时节点:', tempNode);
-            res.json(tempNode);
+            console.error('Backend: Could not find newly created node with ID:', newId);
+            res.status(500).json({ error: '创建节点失败: 无法查询到新创建的节点' });
         }
     } catch (error) {
         console.error('创建节点失败:', error);
@@ -245,16 +273,28 @@ app.get('/api/edges', (req, res) => {
 app.post('/api/edges', (req, res) => {
     try {
         const { sourceId, targetId, label, color } = req.body;
-        run(
+        console.log('Backend: Inserting edge:', { sourceId, targetId, label, color });
+        const newId = run(
             'INSERT INTO edges (sourceId, targetId, label, color) VALUES (?, ?, ?, ?)',
             [sourceId, targetId, label, color]
         );
         
-        const id = lastInsertRowId();
-        const edge = queryOne('SELECT * FROM edges WHERE id = ?', [id]);
-        res.json(edge);
+        console.log('Backend: run function returned ID for new edge:', newId);
+
+        if (newId === null || newId === 0) { // 检查ID是否有效
+            console.error('Backend: Failed to get valid ID after edge insert.');
+            return res.status(500).json({ error: '创建边失败: 无法获取新创建的边ID' });
+        }
+
+        const edge = queryOne('SELECT * FROM edges WHERE id = ?', [newId]);
+        if (edge) {
+            res.json(edge);
+        } else {
+            console.error('Backend: Could not find newly created edge with ID:', newId);
+            res.status(500).json({ error: '创建边失败: 无法查询到新创建的边' });
+        }
     } catch (error) {
-        console.error('创建边失败:', error);
+        console.error('Backend: Failed to create edge:', error);
         res.status(500).json({ error: '创建边失败' });
     }
 });
@@ -280,10 +320,12 @@ app.put('/api/edges/:id', (req, res) => {
 app.delete('/api/edges/:id', (req, res) => {
     try {
         const { id } = req.params;
-        run('DELETE FROM edges WHERE id = ?', [id]);
-        res.json({ success: true });
+        console.log('Backend: Attempting to delete edge with id:', id);
+        const rowsModified = run('DELETE FROM edges WHERE id = ?', [id]);
+        console.log('Backend: Rows modified by delete:', rowsModified);
+        res.json({ success: true, rowsModified });
     } catch (error) {
-        console.error('删除边失败:', error);
+        console.error('Backend: Failed to delete edge:', error);
         res.status(500).json({ error: '删除边失败' });
     }
 });

@@ -8,6 +8,10 @@ class GraphEditor {
         this.selectedEdge = null;
         this.draggingNode = null;
         this.dragOffset = { x: 0, y: 0 };
+        // 创建关系相关状态
+        this.creatingEdge = false;
+        this.edgeSourceNode = null;
+        this.edgeMousePos = { x: 0, y: 0 };
     }
     
     static async create() {
@@ -122,8 +126,10 @@ class GraphEditor {
     
     async deleteEdge(edge) {
         try {
+            console.log('Attempting to delete edge on frontend with id:', edge.id);
             await this.apiDelete(`/api/edges/${edge.id}`);
             this.edges = this.edges.filter(e => e.id !== edge.id);
+            console.log('Frontend: Edges after filter:', this.edges.length);
             this.showStatus('关系已删除');
         } catch (error) {
             console.error('删除关系失败:', error);
@@ -148,14 +154,18 @@ class GraphEditor {
         this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
         this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
         this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
-        this.canvas.addEventListener('mouseleave', this.handleMouseUp.bind(this));
+        this.canvas.addEventListener('mouseleave', (e) => {
+            // 如果正在创建关系，不取消（允许鼠标暂时离开画布）
+            if (!this.creatingEdge) {
+                this.handleMouseUp(e);
+            }
+        });
         
         // 键盘事件
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
         
         // 按钮事件
         document.getElementById('addNodeBtn').addEventListener('click', () => this.showNodeModal());
-        document.getElementById('addEdgeBtn').addEventListener('click', () => this.showEdgeModal());
         document.getElementById('clearBtn').addEventListener('click', this.handleClear.bind(this));
         
         this.setupModalListeners();
@@ -201,6 +211,36 @@ class GraphEditor {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
+        // 如果正在创建关系，处理点击事件
+        if (this.creatingEdge) {
+            // 检查是否点击在节点上
+            for (let node of this.nodes) {
+                if (this.isPointInNode(x, y, node)) {
+                    // 如果点击的是不同的节点，切换源节点
+                    if (node !== this.edgeSourceNode) {
+                        this.edgeSourceNode = node;
+                        this.selectedNode = node;
+                        // 更新鼠标位置为当前点击位置
+                        this.edgeMousePos = { x, y };
+                        this.updatePropertiesPanel();
+                        this.showStatus(`创建关系模式：已选择源节点"${node.name}"，请拖拽到目标节点（或按ESC取消）`);
+                        this.render();
+                    }
+                    return;
+                }
+            }
+            
+            // 如果点击在空白处，取消创建关系模式
+            this.cancelCreatingEdge();
+            // 清除选中状态
+            this.selectedNode = null;
+            this.selectedEdge = null;
+            this.updatePropertiesPanel();
+            this.render();
+            return;
+        }
+        
+        // 正常模式下的点击处理
         this.selectedNode = null;
         this.selectedEdge = null;
         
@@ -216,6 +256,13 @@ class GraphEditor {
         for (let node of this.nodes) {
             if (this.isPointInNode(x, y, node)) {
                 this.selectedNode = node;
+                // 选中节点后，自动进入创建关系模式，源节点就是选中的节点
+                this.edgeSourceNode = node;
+                this.creatingEdge = true;
+                // 初始化鼠标位置为当前点击位置，避免临时线指向错误方向
+                this.edgeMousePos = { x, y };
+                this.canvas.style.cursor = 'crosshair';
+                this.showStatus(`创建关系模式：已选择源节点"${node.name}"，请拖拽到目标节点（或按ESC取消）`);
                 this.updatePropertiesPanel();
                 this.render();
                 return;
@@ -231,6 +278,15 @@ class GraphEditor {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
+        // 如果正在创建关系，不处理拖拽节点（允许拖拽创建关系）
+        if (this.creatingEdge) {
+            // 更新鼠标位置，用于绘制临时线
+            this.edgeMousePos = { x, y };
+            this.render();
+            return;
+        }
+        
+        // 正常的拖拽节点
         for (let node of this.nodes) {
             if (this.isPointInNode(x, y, node)) {
                 this.draggingNode = node;
@@ -241,19 +297,46 @@ class GraphEditor {
     }
     
     handleMouseMove(e) {
-        if (!this.draggingNode) return;
-        
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        this.draggingNode.x = x - this.dragOffset.x;
-        this.draggingNode.y = y - this.dragOffset.y;
+        // 如果正在创建关系，更新鼠标位置并重绘临时线
+        if (this.creatingEdge && this.edgeSourceNode) {
+            this.edgeMousePos = { x, y };
+            this.render();
+            return;
+        }
         
-        this.render();
+        // 正常的拖拽节点
+        if (this.draggingNode) {
+            this.draggingNode.x = x - this.dragOffset.x;
+            this.draggingNode.y = y - this.dragOffset.y;
+            this.render();
+        }
     }
     
-    async handleMouseUp() {
+    async handleMouseUp(e) {
+        // 如果正在创建关系，检查是否释放在目标节点上
+        if (this.creatingEdge && this.edgeSourceNode) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            for (let node of this.nodes) {
+                if (node !== this.edgeSourceNode && this.isPointInNode(x, y, node)) {
+                    // 释放在目标节点上，创建关系
+                    await this.createEdgeFromNodes(this.edgeSourceNode, node);
+                    this.cancelCreatingEdge();
+                    return;
+                }
+            }
+            
+            // 如果释放在空白处，保持创建关系模式，允许用户继续拖拽
+            // 用户可以通过ESC键或点击空白处取消
+        }
+        
+        // 正常的拖拽节点结束
         if (this.draggingNode) {
             await this.saveNode(this.draggingNode);
         }
@@ -261,6 +344,12 @@ class GraphEditor {
     }
     
     handleKeyDown(e) {
+        // 按 ESC 键取消创建关系模式
+        if (e.key === 'Escape' && this.creatingEdge) {
+            this.cancelCreatingEdge();
+            return;
+        }
+        
         // 按 Delete 键删除选中项
         if (e.key === 'Delete' || e.key === 'Del') {
             // 模态框打开时不处理
@@ -407,6 +496,72 @@ class GraphEditor {
         modal.style.display = 'block';
     }
     
+    startCreatingEdge(sourceNode = null) {
+        this.creatingEdge = true;
+        this.edgeSourceNode = sourceNode;
+        if (sourceNode) {
+            this.showStatus(`创建关系模式：已选择源节点"${sourceNode.name}"，请拖拽到目标节点（或按ESC取消）`);
+        } else {
+            this.showStatus('创建关系模式：请点击源节点，然后拖拽到目标节点（或按ESC取消）');
+        }
+        // 改变鼠标样式
+        this.canvas.style.cursor = 'crosshair';
+        if (!sourceNode) {
+            this.render();
+        }
+    }
+    
+    cancelCreatingEdge() {
+        this.creatingEdge = false;
+        this.edgeSourceNode = null;
+        this.edgeMousePos = { x: 0, y: 0 };
+        this.showStatus('已取消创建关系模式');
+        this.canvas.style.cursor = 'default';
+        // 取消创建关系模式时，清除选中的节点
+        this.selectedNode = null;
+        this.render();
+    }
+    
+    async createEdgeFromNodes(sourceNode, targetNode) {
+        // 检查是否已存在相同的关系
+        const existingEdge = this.edges.find(e => 
+            e.sourceId === sourceNode.id && e.targetId === targetNode.id
+        );
+        
+        if (existingEdge) {
+            this.showStatus('关系已存在，请编辑现有关系');
+            this.selectedEdge = existingEdge;
+            this.cancelCreatingEdge();
+            this.updatePropertiesPanel();
+            this.render();
+            return;
+        }
+        
+        // 创建新关系，使用默认值
+        // 创建新关系，使用默认值
+        const newEdge = {
+            sourceId: sourceNode.id,
+            targetId: targetNode.id,
+            label: '关系',
+            color: '#e74c3c'
+        };
+        
+        // 先保存到后端获取ID
+        await this.saveEdge(newEdge);
+        console.log('Frontend: New edge created with id:', newEdge.id, newEdge);
+        this.edges.push(newEdge);
+        
+        this.showStatus(`已创建关系：${sourceNode.name} -> ${targetNode.name}`);
+        this.selectedEdge = newEdge;
+        // 创建关系后，取消创建关系模式
+        this.creatingEdge = false;
+        this.edgeSourceNode = null;
+        this.edgeMousePos = { x: 0, y: 0 };
+        this.canvas.style.cursor = 'default';
+        this.updatePropertiesPanel();
+        this.render();
+    }
+    
     showEdgeModal(edge = null) {
         const modal = document.getElementById('edgeModal');
         const title = document.getElementById('edgeModalTitle');
@@ -530,21 +685,34 @@ class GraphEditor {
     
     async handleDelete() {
         if (!this.selectedNode && !this.selectedEdge) {
-            alert('请先选择一个节点或关系');
+            this.showStatus('请先选择一个节点或关系');
             return;
         }
         
-        if (confirm('确定要删除选中的项目吗？')) {
-            if (this.selectedNode) {
+        if (this.selectedNode) {
+            // 删除节点
+            const nodeName = this.selectedNode.name;
+            if (confirm(`确定要删除节点"${nodeName}"吗？\n删除节点将同时删除与该节点相关的所有关系。`)) {
                 await this.deleteNode(this.selectedNode);
                 this.selectedNode = null;
-            } else if (this.selectedEdge) {
+                this.updatePropertiesPanel();
+                this.render();
+            }
+        } else if (this.selectedEdge) {
+            // 删除关系
+            console.log('Frontend: Attempting to delete selected edge with id:', this.selectedEdge.id);
+            const source = this.nodes.find(n => n.id === this.selectedEdge.sourceId);
+            const target = this.nodes.find(n => n.id === this.selectedEdge.targetId);
+            const sourceName = source ? source.name : '未知';
+            const targetName = target ? target.name : '未知';
+            const edgeLabel = this.selectedEdge.label || '关系';
+            
+            if (confirm(`确定要删除关系"${edgeLabel}"吗？\n(${sourceName} -> ${targetName})`)) {
                 await this.deleteEdge(this.selectedEdge);
                 this.selectedEdge = null;
+                this.updatePropertiesPanel();
+                this.render();
             }
-            
-            this.updatePropertiesPanel();
-            this.render();
         }
     }
     
@@ -705,7 +873,55 @@ class GraphEditor {
             });
         });
         
+        // 绘制正在创建关系的临时线
+        if (this.creatingEdge && this.edgeSourceNode) {
+            this.drawTemporaryEdge(this.edgeSourceNode, this.edgeMousePos);
+        }
+        
         this.nodes.forEach(node => this.drawNode(node));
+    }
+    
+    drawTemporaryEdge(sourceNode, mousePos) {
+        const sourceX = sourceNode.x;
+        const sourceY = sourceNode.y;
+        const targetX = mousePos.x;
+        const targetY = mousePos.y;
+        
+        // 计算起点（在节点边缘）
+        const dx = targetX - sourceX;
+        const dy = targetY - sourceY;
+        const angle = Math.atan2(dy, dx);
+        const startX = sourceX + Math.cos(angle) * sourceNode.radius;
+        const startY = sourceY + Math.sin(angle) * sourceNode.radius;
+        
+        // 绘制临时线（虚线）
+        this.ctx.beginPath();
+        this.ctx.moveTo(startX, startY);
+        this.ctx.lineTo(targetX, targetY);
+        this.ctx.strokeStyle = '#667eea';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([5, 5]);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+        
+        // 绘制临时箭头
+        const arrowSize = 10;
+        const arrowAngle = Math.PI / 6;
+        const lineAngle = Math.atan2(targetY - startY, targetX - startX);
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(targetX, targetY);
+        this.ctx.lineTo(
+            targetX - arrowSize * Math.cos(lineAngle - arrowAngle),
+            targetY - arrowSize * Math.sin(lineAngle - arrowAngle)
+        );
+        this.ctx.lineTo(
+            targetX - arrowSize * Math.cos(lineAngle + arrowAngle),
+            targetY - arrowSize * Math.sin(lineAngle + arrowAngle)
+        );
+        this.ctx.closePath();
+        this.ctx.fillStyle = '#667eea';
+        this.ctx.fill();
     }
     
     // 按节点对分组边
