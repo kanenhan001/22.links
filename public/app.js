@@ -199,8 +199,21 @@ class GraphEditor {
         document.getElementById('nodeForm').addEventListener('submit', this.handleNodeFormSubmit.bind(this));
         document.getElementById('edgeForm').addEventListener('submit', this.handleEdgeFormSubmit.bind(this));
         
-        document.getElementById('propertiesContent').addEventListener('input', this.handlePropertyChange.bind(this));
+        document.getElementById('propertiesContent').addEventListener('input', (e) => {
+            // 处理 textarea 自动高度调整
+            if (e.target.classList.contains('task-textarea')) {
+                this.autoResizeTextarea(e.target);
+            }
+            // 只更新数据，不重新渲染，避免干扰 IME
+            this.handlePropertyInput(e);
+        });
         document.getElementById('propertiesContent').addEventListener('change', this.handlePropertyChange.bind(this));
+        document.getElementById('propertiesContent').addEventListener('blur', (e) => {
+            // 使用 blur 事件保存数据，避免干扰 IME
+            if (e.target.dataset.taskField === 'title') {
+                this.handlePropertyChange(e);
+            }
+        }, true); // 使用捕获阶段，确保先触发
         document.getElementById('propertiesContent').addEventListener('click', this.handleTaskClick.bind(this));
     }
     
@@ -216,22 +229,21 @@ class GraphEditor {
             const index = parseInt(itemEl.dataset.taskIndex, 10);
             if (Number.isNaN(index) || !this.selectedEdge.tasks[index]) return;
             const task = this.selectedEdge.tasks[index];
-            
+
             if (taskField === 'title') {
                 task.title = e.target.value;
             } else if (taskField === 'done') {
                 task.done = !!e.target.checked;
             }
-            
+
             this.saveEdge(this.selectedEdge);
-            this.updatePropertiesPanel();
             this.render();
             return;
         }
 
         const prop = e.target.dataset.prop;
         if (!prop) return;
-        
+
         if (this.selectedNode) {
             this.selectedNode[prop] = e.target.value;
             this.saveNode(this.selectedNode);
@@ -240,6 +252,25 @@ class GraphEditor {
             this.selectedEdge[prop] = e.target.value;
             this.saveEdge(this.selectedEdge);
             this.render();
+        }
+    }
+
+    // 处理输入事件（实时更新数据，但不重新渲染，避免干扰 IME）
+    handlePropertyInput(e) {
+        const taskField = e.target.dataset.taskField;
+        if (taskField && this.selectedEdge) {
+            if (!Array.isArray(this.selectedEdge.tasks)) {
+                this.selectedEdge.tasks = [];
+            }
+            const itemEl = e.target.closest('.task-item');
+            if (!itemEl) return;
+            const index = parseInt(itemEl.dataset.taskIndex, 10);
+            if (Number.isNaN(index) || !this.selectedEdge.tasks[index]) return;
+            const task = this.selectedEdge.tasks[index];
+
+            if (taskField === 'title') {
+                task.title = e.target.value;
+            }
         }
     }
 
@@ -859,7 +890,15 @@ class GraphEditor {
         }
         console.log(message);
     }
-    
+
+    // 自动调整 textarea 高度以适应内容
+    autoResizeTextarea(textarea) {
+        // 临时将高度设为 0，以获取内容的真实高度
+        textarea.style.height = '0';
+        // 设置高度为 scrollHeight，自动适应内容
+        textarea.style.height = textarea.scrollHeight + 'px';
+    }
+
     updatePropertiesPanel() {
         const panel = document.getElementById('propertiesContent');
         
@@ -916,25 +955,31 @@ class GraphEditor {
                     <div class="task-list">
                         ${tasks.map((task, index) => `
                             <div class="task-item" data-task-index="${index}">
-                                <input type="text" data-task-field="title" value="" placeholder="事项内容">
+                                <textarea class="task-textarea" data-task-field="title" placeholder="事项内容">${task.title || ''}</textarea>
                                 <button type="button" class="task-delete-btn" data-task-action="delete">删</button>
                             </div>
                         `).join('')}
                     </div>
                     <div class="task-add">
-                        <input type="text" id="newTaskTitle" placeholder="新增事项...">
+                        <textarea id="newTaskTitle" class="task-textarea task-add-textarea" placeholder="新增事项..."></textarea>
                         <button type="button" id="addTaskBtn" class="task-add-btn">添加</button>
                     </div>
                 </div>
             `;
 
+            // 自动调整所有 textarea 的高度
+            panel.querySelectorAll('.task-textarea').forEach(textarea => {
+                this.autoResizeTextarea(textarea);
+            });
+
             // 渲染完成后，再通过 JS 显式把标题填充到输入框里，避免 HTML 解析导致的显示问题
-            const titleInputs = panel.querySelectorAll('.task-item input[data-task-field="title"]');
+            const titleInputs = panel.querySelectorAll('.task-item textarea[data-task-field="title"]');
             titleInputs.forEach((input, index) => {
                 const task = tasks[index];
                 if (task && typeof task.title === 'string') {
                     input.value = task.title;
                 }
+                this.autoResizeTextarea(input);
             });
         } else {
             panel.innerHTML = '<p>请选择一个节点或关系</p>';
