@@ -282,11 +282,104 @@ class GraphEditor {
         
         if (!source || !target) return false;
         
-        const lineLength = Math.sqrt((target.x - source.x) ** 2 + (target.y - source.y) ** 2);
-        const distanceToStart = Math.sqrt((x - source.x) ** 2 + (y - source.y) ** 2);
-        const distanceToEnd = Math.sqrt((x - target.x) ** 2 + (y - target.y) ** 2);
+        // 找到同一对节点之间的所有边，计算当前边的偏移量
+        // 使用与 groupEdgesByNodePair 相同的逻辑
+        const samePairEdges = this.edges.filter(e => {
+            const key1 = e.sourceId < e.targetId 
+                ? `${e.sourceId}-${e.targetId}`
+                : `${e.targetId}-${e.sourceId}`;
+            const key2 = edge.sourceId < edge.targetId 
+                ? `${edge.sourceId}-${edge.targetId}`
+                : `${edge.targetId}-${edge.sourceId}`;
+            return key1 === key2;
+        });
         
-        return Math.abs(distanceToStart + distanceToEnd - lineLength) < 10;
+        // 按ID排序，确保顺序一致
+        samePairEdges.sort((a, b) => (a.id || 0) - (b.id || 0));
+        
+        const edgeIndex = samePairEdges.findIndex(e => e.id === edge.id);
+        if (edgeIndex === -1) return false;
+        
+        const offset = this.calculateEdgeOffsetForPair(samePairEdges, edgeIndex);
+        
+        // 计算起点和终点（在节点边缘）
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const angle = Math.atan2(dy, dx);
+        const perpAngle = angle + Math.PI / 2;
+        
+        const sourceX = source.x + Math.cos(angle) * source.radius;
+        const sourceY = source.y + Math.sin(angle) * source.radius;
+        const targetX = target.x - Math.cos(angle) * target.radius;
+        const targetY = target.y - Math.sin(angle) * target.radius;
+        
+        if (offset === 0) {
+            // 直线：计算点到直线的距离
+            const A = targetY - sourceY;
+            const B = sourceX - targetX;
+            const C = targetX * sourceY - sourceX * targetY;
+            
+            const distance = Math.abs(A * x + B * y + C) / Math.sqrt(A * A + B * B);
+            
+            // 检查点是否在线段范围内
+            const lineLength = Math.sqrt((targetX - sourceX) ** 2 + (targetY - sourceY) ** 2);
+            const distToStart = Math.sqrt((x - sourceX) ** 2 + (y - sourceY) ** 2);
+            const distToEnd = Math.sqrt((x - targetX) ** 2 + (y - targetY) ** 2);
+            const onSegment = distToStart + distToEnd <= lineLength + 5;
+            
+            return distance < 8 && onSegment;
+        } else {
+            // 弧线：计算点到二次贝塞尔曲线的距离
+            // 使用统一的垂直方向（基于标准化的节点对）
+            let unifiedPerpAngle = perpAngle;
+            if (samePairEdges.length > 1) {
+                const minId = Math.min(edge.sourceId, edge.targetId);
+                const maxId = Math.max(edge.sourceId, edge.targetId);
+                const node1 = this.nodes.find(n => n.id === minId);
+                const node2 = this.nodes.find(n => n.id === maxId);
+                if (node1 && node2) {
+                    const unifiedDx = node2.x - node1.x;
+                    const unifiedDy = node2.y - node1.y;
+                    const unifiedAngle = Math.atan2(unifiedDy, unifiedDx);
+                    unifiedPerpAngle = unifiedAngle + Math.PI / 2;
+                }
+            }
+            
+            const midX = (sourceX + targetX) / 2;
+            const midY = (sourceY + targetY) / 2;
+            const controlX = midX + Math.cos(unifiedPerpAngle) * offset;
+            const controlY = midY + Math.sin(unifiedPerpAngle) * offset;
+            
+            // 采样曲线上的点，计算最小距离
+            let minDistance = Infinity;
+            const samples = 50; // 采样点数
+            
+            for (let i = 0; i <= samples; i++) {
+                const t = i / samples;
+                // 二次贝塞尔曲线：B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
+                const curveX = (1 - t) * (1 - t) * sourceX + 2 * (1 - t) * t * controlX + t * t * targetX;
+                const curveY = (1 - t) * (1 - t) * sourceY + 2 * (1 - t) * t * controlY + t * t * targetY;
+                
+                const dist = Math.sqrt((x - curveX) ** 2 + (y - curveY) ** 2);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                }
+            }
+            
+            return minDistance < 10; // 10像素的点击容差（弧线需要稍大的容差）
+        }
+    }
+    
+    // 为同一对节点的边计算偏移量
+    calculateEdgeOffsetForPair(edges, index) {
+        const totalEdges = edges.length;
+        if (totalEdges === 1) {
+            return 0;
+        }
+        
+        const spacing = 40; // 与 calculateEdgeOffset 保持一致
+        const offset = (index - (totalEdges - 1) / 2) * spacing;
+        return offset;
     }
     
     showNodeModal(node = null) {
@@ -584,8 +677,81 @@ class GraphEditor {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        this.edges.forEach(edge => this.drawEdge(edge));
+        // 按节点对分组边，以便处理多条边的情况
+        const edgeGroups = this.groupEdgesByNodePair();
+        
+        // 绘制所有边
+        edgeGroups.forEach(group => {
+            // 计算统一的垂直方向（基于标准化的节点对）
+            // 使用较小的节点ID作为起点，较大的作为终点，计算统一的垂直方向
+            const node1 = this.nodes.find(n => n.id === group.sourceId);
+            const node2 = this.nodes.find(n => n.id === group.targetId);
+            
+            let unifiedPerpAngle = null;
+            if (node1 && node2 && group.edges.length > 1) {
+                // 计算从 node1 到 node2 的角度
+                const unifiedDx = node2.x - node1.x;
+                const unifiedDy = node2.y - node1.y;
+                const unifiedAngle = Math.atan2(unifiedDy, unifiedDx);
+                // 统一的垂直方向
+                unifiedPerpAngle = unifiedAngle + Math.PI / 2;
+            }
+            
+            // 同一对节点间的所有边，按顺序分配不同的偏移量
+            // 使用统一的垂直方向，确保所有弧线向同一个方向弯曲
+            group.edges.forEach((edge, index) => {
+                const offset = this.calculateEdgeOffset(group, index);
+                this.drawEdge(edge, offset, group.edges.length, unifiedPerpAngle);
+            });
+        });
+        
         this.nodes.forEach(node => this.drawNode(node));
+    }
+    
+    // 按节点对分组边
+    groupEdgesByNodePair() {
+        const groups = new Map();
+        
+        this.edges.forEach(edge => {
+            // 创建标准化的键（较小的ID在前，确保同一对节点被归为一组）
+            const key = edge.sourceId < edge.targetId 
+                ? `${edge.sourceId}-${edge.targetId}`
+                : `${edge.targetId}-${edge.sourceId}`;
+            
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    sourceId: edge.sourceId < edge.targetId ? edge.sourceId : edge.targetId,
+                    targetId: edge.sourceId < edge.targetId ? edge.targetId : edge.sourceId,
+                    edges: []
+                });
+            }
+            
+            groups.get(key).edges.push(edge);
+        });
+        
+        // 对每组中的边按ID排序，确保顺序一致
+        groups.forEach(group => {
+            group.edges.sort((a, b) => (a.id || 0) - (b.id || 0));
+        });
+        
+        return Array.from(groups.values());
+    }
+    
+    // 计算边的偏移量
+    calculateEdgeOffset(group, index) {
+        const totalEdges = group.edges.length;
+        if (totalEdges === 1) {
+            return 0; // 只有一条边，不需要偏移
+        }
+        
+        // 边之间的间隔（像素）- 对于弧线，使用更大的间隔
+        const spacing = 50;
+        // 当前边的偏移量（从中心向两侧分布）
+        // 例如：3条边时，偏移量为 -50, 0, 50
+        // 例如：2条边时，偏移量为 -25, 25
+        const offset = (index - (totalEdges - 1) / 2) * spacing;
+        
+        return offset;
     }
     
     drawNode(node) {
@@ -614,7 +780,7 @@ class GraphEditor {
         }
     }
     
-    drawEdge(edge) {
+    drawEdge(edge, offset = 0, totalEdgesInGroup = 1, unifiedPerpAngle = null) {
         const source = this.nodes.find(n => n.id === edge.sourceId);
         const target = this.nodes.find(n => n.id === edge.targetId);
         
@@ -625,48 +791,131 @@ class GraphEditor {
         const length = Math.sqrt(dx * dx + dy * dy);
         
         const angle = Math.atan2(dy, dx);
+        
+        // 计算起点和终点（在节点边缘）
         const sourceX = source.x + Math.cos(angle) * source.radius;
         const sourceY = source.y + Math.sin(angle) * source.radius;
         const targetX = target.x - Math.cos(angle) * target.radius;
         const targetY = target.y - Math.sin(angle) * target.radius;
         
-        this.ctx.beginPath();
-        this.ctx.moveTo(sourceX, sourceY);
-        this.ctx.lineTo(targetX, targetY);
-        this.ctx.strokeStyle = edge.color;
-        this.ctx.lineWidth = this.selectedEdge === edge ? 4 : 2;
-        this.ctx.stroke();
+        // 使用统一的垂直方向（如果提供），否则使用当前边的垂直方向
+        const perpAngle = unifiedPerpAngle !== null ? unifiedPerpAngle : (angle + Math.PI / 2);
         
+        let pathPoints = [];
+        let arrowAngle = angle;
+        
+        if (totalEdgesInGroup === 1 || offset === 0) {
+            // 单条边，绘制直线
+            this.ctx.beginPath();
+            this.ctx.moveTo(sourceX, sourceY);
+            this.ctx.lineTo(targetX, targetY);
+            this.ctx.strokeStyle = edge.color;
+            this.ctx.lineWidth = this.selectedEdge === edge ? 4 : 2;
+            this.ctx.stroke();
+            
+            pathPoints = [
+                { x: sourceX, y: sourceY },
+                { x: targetX, y: targetY }
+            ];
+        } else {
+            // 多条边，绘制弧线
+            // 计算弧线的控制点（在统一的垂直方向上）
+            const midX = (sourceX + targetX) / 2;
+            const midY = (sourceY + targetY) / 2;
+            
+            // 控制点在统一的垂直方向上，使用偏移量作为控制点位置
+            // 所有弧线使用相同的垂直方向，但由于起点和终点不同，不会重叠
+            const controlX = midX + Math.cos(perpAngle) * offset;
+            const controlY = midY + Math.sin(perpAngle) * offset;
+            
+            // 使用二次贝塞尔曲线绘制弧线
+            this.ctx.beginPath();
+            this.ctx.moveTo(sourceX, sourceY);
+            this.ctx.quadraticCurveTo(controlX, controlY, targetX, targetY);
+            this.ctx.strokeStyle = edge.color;
+            this.ctx.lineWidth = this.selectedEdge === edge ? 4 : 2;
+            this.ctx.stroke();
+            
+            // 计算弧线在终点的切线方向（用于绘制箭头）
+            // 二次贝塞尔曲线在终点的切线方向是从控制点到终点的方向
+            arrowAngle = Math.atan2(targetY - controlY, targetX - controlX);
+            
+            // 保存路径点用于点击检测
+            pathPoints = [
+                { x: sourceX, y: sourceY },
+                { x: controlX, y: controlY },
+                { x: targetX, y: targetY }
+            ];
+        }
+        
+        // 绘制箭头
         const arrowSize = 10;
-        const arrowAngle = Math.PI / 6;
+        const arrowAngleRad = Math.PI / 6;
         
         this.ctx.beginPath();
         this.ctx.moveTo(targetX, targetY);
         this.ctx.lineTo(
-            targetX - arrowSize * Math.cos(angle - arrowAngle),
-            targetY - arrowSize * Math.sin(angle - arrowAngle)
+            targetX - arrowSize * Math.cos(arrowAngle - arrowAngleRad),
+            targetY - arrowSize * Math.sin(arrowAngle - arrowAngleRad)
         );
         this.ctx.lineTo(
-            targetX - arrowSize * Math.cos(angle + arrowAngle),
-            targetY - arrowSize * Math.sin(angle + arrowAngle)
+            targetX - arrowSize * Math.cos(arrowAngle + arrowAngleRad),
+            targetY - arrowSize * Math.sin(arrowAngle + arrowAngleRad)
         );
         this.ctx.closePath();
         this.ctx.fillStyle = edge.color;
         this.ctx.fill();
         
-        const midX = (sourceX + targetX) / 2;
-        const midY = (sourceY + targetY) / 2;
+        // 计算标签位置
+        let labelX, labelY;
         
-        this.ctx.fillStyle = edge.color;
+        if (offset === 0) {
+            // 直线：标签在中心
+            labelX = (sourceX + targetX) / 2;
+            labelY = (sourceY + targetY) / 2;
+        } else {
+            // 弧线：标签在控制点附近，稍微偏移以避免与线重叠
+            const midX = (sourceX + targetX) / 2;
+            const midY = (sourceY + targetY) / 2;
+            const labelOffset = offset > 0 ? 20 : -20;
+            labelX = midX + Math.cos(perpAngle) * (offset + labelOffset);
+            labelY = midY + Math.sin(perpAngle) * (offset + labelOffset);
+        }
+        
+        // 绘制标签背景（白色半透明，提高可读性）
         this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.fillText(edge.label, midX, midY - 5);
+        const textMetrics = this.ctx.measureText(edge.label);
+        const textWidth = textMetrics.width;
+        const textHeight = 12;
         
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.fillRect(
+            labelX - textWidth / 2 - 4,
+            labelY - textHeight / 2 - 2,
+            textWidth + 8,
+            textHeight + 4
+        );
+        
+        // 绘制标签文字
+        this.ctx.fillStyle = edge.color;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(edge.label, labelX, labelY);
+        
+        // 选中效果
         if (this.selectedEdge === edge) {
             this.ctx.beginPath();
-            this.ctx.moveTo(sourceX, sourceY);
-            this.ctx.lineTo(targetX, targetY);
+            if (offset === 0) {
+                this.ctx.moveTo(sourceX, sourceY);
+                this.ctx.lineTo(targetX, targetY);
+            } else {
+                const midX = (sourceX + targetX) / 2;
+                const midY = (sourceY + targetY) / 2;
+                const controlX = midX + Math.cos(perpAngle) * offset;
+                const controlY = midY + Math.sin(perpAngle) * offset;
+                this.ctx.moveTo(sourceX, sourceY);
+                this.ctx.quadraticCurveTo(controlX, controlY, targetX, targetY);
+            }
             this.ctx.strokeStyle = '#667eea';
             this.ctx.lineWidth = 6;
             this.ctx.globalAlpha = 0.3;
