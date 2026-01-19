@@ -201,9 +201,34 @@ class GraphEditor {
         
         document.getElementById('propertiesContent').addEventListener('input', this.handlePropertyChange.bind(this));
         document.getElementById('propertiesContent').addEventListener('change', this.handlePropertyChange.bind(this));
+        document.getElementById('propertiesContent').addEventListener('click', this.handleTaskClick.bind(this));
     }
     
     handlePropertyChange(e) {
+        // 处理关系的事项清单字段
+        const taskField = e.target.dataset.taskField;
+        if (taskField && this.selectedEdge) {
+            if (!Array.isArray(this.selectedEdge.tasks)) {
+                this.selectedEdge.tasks = [];
+            }
+            const itemEl = e.target.closest('.task-item');
+            if (!itemEl) return;
+            const index = parseInt(itemEl.dataset.taskIndex, 10);
+            if (Number.isNaN(index) || !this.selectedEdge.tasks[index]) return;
+            const task = this.selectedEdge.tasks[index];
+            
+            if (taskField === 'title') {
+                task.title = e.target.value;
+            } else if (taskField === 'done') {
+                task.done = !!e.target.checked;
+            }
+            
+            this.saveEdge(this.selectedEdge);
+            this.updatePropertiesPanel();
+            this.render();
+            return;
+        }
+
         const prop = e.target.dataset.prop;
         if (!prop) return;
         
@@ -214,6 +239,51 @@ class GraphEditor {
         } else if (this.selectedEdge) {
             this.selectedEdge[prop] = e.target.value;
             this.saveEdge(this.selectedEdge);
+            this.render();
+        }
+    }
+
+    handleTaskClick(e) {
+        if (!this.selectedEdge) return;
+
+        // 新增事项
+        if (e.target.id === 'addTaskBtn') {
+            const input = document.getElementById('newTaskTitle');
+            if (!input) return;
+            const title = input.value.trim();
+            if (!title) return;
+
+            if (!Array.isArray(this.selectedEdge.tasks)) {
+                this.selectedEdge.tasks = [];
+            }
+
+            this.selectedEdge.tasks.push({
+                id: Date.now(),
+                title,
+                done: false
+            });
+
+            input.value = '';
+            this.saveEdge(this.selectedEdge);
+            this.updatePropertiesPanel();
+            this.render();
+            return;
+        }
+
+        // 删除事项
+        if (e.target.dataset.taskAction === 'delete') {
+            const itemEl = e.target.closest('.task-item');
+            if (!itemEl) return;
+            const index = parseInt(itemEl.dataset.taskIndex, 10);
+            if (Number.isNaN(index)) return;
+
+            if (!Array.isArray(this.selectedEdge.tasks)) {
+                this.selectedEdge.tasks = [];
+            }
+
+            this.selectedEdge.tasks.splice(index, 1);
+            this.saveEdge(this.selectedEdge);
+            this.updatePropertiesPanel();
             this.render();
         }
     }
@@ -822,31 +892,50 @@ class GraphEditor {
         } else if (this.selectedEdge) {
             const source = this.nodes.find(n => n.id === this.selectedEdge.sourceId);
             const target = this.nodes.find(n => n.id === this.selectedEdge.targetId);
+            const tasks = Array.isArray(this.selectedEdge.tasks) ? this.selectedEdge.tasks : [];
+            console.log('关系属性面板 - 当前关系任务列表:', this.selectedEdge.id, tasks);
             
             panel.innerHTML = `
                 <div class="property-group">
-                    <label>关系ID:</label>
-                    <input type="text" value="${this.selectedEdge.id}" readonly>
+                    <label>源 / 目标节点:</label>
+                    <div class="property-inline-row">
+                        <input type="text" value="${source ? source.name : '未知'}" readonly>
+                        <span class="property-inline-arrow">→</span>
+                        <input type="text" value="${target ? target.name : '未知'}" readonly>
+                    </div>
                 </div>
                 <div class="property-group">
-                    <label>源节点:</label>
-                    <input type="text" value="${source ? source.name : '未知'}" readonly>
+                    <label>关系名称:</label>
+                    <div class="property-inline-row">
+                        <input type="text" id="propLabel" value="${this.selectedEdge.label}" data-prop="label">
+                        <input type="color" id="propEdgeColor" value="${this.selectedEdge.color}" data-prop="color" class="inline-color-input">
+                    </div>
                 </div>
                 <div class="property-group">
-                    <label>目标节点:</label>
-                    <input type="text" value="${target ? target.name : '未知'}" readonly>
+                    <label>事项清单:</label>
+                    <div class="task-list">
+                        ${tasks.map((task, index) => `
+                            <div class="task-item" data-task-index="${index}">
+                                <input type="text" data-task-field="title" value="" placeholder="事项内容">
+                                <button type="button" class="task-delete-btn" data-task-action="delete">删</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="task-add">
+                        <input type="text" id="newTaskTitle" placeholder="新增事项...">
+                        <button type="button" id="addTaskBtn" class="task-add-btn">添加</button>
+                    </div>
                 </div>
-                <div class="property-group">
-                    <label>关系标签:</label>
-                    <input type="text" id="propLabel" value="${this.selectedEdge.label}" data-prop="label">
-                </div>
-                <div class="property-group">
-                    <label>关系颜色:</label>
-                    <input type="color" id="propEdgeColor" value="${this.selectedEdge.color}" data-prop="color">
-                </div>
-                <p style="color: #666; font-size: 12px; margin-top: 10px;">💡 按 Delete 键删除关系</p>
-                
             `;
+
+            // 渲染完成后，再通过 JS 显式把标题填充到输入框里，避免 HTML 解析导致的显示问题
+            const titleInputs = panel.querySelectorAll('.task-item input[data-task-field="title"]');
+            titleInputs.forEach((input, index) => {
+                const task = tasks[index];
+                if (task && typeof task.title === 'string') {
+                    input.value = task.title;
+                }
+            });
         } else {
             panel.innerHTML = '<p>请选择一个节点或关系</p>';
         }
@@ -1116,7 +1205,8 @@ class GraphEditor {
             // 弧线：标签在控制点附近，稍微偏移以避免与线重叠
             const midX = (sourceX + targetX) / 2;
             const midY = (sourceY + targetY) / 2;
-            const labelOffset = offset > 0 ? 20 : -20;
+            // 让标签更靠近弧线：减小与弧线的额外偏移量
+            const labelOffset = offset > 0 ? 8 : -8;
             labelX = midX + Math.cos(perpAngle) * (offset + labelOffset);
             labelY = midY + Math.sin(perpAngle) * (offset + labelOffset);
         }

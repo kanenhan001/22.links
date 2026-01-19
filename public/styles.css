@@ -117,7 +117,7 @@ body {
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    width: 280px;
+    width: 380px; /* 再加宽一些，内容更舒展 */
     position: fixed;
     right: 20px;
     top: 110px;
@@ -173,6 +173,27 @@ body {
 .property-group textarea {
     resize: vertical;
     min-height: 80px;
+}
+
+/* 源 / 目标节点同一行展示 */
+.property-inline-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.property-inline-row input[type="text"] {
+    flex: 1 1 0;
+}
+
+.property-inline-row .inline-color-input {
+    width: 46px;
+    padding: 0;
+}
+
+.property-inline-arrow {
+    font-size: 12px;
+    color: #999;
 }
 
 .btn-delete {
@@ -333,6 +354,75 @@ body {
 
 .selected {
     filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.8));
+}
+
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: #fafafa;
+    border-radius: 6px;
+    border: 1px solid #eee;
+}
+
+.task-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-item input[type="text"] {
+    flex: 1 1 auto; /* 文本输入尽量占满剩余空间 */
+    max-width: 100%;
+    padding: 4px 6px;
+    font-size: 13px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.task-delete-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    background: #fff;
+    cursor: pointer;
+}
+
+.task-delete-btn:hover {
+    background: #ffecec;
+    border-color: #ff9b9b;
+}
+
+.task-add {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.task-add input[type="text"] {
+    flex: 1;
+    padding: 4px 6px;
+    font-size: 13px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.task-add-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: none;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    cursor: pointer;
+}
+
+.task-add-btn:hover {
+    opacity: 0.9;
 }
 
 @media (max-width: 1200px) {

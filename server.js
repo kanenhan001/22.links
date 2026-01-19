@@ -60,10 +60,19 @@ async function initDatabase() {
                 targetId INTEGER,
                 label TEXT,
                 color TEXT,
+                tasks TEXT, -- 事项清单（JSON 字符串）
                 FOREIGN KEY (sourceId) REFERENCES nodes(id),
                 FOREIGN KEY (targetId) REFERENCES nodes(id)
             );
         `);
+
+        // 对于旧数据库，如果没有 tasks 字段，则尝试添加
+        try {
+            db.run('ALTER TABLE edges ADD COLUMN tasks TEXT');
+            console.log('成功为 edges 表添加 tasks 列');
+        } catch (e) {
+            console.log('edges 表的 tasks 列可能已存在:', e.message);
+        }
         console.log('表初始化完成');
         
         saveDatabase();
@@ -262,7 +271,12 @@ app.delete('/api/nodes/:id', (req, res) => {
 
 app.get('/api/edges', (req, res) => {
     try {
-        const edges = queryAll('SELECT * FROM edges ORDER BY id');
+        const edgesRaw = queryAll('SELECT * FROM edges ORDER BY id');
+        // 将 tasks 从 JSON 字符串解析为数组
+        const edges = edgesRaw.map(e => ({
+            ...e,
+            tasks: e.tasks ? JSON.parse(e.tasks) : []
+        }));
         res.json(edges);
     } catch (error) {
         console.error('获取边失败:', error);
@@ -272,11 +286,12 @@ app.get('/api/edges', (req, res) => {
 
 app.post('/api/edges', (req, res) => {
     try {
-        const { sourceId, targetId, label, color } = req.body;
-        console.log('Backend: Inserting edge:', { sourceId, targetId, label, color });
+        const { sourceId, targetId, label, color, tasks } = req.body;
+        const tasksJson = tasks ? JSON.stringify(tasks) : '[]';
+        console.log('Backend: Inserting edge:', { sourceId, targetId, label, color, tasks });
         const newId = run(
-            'INSERT INTO edges (sourceId, targetId, label, color) VALUES (?, ?, ?, ?)',
-            [sourceId, targetId, label, color]
+            'INSERT INTO edges (sourceId, targetId, label, color, tasks) VALUES (?, ?, ?, ?, ?)',
+            [sourceId, targetId, label, color, tasksJson]
         );
         
         console.log('Backend: run function returned ID for new edge:', newId);
@@ -286,8 +301,12 @@ app.post('/api/edges', (req, res) => {
             return res.status(500).json({ error: '创建边失败: 无法获取新创建的边ID' });
         }
 
-        const edge = queryOne('SELECT * FROM edges WHERE id = ?', [newId]);
+        let edge = queryOne('SELECT * FROM edges WHERE id = ?', [newId]);
         if (edge) {
+            edge = {
+                ...edge,
+                tasks: edge.tasks ? JSON.parse(edge.tasks) : []
+            };
             res.json(edge);
         } else {
             console.error('Backend: Could not find newly created edge with ID:', newId);
@@ -302,14 +321,21 @@ app.post('/api/edges', (req, res) => {
 app.put('/api/edges/:id', (req, res) => {
     try {
         const { id } = req.params;
-        const { sourceId, targetId, label, color } = req.body;
+        const { sourceId, targetId, label, color, tasks } = req.body;
+        const tasksJson = tasks ? JSON.stringify(tasks) : '[]';
         
         run(
-            'UPDATE edges SET sourceId = ?, targetId = ?, label = ?, color = ? WHERE id = ?',
-            [sourceId, targetId, label, color, id]
+            'UPDATE edges SET sourceId = ?, targetId = ?, label = ?, color = ?, tasks = ? WHERE id = ?',
+            [sourceId, targetId, label, color, tasksJson, id]
         );
         
-        const edge = queryOne('SELECT * FROM edges WHERE id = ?', [id]);
+        let edge = queryOne('SELECT * FROM edges WHERE id = ?', [id]);
+        if (edge) {
+            edge = {
+                ...edge,
+                tasks: edge.tasks ? JSON.parse(edge.tasks) : []
+            };
+        }
         res.json(edge);
     } catch (error) {
         console.error('更新边失败:', error);
