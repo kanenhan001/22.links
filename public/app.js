@@ -368,7 +368,7 @@ class GraphEditor {
                 header.innerHTML = `
                     <input type="text" class="task-list-name-input" 
                         data-prop="taskListName" 
-                        placeholder="请输入清单名称（如：目标、待办等）" 
+                        placeholder="请输入事项清单名称（如：目标、待办等）" 
                         value="${currentTitle}"
                         data-original-value="${currentTitle}">
                 `;
@@ -1082,7 +1082,7 @@ class GraphEditor {
                                 </svg>
                             </button>
                         ` : `
-                            <input type="text" class="task-list-name-input" data-prop="taskListName" placeholder="请输入清单名称（如：目标、待办等）" value="">
+                            <input type="text" class="task-list-name-input" data-prop="taskListName" placeholder="请输入事项清单名称（如：目标、待办等）" value="">
                         `}
                     </div>
                     <div class="task-list" id="nodeTaskList">
