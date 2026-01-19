@@ -182,13 +182,16 @@ body {
     gap: 6px;
 }
 
-.property-inline-row input[type="text"] {
+.property-inline-row input[type="text"],
+.property-inline-row select {
     flex: 1 1 0;
+    min-width: 0;
 }
 
 .property-inline-row .inline-color-input {
     width: 46px;
     padding: 0;
+    flex: none;
 }
 
 .property-inline-arrow {
@@ -441,6 +444,89 @@ body {
 
 .task-add-btn:hover {
     opacity: 0.9;
+}
+
+/* 发出的关系列表样式 */
+.outgoing-edges-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: #fafafa;
+    border-radius: 6px;
+    border: 1px solid #eee;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.outgoing-edge-item {
+    padding: 6px 8px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #eee;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.outgoing-edge-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+}
+
+.outgoing-edge-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.edge-arrow {
+    color: #999;
+    font-weight: bold;
+}
+
+.edge-target {
+    font-weight: 500;
+    color: #333;
+}
+
+.edge-label {
+    color: #666;
+}
+
+.edge-task-count {
+    font-size: 12px;
+    color: #667eea;
+    font-weight: 500;
+}
+
+.edge-tasks-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-left: 16px;
+    font-size: 12px;
+}
+
+.task-preview-item {
+    color: #555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 2px 0;
+}
+
+.task-preview-item.done {
+    color: #999;
+    text-decoration: line-through;
+}
+
+.task-more {
+    color: #999;
+    font-size: 11px;
+    font-style: italic;
 }
 
 @media (max-width: 1200px) {

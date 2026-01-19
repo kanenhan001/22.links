@@ -275,6 +275,22 @@ class GraphEditor {
     }
 
     handleTaskClick(e) {
+        // 点击发出的关系项，选中该关系
+        const outgoingEdgeItem = e.target.closest('.outgoing-edge-item');
+        if (outgoingEdgeItem) {
+            const edgeId = outgoingEdgeItem.dataset.edgeId;
+            if (edgeId) {
+                const edge = this.edges.find(ed => ed.id === parseInt(edgeId));
+                if (edge) {
+                    this.selectedEdge = edge;
+                    this.selectedNode = null;
+                    this.updatePropertiesPanel();
+                    this.render();
+                }
+            }
+            return;
+        }
+
         if (!this.selectedEdge) return;
 
         // 新增事项
@@ -903,27 +919,51 @@ class GraphEditor {
         const panel = document.getElementById('propertiesContent');
         
         if (this.selectedNode) {
+            // 找出所有从当前节点发出的关系
+            const outgoingEdges = this.edges.filter(e => e.sourceId === this.selectedNode.id);
+            
             panel.innerHTML = `
                 <div class="property-group">
-                    <label>节点ID:</label>
-                    <input type="text" value="${this.selectedNode.id}" readonly>
+                    <label>基本信息:</label>
+                    <div class="property-inline-row">
+                        <input type="text" id="propName" value="${this.selectedNode.name}" data-prop="name" placeholder="名称">
+                        <select id="propType" data-prop="type">
+                            <option value="person" ${this.selectedNode.type === 'person' ? 'selected' : ''}>人物</option>
+                            <option value="organization" ${this.selectedNode.type === 'organization' ? 'selected' : ''}>组织</option>
+                            <option value="event" ${this.selectedNode.type === 'event' ? 'selected' : ''}>事件</option>
+                            <option value="concept" ${this.selectedNode.type === 'concept' ? 'selected' : ''}>概念</option>
+                        </select>
+                        <input type="color" id="propColor" value="${this.selectedNode.color}" data-prop="color" class="inline-color-input">
+                    </div>
                 </div>
                 <div class="property-group">
-                    <label>节点名称:</label>
-                    <input type="text" id="propName" value="${this.selectedNode.name}" data-prop="name">
-                </div>
-                <div class="property-group">
-                    <label>节点类型:</label>
-                    <select id="propType" data-prop="type">
-                        <option value="person" ${this.selectedNode.type === 'person' ? 'selected' : ''}>人物</option>
-                        <option value="organization" ${this.selectedNode.type === 'organization' ? 'selected' : ''}>组织</option>
-                        <option value="event" ${this.selectedNode.type === 'event' ? 'selected' : ''}>事件</option>
-                        <option value="concept" ${this.selectedNode.type === 'concept' ? 'selected' : ''}>概念</option>
-                    </select>
-                </div>
-                <div class="property-group">
-                    <label>节点颜色:</label>
-                    <input type="color" id="propColor" value="${this.selectedNode.color}" data-prop="color">
+                    <label>发出的关系 (${outgoingEdges.length}):</label>
+                    ${outgoingEdges.length > 0 ? `
+                        <div class="outgoing-edges-list">
+                            ${outgoingEdges.map(edge => {
+                                const targetNode = this.nodes.find(n => n.id === edge.targetId);
+                                const tasks = Array.isArray(edge.tasks) ? edge.tasks : [];
+                                return `
+                                    <div class="outgoing-edge-item" data-edge-id="${edge.id}">
+                                        <div class="outgoing-edge-header">
+                                            <span class="edge-arrow">→</span>
+                                            <span class="edge-target">${targetNode ? targetNode.name : '未知'}</span>
+                                            <span class="edge-label">${edge.label}</span>
+                                            ${tasks.length > 0 ? `<span class="edge-task-count">(${tasks.length})</span>` : ''}
+                                        </div>
+                                        ${tasks.length > 0 ? `
+                                            <div class="edge-tasks-preview">
+                                                ${tasks.slice(0, 3).map(task => `
+                                                    <span class="task-preview-item ${task.done ? 'done' : ''}">${task.title}</span>
+                                                `).join('')}
+                                                ${tasks.length > 3 ? `<span class="task-more">+${tasks.length - 3}更多</span>` : ''}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    ` : '<p style="color: #999; font-size: 13px;">暂无发出的关系</p>'}
                 </div>
                 <p style="color: #666; font-size: 12px; margin-top: 10px;">💡 按 Delete 键删除选中项</p>
                 
