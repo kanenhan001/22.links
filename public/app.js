@@ -12,6 +12,15 @@ class GraphEditor {
         this.creatingEdge = false;
         this.edgeSourceNode = null;
         this.edgeMousePos = { x: 0, y: 0 };
+        // 拖拽边的状态
+        this.draggingEdge = null;
+        this.edgeDragOffset = { x: 0, y: 0 };
+        this.edgeDragStartPos = { x: 0, y: 0 };
+        this.edgeDragTempTarget = null;
+        // 拖拽转折点的状态
+        this.draggingBendPoint = null;
+        this.bendPointIndex = -1;
+        this.bendPointEdge = null;
     }
     
     static async create() {
@@ -517,11 +526,11 @@ class GraphEditor {
         this.render();
     }
     
-    handleCanvasDoubleClick(e) {
+    async handleCanvasDoubleClick(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
+
         // 检查双击是否发生在节点上
         for (let node of this.nodes) {
             if (this.isPointInNode(x, y, node)) {
@@ -534,13 +543,48 @@ class GraphEditor {
                 return;
             }
         }
+
+        // 检查双击是否发生在边上（添加转折点）
+        for (let edge of this.edges) {
+            if (this.isPointOnEdge(x, y, edge)) {
+                // 选中这条边
+                this.selectedEdge = edge;
+                this.selectedNode = null;
+                this.updatePropertiesPanel();
+
+                // 添加转折点
+                if (!edge.bendPoints) {
+                    edge.bendPoints = [];
+                }
+
+                // 计算中点作为新的转折点位置
+                const source = this.nodes.find(n => n.id === edge.sourceId);
+                const target = this.nodes.find(n => n.id === edge.targetId);
+                if (source && target) {
+                    const newBendPoint = {
+                        x: (source.x + target.x) / 2,
+                        y: (source.y + target.y) / 2
+                    };
+                    edge.bendPoints.push(newBendPoint);
+                    this.showStatus('已添加转折点，请拖拽调整位置（双击其他位置完成）');
+                    // 立刻保存一次，避免“只添加不拖拽”时刷新丢失
+                    try {
+                        await this.saveEdge(edge);
+                    } catch (err) {
+                        console.error('保存转折点失败:', err);
+                    }
+                    this.render();
+                }
+                return;
+            }
+        }
     }
     
     handleMouseDown(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
+
         // 如果正在创建关系模式，不处理节点拖拽（只处理选择目标节点）
         if (this.creatingEdge) {
             // 更新鼠标位置，用于绘制临时线
@@ -548,7 +592,35 @@ class GraphEditor {
             this.render();
             return;
         }
-        
+
+        // 检查是否点击在转折点上（拖拽转折点）
+        if (this.selectedEdge) {
+            const bendPointHit = this.isPointOnBendPoint(x, y, this.selectedEdge);
+            if (bendPointHit) {
+                this.draggingBendPoint = this.selectedEdge;
+                this.bendPointIndex = bendPointHit.index;
+                this.bendPointEdge = this.selectedEdge;
+                this.edgeDragOffset = { x: x - bendPointHit.point.x, y: y - bendPointHit.point.y };
+                this.render();
+                return;
+            }
+        }
+
+        // 检查是否点击在边上
+        for (let edge of this.edges) {
+            if (this.isPointOnEdge(x, y, edge)) {
+                this.draggingEdge = edge;
+                this.edgeDragStartPos = { x, y };
+                this.edgeDragTempTarget = null;
+                // 选中这条边
+                this.selectedEdge = edge;
+                this.selectedNode = null;
+                this.updatePropertiesPanel();
+                this.render();
+                return;
+            }
+        }
+
         // 正常的拖拽节点
         for (let node of this.nodes) {
             if (this.isPointInNode(x, y, node)) {
@@ -563,14 +635,42 @@ class GraphEditor {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
+
         // 如果正在创建关系，更新鼠标位置并重绘临时线
         if (this.creatingEdge && this.edgeSourceNode) {
             this.edgeMousePos = { x, y };
             this.render();
             return;
         }
-        
+
+        // 拖拽转折点
+        if (this.draggingBendPoint && this.bendPointEdge) {
+            const bendPoints = this.bendPointEdge.bendPoints || [];
+            if (bendPoints[this.bendPointIndex]) {
+                bendPoints[this.bendPointIndex] = { x, y };
+            }
+            this.render();
+            return;
+        }
+
+        // 拖拽边时更新预览
+        if (this.draggingEdge) {
+            // 更新拖拽位置
+            this.edgeDragStartPos = { x, y };
+            // 检查是否悬停在某个节点上
+            this.edgeDragTempTarget = null;
+            for (let node of this.nodes) {
+                if (this.isPointInNode(x, y, node)) {
+                    // 不能连接到边的原始目标节点
+                    if (node.id !== this.draggingEdge.targetId && node.id !== this.draggingEdge.sourceId) {
+                        this.edgeDragTempTarget = node;
+                    }
+                }
+            }
+            this.render();
+            return;
+        }
+
         // 正常的拖拽节点
         if (this.draggingNode) {
             this.draggingNode.x = x - this.dragOffset.x;
@@ -585,7 +685,7 @@ class GraphEditor {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
+
             for (let node of this.nodes) {
                 if (node !== this.edgeSourceNode && this.isPointInNode(x, y, node)) {
                     // 释放在目标节点上，创建关系
@@ -594,11 +694,58 @@ class GraphEditor {
                     return;
                 }
             }
-            
+
             // 如果释放在空白处，保持创建关系模式，允许用户继续拖拽
             // 用户可以通过ESC键或点击空白处取消
         }
-        
+
+        // 拖拽转折点结束
+        if (this.draggingBendPoint && this.bendPointEdge) {
+            try {
+                // 保存转折点数据到后端
+                await this.saveEdge(this.bendPointEdge);
+                this.showStatus('转折点已保存');
+            } finally {
+                // 无论保存是否成功，都要清理状态，否则会导致无法二次拖拽
+                this.draggingBendPoint = null;
+                this.bendPointIndex = -1;
+                this.bendPointEdge = null;
+            }
+            return;
+        }
+
+        // 拖拽边结束，重连到新目标
+        if (this.draggingEdge && this.edgeDragTempTarget) {
+            const edge = this.draggingEdge;
+            const oldTargetId = edge.targetId;
+            const newTargetId = this.edgeDragTempTarget.id;
+
+            // 更新边的目标节点
+            edge.targetId = newTargetId;
+
+            // 保存到后端
+            await this.saveEdge(edge);
+
+            const sourceNode = this.nodes.find(n => n.id === edge.sourceId);
+            const newTargetNode = this.nodes.find(n => n.id === newTargetId);
+
+            this.showStatus(`已重连关系：${sourceNode.name} -> ${newTargetNode.name}`);
+
+            // 清除拖拽状态
+            this.draggingEdge = null;
+            this.edgeDragTempTarget = null;
+            this.render();
+            return;
+        }
+
+        // 清除拖拽边状态（如果没有重连）
+        if (this.draggingEdge) {
+            this.draggingEdge = null;
+            this.edgeDragTempTarget = null;
+            this.render();
+            return;
+        }
+
         // 正常的拖拽节点结束
         if (this.draggingNode) {
             await this.saveNode(this.draggingNode);
@@ -632,12 +779,77 @@ class GraphEditor {
         return distance <= node.radius;
     }
     
+    // 辅助函数：计算点到线段的距离
+    pointToLineSegmentDistance(px, py, x1, y1, x2, y2) {
+        const A = px - x1;
+        const B = py - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+        
+        if (lenSq !== 0) {
+            param = dot / lenSq;
+        }
+        
+        let xx, yy;
+        
+        if (param < 0) {
+            xx = x1;
+            yy = y1;
+        } else if (param > 1) {
+            xx = x2;
+            yy = y2;
+        } else {
+            xx = x1 + param * C;
+            yy = y1 + param * D;
+        }
+        
+        const dx = px - xx;
+        const dy = py - yy;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
     isPointOnEdge(x, y, edge) {
         const source = this.nodes.find(n => n.id === edge.sourceId);
         const target = this.nodes.find(n => n.id === edge.targetId);
         
         if (!source || !target) return false;
         
+        // 获取转折点数组
+        const bendPoints = Array.isArray(edge.bendPoints) ? edge.bendPoints : [];
+        
+        // 如果有转折点，检查是否在折线的任意一段上
+        if (bendPoints.length > 0) {
+            // 计算起点和终点（在节点边缘）
+            const dx = target.x - source.x;
+            const dy = target.y - source.y;
+            const angle = Math.atan2(dy, dx);
+            
+            const sourceX = source.x + Math.cos(angle) * source.radius;
+            const sourceY = source.y + Math.sin(angle) * source.radius;
+            const targetX = target.x - Math.cos(angle) * target.radius;
+            const targetY = target.y - Math.sin(angle) * target.radius;
+            
+            // 构建路径点数组
+            const pathPoints = [{ x: sourceX, y: sourceY }, ...bendPoints, { x: targetX, y: targetY }];
+            
+            // 检查点击是否在任意一段线段上
+            const hitRadius = 10; // 点击容差
+            for (let i = 0; i < pathPoints.length - 1; i++) {
+                const p1 = pathPoints[i];
+                const p2 = pathPoints[i + 1];
+                const distance = this.pointToLineSegmentDistance(x, y, p1.x, p1.y, p2.x, p2.y);
+                if (distance < hitRadius) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // 没有转折点时，使用原来的逻辑（直线或弧线）
         // 找到同一对节点之间的所有边，计算当前边的偏移量
         // 使用与 groupEdgesByNodePair 相同的逻辑
         const samePairEdges = this.edges.filter(e => {
@@ -725,7 +937,22 @@ class GraphEditor {
             return minDistance < 10; // 10像素的点击容差（弧线需要稍大的容差）
         }
     }
-    
+
+    // 检测点是否在转折点上
+    isPointOnBendPoint(x, y, edge) {
+        const bendPoints = Array.isArray(edge.bendPoints) ? edge.bendPoints : [];
+        const hitRadius = 10;
+
+        for (let i = 0; i < bendPoints.length; i++) {
+            const bp = bendPoints[i];
+            const dist = Math.sqrt((x - bp.x) ** 2 + (y - bp.y) ** 2);
+            if (dist < hitRadius) {
+                return { index: i, point: bp };
+            }
+        }
+        return null;
+    }
+
     // 为同一对节点的边计算偏移量
     calculateEdgeOffsetForPair(edges, index) {
         const totalEdges = edges.length;
@@ -1240,7 +1467,22 @@ class GraphEditor {
         if (this.creatingEdge && this.edgeSourceNode) {
             this.drawTemporaryEdge(this.edgeSourceNode, this.edgeMousePos);
         }
-        
+
+        // 绘制拖拽边时的预览线
+        if (this.draggingEdge && this.edgeDragTempTarget) {
+            // 从拖拽边的源节点或目标节点到新目标节点绘制预览线
+            const source = this.nodes.find(n => n.id === this.draggingEdge.sourceId);
+            const target = this.nodes.find(n => n.id === this.draggingEdge.targetId);
+            const newTarget = this.edgeDragTempTarget;
+
+            if (source && newTarget) {
+                this.drawTemporaryEdge(source, {
+                    x: newTarget.x,
+                    y: newTarget.y
+                });
+            }
+        }
+
         this.nodes.forEach(node => this.drawNode(node));
     }
     
@@ -1362,75 +1604,52 @@ class GraphEditor {
     drawEdge(edge, offset = 0, totalEdgesInGroup = 1, unifiedPerpAngle = null) {
         const source = this.nodes.find(n => n.id === edge.sourceId);
         const target = this.nodes.find(n => n.id === edge.targetId);
-        
+
         if (!source || !target) return;
-        
+
         const dx = target.x - source.x;
         const dy = target.y - source.y;
         const length = Math.sqrt(dx * dx + dy * dy);
-        
+
         const angle = Math.atan2(dy, dx);
-        
+
         // 计算起点和终点（在节点边缘）
         const sourceX = source.x + Math.cos(angle) * source.radius;
         const sourceY = source.y + Math.sin(angle) * source.radius;
         const targetX = target.x - Math.cos(angle) * target.radius;
         const targetY = target.y - Math.sin(angle) * target.radius;
-        
+
         // 使用统一的垂直方向（如果提供），否则使用当前边的垂直方向
         const perpAngle = unifiedPerpAngle !== null ? unifiedPerpAngle : (angle + Math.PI / 2);
-        
-        let pathPoints = [];
-        let arrowAngle = angle;
-        
-        if (totalEdgesInGroup === 1 || offset === 0) {
-            // 单条边，绘制直线
-            this.ctx.beginPath();
-            this.ctx.moveTo(sourceX, sourceY);
-            this.ctx.lineTo(targetX, targetY);
-            this.ctx.strokeStyle = edge.color;
-            this.ctx.lineWidth = this.selectedEdge === edge ? 4 : 2;
-            this.ctx.stroke();
-            
-            pathPoints = [
-                { x: sourceX, y: sourceY },
-                { x: targetX, y: targetY }
-            ];
-        } else {
-            // 多条边，绘制弧线
-            // 计算弧线的控制点（在统一的垂直方向上）
-            const midX = (sourceX + targetX) / 2;
-            const midY = (sourceY + targetY) / 2;
-            
-            // 控制点在统一的垂直方向上，使用偏移量作为控制点位置
-            // 所有弧线使用相同的垂直方向，但由于起点和终点不同，不会重叠
-            const controlX = midX + Math.cos(perpAngle) * offset;
-            const controlY = midY + Math.sin(perpAngle) * offset;
-            
-            // 使用二次贝塞尔曲线绘制弧线
-            this.ctx.beginPath();
-            this.ctx.moveTo(sourceX, sourceY);
-            this.ctx.quadraticCurveTo(controlX, controlY, targetX, targetY);
-            this.ctx.strokeStyle = edge.color;
-            this.ctx.lineWidth = this.selectedEdge === edge ? 4 : 2;
-            this.ctx.stroke();
-            
-            // 计算弧线在终点的切线方向（用于绘制箭头）
-            // 二次贝塞尔曲线在终点的切线方向是从控制点到终点的方向
-            arrowAngle = Math.atan2(targetY - controlY, targetX - controlX);
-            
-            // 保存路径点用于点击检测
-            pathPoints = [
-                { x: sourceX, y: sourceY },
-                { x: controlX, y: controlY },
-                { x: targetX, y: targetY }
-            ];
+
+        // 获取转折点数组
+        const bendPoints = Array.isArray(edge.bendPoints) ? edge.bendPoints : [];
+
+        // 构建路径点
+        const pathPoints = [{ x: sourceX, y: sourceY }, ...bendPoints, { x: targetX, y: targetY }];
+
+        // 绘制折线
+        this.ctx.beginPath();
+        this.ctx.moveTo(sourceX, sourceY);
+        for (const point of bendPoints) {
+            this.ctx.lineTo(point.x, point.y);
         }
-        
+        this.ctx.lineTo(targetX, targetY);
+        this.ctx.strokeStyle = edge.color;
+        this.ctx.lineWidth = this.selectedEdge === edge ? 4 : 2;
+        this.ctx.stroke();
+
+        // 计算终点的箭头角度（最后一段的方向）
+        let arrowAngle = angle;
+        if (bendPoints.length > 0) {
+            const lastBend = bendPoints[bendPoints.length - 1];
+            arrowAngle = Math.atan2(targetY - lastBend.y, targetX - lastBend.x);
+        }
+
         // 绘制箭头
         const arrowSize = 10;
         const arrowAngleRad = Math.PI / 6;
-        
+
         this.ctx.beginPath();
         this.ctx.moveTo(targetX, targetY);
         this.ctx.lineTo(
@@ -1444,37 +1663,33 @@ class GraphEditor {
         this.ctx.closePath();
         this.ctx.fillStyle = edge.color;
         this.ctx.fill();
-        
-        // 计算标签位置
+
+        // 计算标签位置（第一个转折点位置或中点）
         let labelX, labelY;
-        
-        if (offset === 0) {
-            // 直线：标签在中心
+
+        if (bendPoints.length > 0) {
+            // 标签在第一个转折点位置
+            labelX = bendPoints[0].x;
+            labelY = bendPoints[0].y - 15;
+        } else {
+            // 标签在中心
             labelX = (sourceX + targetX) / 2;
             labelY = (sourceY + targetY) / 2;
-        } else {
-            // 弧线：标签在控制点附近，稍微偏移以避免与线重叠
-            const midX = (sourceX + targetX) / 2;
-            const midY = (sourceY + targetY) / 2;
-            // 让标签更靠近弧线：减小与弧线的额外偏移量
-            const labelOffset = offset > 0 ? 8 : -8;
-            labelX = midX + Math.cos(perpAngle) * (offset + labelOffset);
-            labelY = midY + Math.sin(perpAngle) * (offset + labelOffset);
         }
-        
+
         // 构建标签文本：如果有关系事项，显示名称 + 事项数量
         const tasks = Array.isArray(edge.tasks) ? edge.tasks : [];
         let displayLabel = edge.label;
         if (tasks.length > 0) {
             displayLabel = `${edge.label} (${tasks.length})`;
         }
-        
+
         // 绘制标签背景（白色半透明，提高可读性）
         this.ctx.font = '12px Arial';
         const textMetrics = this.ctx.measureText(displayLabel);
         const textWidth = textMetrics.width;
         const textHeight = 12;
-        
+
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         this.ctx.fillRect(
             labelX - textWidth / 2 - 4,
@@ -1482,27 +1697,38 @@ class GraphEditor {
             textWidth + 8,
             textHeight + 4
         );
-        
+
         // 绘制标签文字
         this.ctx.fillStyle = edge.color;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         this.ctx.fillText(displayLabel, labelX, labelY);
-        
+
+        // 绘制转折点（选中边时才显示）
+        if (this.selectedEdge === edge && bendPoints.length > 0) {
+            for (let i = 0; i < bendPoints.length; i++) {
+                const bp = bendPoints[i];
+                const isDragging = this.draggingBendPoint === edge && this.bendPointIndex === i;
+                const pointRadius = isDragging ? 10 : 8;
+
+                this.ctx.beginPath();
+                this.ctx.arc(bp.x, bp.y, pointRadius, 0, Math.PI * 2);
+                this.ctx.fillStyle = isDragging ? '#667eea' : '#fff';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#667eea';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
+        }
+
         // 选中效果
         if (this.selectedEdge === edge) {
             this.ctx.beginPath();
-            if (offset === 0) {
-                this.ctx.moveTo(sourceX, sourceY);
-                this.ctx.lineTo(targetX, targetY);
-            } else {
-                const midX = (sourceX + targetX) / 2;
-                const midY = (sourceY + targetY) / 2;
-                const controlX = midX + Math.cos(perpAngle) * offset;
-                const controlY = midY + Math.sin(perpAngle) * offset;
-                this.ctx.moveTo(sourceX, sourceY);
-                this.ctx.quadraticCurveTo(controlX, controlY, targetX, targetY);
+            this.ctx.moveTo(sourceX, sourceY);
+            for (const point of bendPoints) {
+                this.ctx.lineTo(point.x, point.y);
             }
+            this.ctx.lineTo(targetX, targetY);
             this.ctx.strokeStyle = '#667eea';
             this.ctx.lineWidth = 6;
             this.ctx.globalAlpha = 0.3;

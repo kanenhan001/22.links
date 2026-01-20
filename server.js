@@ -62,6 +62,7 @@ async function initDatabase() {
                 targetId INTEGER,
                 label TEXT,
                 color TEXT,
+                bendPoints TEXT, -- 转折点（JSON 字符串）
                 tasks TEXT, -- 事项清单（JSON 字符串）
                 FOREIGN KEY (sourceId) REFERENCES nodes(id),
                 FOREIGN KEY (targetId) REFERENCES nodes(id)
@@ -74,6 +75,14 @@ async function initDatabase() {
             console.log('成功为 edges 表添加 tasks 列');
         } catch (e) {
             console.log('edges 表的 tasks 列可能已存在:', e.message);
+        }
+
+        // 对于旧数据库，如果没有 bendPoints 字段，则尝试添加
+        try {
+            db.run('ALTER TABLE edges ADD COLUMN bendPoints TEXT');
+            console.log('成功为 edges 表添加 bendPoints 列');
+        } catch (e) {
+            console.log('edges 表的 bendPoints 列可能已存在:', e.message);
         }
         
         // 对于旧数据库，添加 nodes 表的新字段
@@ -296,9 +305,10 @@ app.delete('/api/nodes/:id', (req, res) => {
 app.get('/api/edges', (req, res) => {
     try {
         const edgesRaw = queryAll('SELECT * FROM edges ORDER BY id');
-        // 将 tasks 从 JSON 字符串解析为数组
+        // 将 tasks/bendPoints 从 JSON 字符串解析为数组
         const edges = edgesRaw.map(e => ({
             ...e,
+            bendPoints: e.bendPoints ? JSON.parse(e.bendPoints) : [],
             tasks: e.tasks ? JSON.parse(e.tasks) : []
         }));
         res.json(edges);
@@ -310,12 +320,13 @@ app.get('/api/edges', (req, res) => {
 
 app.post('/api/edges', (req, res) => {
     try {
-        const { sourceId, targetId, label, color, tasks } = req.body;
+        const { sourceId, targetId, label, color, bendPoints, tasks } = req.body;
+        const bendPointsJson = bendPoints ? JSON.stringify(bendPoints) : '[]';
         const tasksJson = tasks ? JSON.stringify(tasks) : '[]';
-        console.log('Backend: Inserting edge:', { sourceId, targetId, label, color, tasks });
+        console.log('Backend: Inserting edge:', { sourceId, targetId, label, color, bendPoints, tasks });
         const newId = run(
-            'INSERT INTO edges (sourceId, targetId, label, color, tasks) VALUES (?, ?, ?, ?, ?)',
-            [sourceId, targetId, label, color, tasksJson]
+            'INSERT INTO edges (sourceId, targetId, label, color, bendPoints, tasks) VALUES (?, ?, ?, ?, ?, ?)',
+            [sourceId, targetId, label, color, bendPointsJson, tasksJson]
         );
         
         console.log('Backend: run function returned ID for new edge:', newId);
@@ -329,6 +340,7 @@ app.post('/api/edges', (req, res) => {
         if (edge) {
             edge = {
                 ...edge,
+                bendPoints: edge.bendPoints ? JSON.parse(edge.bendPoints) : [],
                 tasks: edge.tasks ? JSON.parse(edge.tasks) : []
             };
             res.json(edge);
@@ -345,18 +357,20 @@ app.post('/api/edges', (req, res) => {
 app.put('/api/edges/:id', (req, res) => {
     try {
         const { id } = req.params;
-        const { sourceId, targetId, label, color, tasks } = req.body;
+        const { sourceId, targetId, label, color, bendPoints, tasks } = req.body;
+        const bendPointsJson = bendPoints ? JSON.stringify(bendPoints) : '[]';
         const tasksJson = tasks ? JSON.stringify(tasks) : '[]';
         
         run(
-            'UPDATE edges SET sourceId = ?, targetId = ?, label = ?, color = ?, tasks = ? WHERE id = ?',
-            [sourceId, targetId, label, color, tasksJson, id]
+            'UPDATE edges SET sourceId = ?, targetId = ?, label = ?, color = ?, bendPoints = ?, tasks = ? WHERE id = ?',
+            [sourceId, targetId, label, color, bendPointsJson, tasksJson, id]
         );
         
         let edge = queryOne('SELECT * FROM edges WHERE id = ?', [id]);
         if (edge) {
             edge = {
                 ...edge,
+                bendPoints: edge.bendPoints ? JSON.parse(edge.bendPoints) : [],
                 tasks: edge.tasks ? JSON.parse(edge.tasks) : []
             };
         }
