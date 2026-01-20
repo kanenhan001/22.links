@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登录 - 关系图编辑器</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .auth-page {
+      max-width: 1100px;
+      margin: 0 auto;
+      height: calc(100vh - 40px);
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 24px;
+      padding: 20px;
+    }
+    .auth-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+      padding: 22px 24px;
+    }
+    .auth-card h1 { font-size: 22px; margin-bottom: 8px; color: #222; }
+    .auth-card p { color: #666; line-height: 1.6; margin-bottom: 14px; }
+    .feature-list { margin-top: 10px; display: grid; gap: 10px; }
+    .feature-item { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 12px 12px; }
+    .feature-item b { color: #333; }
+    .qr-box {
+      border: 1px dashed #cfd3ff;
+      border-radius: 12px;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(102,126,234,0.06), rgba(118,75,162,0.04));
+      min-height: 260px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      gap: 10px;
+    }
+    .qr-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+    .btn-secondary {
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-secondary:hover { border-color: #667eea; color: #667eea; }
+    .small-note { font-size: 12px; color: #999; margin-top: 10px; }
+    #qrLink { word-break: break-all; font-size: 12px; color: #667eea; display: none; }
+    @media (max-width: 1000px) {
+      .auth-page { grid-template-columns: 1fr; height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card">
+      <h1>关系图编辑器</h1>
+      <p>用“图”的方式把复杂关系讲清楚：节点、关系、任务清单、转折点路径，一目了然。</p>
+      <div class="feature-list">
+        <div class="feature-item"><b>快速梳理</b>：双击创建关系，拖拽转折点调整走向。</div>
+        <div class="feature-item"><b>结构化记录</b>：节点/关系都有事项清单，追踪关键目标与行动。</div>
+        <div class="feature-item"><b>多关系图管理</b>：登录后可管理“我的关系图”，随时打开继续编辑。</div>
+      </div>
+    </div>
+
+    <div class="auth-card">
+      <h1>微信扫码登录</h1>
+      <p>登录后进入“我的关系图”，选择或新建一个关系图开始编辑。</p>
+      <div class="qr-box">
+        <div id="qrStatus">正在获取二维码…</div>
+        <a id="qrLink" href="#" target="_blank" rel="noreferrer">打开微信扫码链接</a>
+      </div>
+      <div class="qr-actions">
+        <button id="btnRefreshQr" class="btn-secondary">刷新二维码</button>
+        <button id="btnMockLogin" class="btn-secondary">开发模式登录</button>
+      </div>
+      <div class="small-note">
+        说明：微信扫码登录需要配置 `WECHAT_APPID/WECHAT_SECRET/WECHAT_CALLBACK_URL`。未配置时可先用“开发模式登录”体验完整流程。
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchJson(url, opts) {
+      const res = await fetch(url, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      return data;
+    }
+
+    async function checkStatus() {
+      const s = await fetchJson('/api/auth/status');
+      if (s.loggedIn) window.location.href = '/my';
+    }
+
+    async function loadQr() {
+      const statusEl = document.getElementById('qrStatus');
+      const linkEl = document.getElementById('qrLink');
+      linkEl.style.display = 'none';
+      statusEl.textContent = '正在获取二维码…';
+      try {
+        const { qrUrl } = await fetchJson('/api/auth/wechat/start');
+        statusEl.textContent = '请使用微信扫码登录';
+        linkEl.href = qrUrl;
+        linkEl.style.display = 'block';
+      } catch (e) {
+        statusEl.textContent = '微信扫码登录未配置或暂不可用';
+      }
+    }
+
+    document.getElementById('btnRefreshQr').addEventListener('click', loadQr);
+    document.getElementById('btnMockLogin').addEventListener('click', async () => {
+      await fetchJson('/api/auth/mock-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: '测试用户' })
+      });
+      window.location.href = '/my';
+    });
+
+    checkStatus().then(loadQr);
+  </script>
+</body>
+</html>
+
+

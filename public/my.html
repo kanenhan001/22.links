@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我的关系图 - 关系图编辑器</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      height: calc(100vh - 40px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .topbar {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.10);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand { font-weight: 800; color: #333; }
+    .spacer { flex: 1; }
+    .user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #555;
+      font-weight: 600;
+    }
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #eee;
+      object-fit: cover;
+    }
+    .btn {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .btn.secondary {
+      background: #fff;
+      color: #444;
+      border: 1px solid #ddd;
+    }
+    .btn.secondary:hover { border-color: #667eea; color: #667eea; }
+    .content {
+      flex: 1;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.10);
+      padding: 16px;
+      overflow: auto;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      border: 1px solid #eee;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(102,126,234,0.6);
+      box-shadow: 0 10px 22px rgba(0,0,0,0.10);
+    }
+    .thumb {
+      height: 140px;
+      background: linear-gradient(135deg, rgba(102,126,234,0.10), rgba(118,75,162,0.06));
+      display: grid;
+      place-items: center;
+      color: #667eea;
+      font-weight: 900;
+      font-size: 34px;
+      letter-spacing: 1px;
+    }
+    .card-body { padding: 12px 12px; }
+    .name { font-weight: 800; color: #333; margin-bottom: 6px; }
+    .meta { font-size: 12px; color: #888; }
+    .empty {
+      color: #666;
+      text-align: center;
+      padding: 30px 0;
+    }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    input[type="text"]{
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      min-width: 260px;
+      font-size: 14px;
+    }
+    input[type="text"]:focus{
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 2px rgba(102,126,234,0.18);
+    }
+    /* 卡片更多按钮样式 */
+    .card { position: relative; }
+    .card-more {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      border: none;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transition: background .15s;
+      z-index: 10;
+    }
+    .card:hover .card-more { display: flex; }
+    .card-more:hover { background: #fff; }
+    .card-more svg { width: 16px; height: 16px; color: #555; }
+    /* 下拉菜单样式 */
+    .dropdown-menu {
+      position: fixed;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+      min-width: 160px;
+      padding: 6px 0 12px 0;
+      display: none;
+      z-index: 1000;
+    }
+    .dropdown-menu.show { display: block; }
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #333;
+      transition: background .1s;
+    }
+    .dropdown-item:hover { background: #f5f5f5; }
+    .dropdown-item svg { width: 16px; height: 16px; color: #666; }
+    .dropdown-item.danger { color: #e53935; }
+    .dropdown-item.danger svg { color: #e53935; }
+    /* 导出选择样式 */
+    .dropdown-with-select {
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 14px;
+    }
+    .dropdown-select-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    .export-format-select {
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .export-format-select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .export-btn {
+      padding: 4px 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .export-btn:hover {
+      opacity: 0.9;
+    }
+    .dropdown-divider {
+      height: 1px;
+      background: #eee;
+      margin: 6px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <div class="brand">我的关系图</div>
+      <div class="spacer"></div>
+      <div class="user">
+        <img id="avatar" class="avatar" alt="" />
+        <span id="nickname">未登录</span>
+      </div>
+      <button id="btnLogout" class="btn secondary">退出</button>
+    </div>
+
+    <div class="topbar">
+      <div class="row">
+        <input id="graphName" type="text" placeholder="关系图名称（例如：项目协作关系）" />
+        <button id="btnCreate" class="btn">新建关系图</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="grid" class="grid"></div>
+      <div id="empty" class="empty" style="display:none;">还没有关系图，先创建一个吧。</div>
+    </div>
+  </div>
+
+  <!-- 隐藏的画布用于导出 -->
+  <canvas id="exportCanvas" style="display:none;"></canvas>
+
+  <script>
+    async function fetchJson(url, opts) {
+      const res = await fetch(url, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      return data;
+    }
+
+    function fmtTime(iso) {
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString();
+      } catch (_) {
+        return iso || '';
+      }
+    }
+
+    async function ensureLogin() {
+      const s = await fetchJson('/api/auth/status');
+      if (!s.loggedIn) {
+        window.location.href = '/login';
+        return null;
+      }
+      document.getElementById('nickname').textContent = s.user?.nickname || '用户';
+      const avatar = document.getElementById('avatar');
+      if (s.user?.avatarUrl) {
+        avatar.src = s.user.avatarUrl;
+        avatar.style.background = 'transparent';
+      } else {
+        avatar.removeAttribute('src');
+      }
+      return s.user;
+    }
+
+    function renderCards(list) {
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('empty');
+      grid.innerHTML = '';
+      if (!list || list.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      for (const g of list) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        // 阻止点击菜单时触发卡片跳转
+        card.addEventListener('click', (e) => {
+          if (!e.target.closest('.card-more') && !e.target.closest('.dropdown-menu')) {
+            window.location.href = '/g/' + g.id;
+          }
+        });
+        const first = (g.name || 'G').trim().slice(0,1).toUpperCase();
+        const thumbHtml = (g.thumbnail && g.thumbnail.startsWith('data:image'))
+          ? `<img src="${g.thumbnail}" style="width:100%;height:140px;object-fit:cover;display:block;" alt="">`
+          : `<div class="thumb">${first}</div>`;
+        card.innerHTML = `
+          ${thumbHtml}
+          <!-- 更多按钮 -->
+          <button class="card-more" data-graph-id="${g.id}" title="更多操作">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="6" r="2"/>
+              <circle cx="12" cy="12" r="2"/>
+              <circle cx="12" cy="18" r="2"/>
+            </svg>
+          </button>
+          <!-- 下拉菜单 -->
+          <div class="dropdown-menu" id="menu-${g.id}">
+            <div class="dropdown-item" onclick="event.stopPropagation(); handleMenuAction('rename', ${g.id})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+              重命名
+            </div>
+            <div class="dropdown-item" onclick="event.stopPropagation(); handleMenuAction('copy', ${g.id})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              复制
+            </div>
+            <div class="dropdown-item dropdown-with-select" onclick="event.stopPropagation();">
+              <div class="dropdown-select-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>导出图片</span>
+              </div>
+              <select class="export-format-select" id="format-${g.id}" onchange="event.stopPropagation();">
+                <option value="jpg">JPG</option>
+                <option value="png">PNG</option>
+              </select>
+              <button class="export-btn" onclick="event.stopPropagation(); handleExport(${g.id})">导出</button>
+            </div>
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-item danger" onclick="event.stopPropagation(); handleMenuAction('delete', ${g.id})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              删除
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="name">${g.name || '未命名关系图'}</div>
+            <div class="meta">创建时间：${fmtTime(g.createdAt)}</div>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      }
+    }
+
+    async function loadGraphs() {
+      const list = await fetchJson('/api/graphs');
+      renderCards(list);
+    }
+
+    // 菜单相关逻辑
+    let activeMenuId = null;
+    let activeMenuButton = null;
+
+    function closeMenu() {
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+      activeMenuId = null;
+      activeMenuButton = null;
+    }
+
+    function showMenu(graphId, button) {
+      closeMenu();
+      const menu = document.getElementById('menu-' + graphId);
+      const btn = button || document.querySelector('.card-more[data-graph-id="' + graphId + '"]');
+      if (menu && btn) {
+        // 计算菜单位置
+        const rect = btn.getBoundingClientRect();
+        menu.style.left = rect.right - 150 + 'px';
+        menu.style.top = rect.bottom + 5 + 'px';
+        menu.classList.add('show');
+        activeMenuId = graphId;
+        activeMenuButton = btn;
+      }
+    }
+
+    // 点击事件处理
+    document.addEventListener('click', (e) => {
+      // 处理更多按钮点击
+      const moreBtn = e.target.closest('.card-more');
+      if (moreBtn) {
+        e.stopPropagation();
+        const graphId = moreBtn.dataset.graphId;
+        showMenu(graphId, moreBtn);
+        return;
+      }
+
+      // 处理菜单内的点击
+      if (activeMenuId) {
+        const menu = document.getElementById('menu-' + activeMenuId);
+        // 如果点击不在菜单内，关闭菜单
+        if (menu && !menu.contains(e.target)) {
+          closeMenu();
+        }
+      }
+    });
+
+    // 全局菜单操作处理函数
+    window.handleMenuAction = function(action, graphId) {
+      closeMenu();
+
+      if (action === 'delete') {
+        if (confirm('确定要删除这个关系图吗？此操作不可恢复。')) {
+          fetchJson('/api/graphs/' + graphId, { method: 'DELETE' })
+            .then(() => loadGraphs())
+            .catch(err => alert('删除失败: ' + err.message));
+        }
+      } else if (action === 'rename') {
+        const newName = prompt('请输入新的关系图名称：');
+        if (newName && newName.trim()) {
+          fetchJson('/api/graphs/' + graphId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName.trim() })
+          }).then(() => loadGraphs());
+        }
+      } else if (action === 'copy') {
+        const name = prompt('请输入复制后的名称：', '副本 - ');
+        if (name && name.trim()) {
+          fetchJson('/api/graphs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim() })
+          }).then(() => loadGraphs());
+        }
+      }
+    };
+
+    // 导出图片函数 - 静默导出，不打开新窗口
+    window.handleExport = async function(graphId) {
+      console.log('开始导出，graphId:', graphId);
+      const format = document.getElementById('format-' + graphId)?.value || 'png';
+      console.log('导出格式:', format);
+      closeMenu();
+
+      try {
+        // 获取关系图数据
+        console.log('正在获取数据...');
+        const [nodes, edges] = await Promise.all([
+          fetchJson('/api/nodes?graphId=' + graphId),
+          fetchJson('/api/edges?graphId=' + graphId)
+        ]);
+        console.log('获取到数据:', nodes.length, '节点', edges.length, '边');
+
+        // 在隐藏画布上渲染并导出
+        const canvas = document.getElementById('exportCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 计算画布范围
+        let minX = 50, minY = 50, maxX = 800, maxY = 600;
+        if (nodes.length > 0) {
+          minX = Math.min(...nodes.map(n => n.x - (n.radius || 20))) - 50;
+          minY = Math.min(...nodes.map(n => n.y - (n.radius || 20))) - 50;
+          maxX = Math.max(...nodes.map(n => n.x + (n.radius || 20))) + 50;
+          maxY = Math.max(...nodes.map(n => n.y + (n.radius || 20))) + 50;
+        }
+        const width = Math.max(800, maxX - minX);
+        const height = Math.max(600, maxY - minY);
+        canvas.width = width;
+        canvas.height = height;
+
+        // 填充背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        // 缩放和平移
+        ctx.translate(-minX, -minY);
+
+        // 绘制边
+        edges.forEach(edge => {
+          const source = nodes.find(n => n.id === edge.sourceId);
+          const target = nodes.find(n => n.id === edge.targetId);
+          if (source && target) {
+            ctx.beginPath();
+            ctx.moveTo(source.x, source.y);
+            const bendPoints = edge.bendPoints ? JSON.parse(edge.bendPoints) : [];
+            bendPoints.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.lineTo(target.x, target.y);
+            ctx.strokeStyle = edge.color || '#999';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 绘制标签
+            if (edge.label) {
+              ctx.font = '12px sans-serif';
+              ctx.fillStyle = edge.color || '#666';
+              const midX = bendPoints.length > 0 ? bendPoints[0].x : (source.x + target.x) / 2;
+              const midY = bendPoints.length > 0 ? bendPoints[0].y : (source.y + target.y) / 2;
+              ctx.fillText(edge.label, midX - 20, midY - 5);
+            }
+          }
+        });
+
+        // 绘制节点
+        nodes.forEach(node => {
+          const radius = node.radius || 30;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = node.color || '#667eea';
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // 绘制文字
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 14px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText((node.name || '').slice(0, 4), node.x, node.y);
+        });
+
+        // 导出图片
+        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+        const dataUrl = canvas.toDataURL(mimeType, 0.9);
+        const link = document.createElement('a');
+        link.download = `graph-${graphId}-${Date.now()}.${format}`;
+        link.href = dataUrl;
+        link.click();
+
+        console.log('图片导出成功');
+      } catch (err) {
+        console.error('导出失败:', err);
+        alert('导出失败: ' + err.message);
+      }
+    };
+
+    document.getElementById('btnCreate').addEventListener('click', async () => {
+      const name = document.getElementById('graphName').value.trim() || '未命名关系图';
+      const g = await fetchJson('/api/graphs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      window.location.href = '/g/' + g.id;
+    });
+
+    document.getElementById('btnLogout').addEventListener('click', async () => {
+      await fetchJson('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    });
+
+    ensureLogin().then(u => {
+      if (u) loadGraphs();
+    });
+  </script>
+</body>
+</html>
+
+

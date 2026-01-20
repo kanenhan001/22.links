@@ -27,6 +27,9 @@ class GraphEditor {
         this.minZoom = 0.25; // 最小缩放 25%
         this.maxZoom = 3.0; // 最大缩放 300%
         this.zoomStep = 0.1; // 每次缩放步长
+
+        // 当前关系图ID（来自 URL /g/:id）
+        this.graphId = this.getGraphIdFromUrl();
     }
     
     static async create() {
@@ -48,6 +51,25 @@ class GraphEditor {
         editor.setupEventListeners();
         await editor.loadData();
         return editor;
+    }
+
+    getGraphIdFromUrl() {
+        // 支持路径：/g/:id  或 ?graphId=xx
+        try {
+            const url = new URL(window.location.href);
+            const q = url.searchParams.get('graphId');
+            if (q) {
+                const gid = parseInt(q, 10);
+                if (!Number.isNaN(gid) && gid > 0) return gid;
+            }
+            const parts = window.location.pathname.split('/').filter(Boolean);
+            const gIndex = parts.indexOf('g');
+            if (gIndex !== -1 && parts[gIndex + 1]) {
+                const gid = parseInt(parts[gIndex + 1], 10);
+                if (!Number.isNaN(gid) && gid > 0) return gid;
+            }
+        } catch (_) {}
+        return 1;
     }
     
     // ==================== API 调用 ====================
@@ -88,8 +110,8 @@ class GraphEditor {
         try {
             this.showStatus('正在加载数据...');
             const [nodes, edges] = await Promise.all([
-                this.apiGet('/api/nodes'),
-                this.apiGet('/api/edges')
+                this.apiGet(`/api/nodes?graphId=${this.graphId}`),
+                this.apiGet(`/api/edges?graphId=${this.graphId}`)
             ]);
             this.nodes = nodes;
             this.edges = edges;
@@ -105,6 +127,7 @@ class GraphEditor {
     async saveNode(node) {
         console.log('saveNode 被调用, id:', node.id);
         try {
+            node.graphId = this.graphId;
             if (node.id) {
                 console.log('更新节点:', node.id);
                 await this.apiPut(`/api/nodes/${node.id}`, node);
@@ -128,6 +151,7 @@ class GraphEditor {
     
     async saveEdge(edge) {
         try {
+            edge.graphId = this.graphId;
             if (edge.id) {
                 await this.apiPut(`/api/edges/${edge.id}`, edge);
             } else {
@@ -1888,10 +1912,90 @@ class GraphEditor {
         // 恢复变换状态
         this.ctx.restore();
     }
+
+    // 导出画布为图片
+    exportAsImage(format = 'png') {
+        // 保存当前状态
+        const zoomLevel = this.zoomLevel;
+        const panX = this.panX;
+        const panY = this.panY;
+        const selectedNode = this.selectedNode;
+        const selectedEdge = this.selectedEdge;
+
+        try {
+            // 重置缩放和偏移以获取完整视图
+            this.zoomLevel = 1;
+            this.panX = 0;
+            this.panY = 0;
+            this.selectedNode = null;
+            this.selectedEdge = null;
+
+            // 计算画布所需尺寸
+            let minX = 0, minY = 0, maxX = this.canvas.width, maxY = this.canvas.height;
+            if (this.nodes.length > 0) {
+                minX = Math.min(...this.nodes.map(n => n.x - n.radius)) - 50;
+                minY = Math.min(...this.nodes.map(n => n.y - n.radius)) - 50;
+                maxX = Math.max(...this.nodes.map(n => n.x + n.radius)) + 50;
+                maxY = Math.max(...this.nodes.map(n => n.y + n.radius)) + 50;
+            }
+
+            const width = Math.max(800, maxX - minX);
+            const height = Math.max(600, maxY - minY);
+
+            // 创建临时画布
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = width;
+            exportCanvas.height = height;
+            const exportCtx = exportCanvas.getContext('2d');
+
+            // 填充白色背景
+            exportCtx.fillStyle = '#ffffff';
+            exportCtx.fillRect(0, 0, width, height);
+
+            // 绘制所有内容
+            this.ctx = exportCtx;
+            this.render();
+
+            // 导出为图片
+            const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+            const dataUrl = exportCanvas.toDataURL(mimeType, 0.9);
+
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.download = `graph-${Date.now()}.${format}`;
+            link.href = dataUrl;
+            link.click();
+
+            console.log('图片导出成功');
+        } catch (err) {
+            console.error('导出失败:', err);
+            alert('导出失败: ' + err.message);
+        } finally {
+            // 恢复原始状态
+            this.ctx = this.ctx;
+            this.zoomLevel = zoomLevel;
+            this.panX = panX;
+            this.panY = panY;
+            this.selectedNode = selectedNode;
+            this.selectedEdge = selectedEdge;
+            this.render();
+        }
+    }
 }
 
 let editor;
 (async () => {
     editor = await GraphEditor.create();
     console.log('GraphEditor initialized successfully');
+
+    // 检查是否为导出模式
+    const urlParams = new URLSearchParams(window.location.search);
+    const exportFormat = urlParams.get('export');
+    if (exportFormat === 'png' || exportFormat === 'jpg') {
+        setTimeout(() => {
+            editor.exportAsImage(exportFormat);
+            // 清除 URL 参数
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }, 500);
+    }
 })();

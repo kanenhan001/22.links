@@ -22,11 +22,11 @@
 
 
 
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
 
 
 
-    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="shortcut icon" href="/favicon.ico">
 
 
 
@@ -50,7 +50,7 @@
 
 
 
-            <button id="clearBtn">🔄 清空画布</button>
+            <button id="clearBtn" style="display: none;" >🔄 清空画布</button>
 
 
 
@@ -67,6 +67,7 @@
 
 
             <button id="helpBtn" style="margin-left: auto;">帮助</button>
+            <button id="myGraphsBtn" style="margin-left: 10px;">我的关系图</button>
 
 
 
@@ -314,7 +315,13 @@
 
 
 
-    <script src="app.js"></script>
+    <script src="/app.js"></script>
+    <script>
+      // 顶部快捷入口
+      document.getElementById('myGraphsBtn')?.addEventListener('click', () => {
+        window.location.href = '/my';
+      });
+    </script>
 
 
 
