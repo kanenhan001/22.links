@@ -21,10 +21,30 @@ class GraphEditor {
         this.draggingBendPoint = null;
         this.bendPointIndex = -1;
         this.bendPointEdge = null;
+        // 缩放相关状态
+        // 默认缩放级别，稍后会尝试从本地缓存恢复
+        this.zoomLevel = 1.0; // 当前缩放级别，1.0 = 100%
+        this.minZoom = 0.25; // 最小缩放 25%
+        this.maxZoom = 3.0; // 最大缩放 300%
+        this.zoomStep = 0.1; // 每次缩放步长
     }
     
     static async create() {
         const editor = new GraphEditor();
+
+        // 在初始化时尝试从 localStorage 恢复缩放比例
+        try {
+            const storedZoom = window.localStorage.getItem('graphEditor.zoomLevel');
+            if (storedZoom) {
+                const parsed = parseFloat(storedZoom);
+                if (!Number.isNaN(parsed) && parsed > 0) {
+                    editor.zoomLevel = Math.max(editor.minZoom, Math.min(editor.maxZoom, parsed));
+                }
+            }
+        } catch (err) {
+            console.warn('读取缩放缓存失败:', err);
+        }
+
         editor.setupEventListeners();
         await editor.loadData();
         return editor;
@@ -179,7 +199,48 @@ class GraphEditor {
         document.getElementById('clearBtn').addEventListener('click', this.handleClear.bind(this));
         document.getElementById('helpBtn').addEventListener('click', () => this.showHelpModal());
         
+        // 缩放控件事件
+        document.getElementById('zoomInBtn').addEventListener('click', () => this.zoomIn());
+        document.getElementById('zoomOutBtn').addEventListener('click', () => this.zoomOut());
+        document.getElementById('zoomResetBtn').addEventListener('click', () => this.zoomReset());
+        
+        // 鼠标滚轮缩放
+        this.canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -this.zoomStep : this.zoomStep;
+            this.setZoom(this.zoomLevel + delta);
+        }, { passive: false });
+        
         this.setupModalListeners();
+        this.updateZoomDisplay();
+        this.applyZoom(); // 初始化时应用缩放
+        
+        // 更新缩放控件位置和属性面板高度（延迟执行，确保DOM已完全渲染）
+        setTimeout(() => {
+            this.updateZoomControlsPosition();
+            this.updatePropertiesPanelHeight();
+        }, 100);
+        
+        // 使用防抖优化性能
+        let positionUpdateTimer = null;
+        const debouncedUpdatePosition = () => {
+            if (positionUpdateTimer) {
+                clearTimeout(positionUpdateTimer);
+            }
+            positionUpdateTimer = setTimeout(() => {
+                this.updateZoomControlsPosition();
+                this.updatePropertiesPanelHeight();
+            }, 10);
+        };
+        
+        // 监听窗口大小变化和滚动，更新缩放控件位置和属性面板高度
+        window.addEventListener('resize', debouncedUpdatePosition);
+        window.addEventListener('scroll', debouncedUpdatePosition, true); // 使用捕获阶段监听所有滚动
+        
+        const canvasContainer = document.querySelector('.canvas-container');
+        if (canvasContainer) {
+            canvasContainer.addEventListener('scroll', debouncedUpdatePosition);
+        }
     }
     
     setupModalListeners() {
@@ -477,9 +538,7 @@ class GraphEditor {
     }
     
     handleCanvasClick(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = this.getCanvasCoordinates(e);
         
         // 如果正在创建关系，处理点击事件 (点击空白处取消，点击节点切换源节点)
         if (this.creatingEdge) {
@@ -527,9 +586,7 @@ class GraphEditor {
     }
     
     async handleCanvasDoubleClick(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = this.getCanvasCoordinates(e);
 
         // 检查双击是否发生在节点上
         for (let node of this.nodes) {
@@ -581,9 +638,7 @@ class GraphEditor {
     }
     
     handleMouseDown(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = this.getCanvasCoordinates(e);
 
         // 如果正在创建关系模式，不处理节点拖拽（只处理选择目标节点）
         if (this.creatingEdge) {
@@ -632,9 +687,7 @@ class GraphEditor {
     }
     
     handleMouseMove(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = this.getCanvasCoordinates(e);
 
         // 如果正在创建关系，更新鼠标位置并重绘临时线
         if (this.creatingEdge && this.edgeSourceNode) {
@@ -682,9 +735,7 @@ class GraphEditor {
     async handleMouseUp(e) {
         // 如果正在创建关系，检查是否释放在目标节点上
         if (this.creatingEdge && this.edgeSourceNode) {
-            const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const { x, y } = this.getCanvasCoordinates(e);
 
             for (let node of this.nodes) {
                 if (node !== this.edgeSourceNode && this.isPointInNode(x, y, node)) {
@@ -1265,6 +1316,83 @@ class GraphEditor {
         }
         console.log(message);
     }
+    
+    // ==================== 缩放功能 ====================
+    
+    setZoom(level) {
+        // 限制缩放范围
+        this.zoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, level));
+
+        // 缓存当前缩放比例到 localStorage，便于刷新后恢复
+        try {
+            window.localStorage.setItem('graphEditor.zoomLevel', String(this.zoomLevel));
+        } catch (err) {
+            console.warn('保存缩放缓存失败:', err);
+        }
+
+        this.updateZoomDisplay();
+        this.applyZoom();
+        this.render();
+    }
+    
+    zoomIn() {
+        this.setZoom(this.zoomLevel + this.zoomStep);
+    }
+    
+    zoomOut() {
+        this.setZoom(this.zoomLevel - this.zoomStep);
+    }
+    
+    zoomReset() {
+        this.setZoom(1.0);
+    }
+    
+    updateZoomDisplay() {
+        const zoomLevelEl = document.getElementById('zoomLevel');
+        if (zoomLevelEl) {
+            zoomLevelEl.textContent = Math.round(this.zoomLevel * 100) + '%';
+        }
+    }
+    
+    applyZoom() {
+        // 使用 CSS transform 来缩放 canvas
+        this.canvas.style.transform = `scale(${this.zoomLevel})`;
+        this.canvas.style.transformOrigin = 'top left';
+    }
+    
+    // 更新缩放控件位置，使其固定在画布左下角
+    updateZoomControlsPosition() {
+        const zoomControls = document.querySelector('.zoom-controls');
+        const canvasContainer = document.querySelector('.canvas-container');
+        if (zoomControls && canvasContainer) {
+            const rect = canvasContainer.getBoundingClientRect();
+            // 计算画布容器的左下角位置
+            zoomControls.style.left = (rect.left + 20) + 'px';
+            zoomControls.style.bottom = (window.innerHeight - rect.bottom + 20) + 'px';
+        }
+    }
+    
+    // 更新属性面板高度，使其与画布容器高度一致
+    updatePropertiesPanelHeight() {
+        const propertiesPanel = document.querySelector('.properties-panel');
+        const canvasContainer = document.querySelector('.canvas-container');
+        if (propertiesPanel && canvasContainer && !propertiesPanel.classList.contains('collapsed')) {
+            const canvasRect = canvasContainer.getBoundingClientRect();
+            const panelRect = propertiesPanel.getBoundingClientRect();
+            // 设置属性面板高度与画布容器高度一致
+            propertiesPanel.style.height = canvasRect.height + 'px';
+        }
+    }
+    
+    // 获取考虑缩放后的鼠标坐标
+    getCanvasCoordinates(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        // CSS transform scale 会影响 getBoundingClientRect，所以需要除以缩放比例
+        // 但实际测试发现，getBoundingClientRect 返回的是原始尺寸，所以直接除以缩放比例即可
+        const x = (e.clientX - rect.left) / this.zoomLevel;
+        const y = (e.clientY - rect.top) / this.zoomLevel;
+        return { x, y };
+    }
 
     // 自动调整 textarea 高度以适应内容
     autoResizeTextarea(textarea) {
@@ -1276,8 +1404,12 @@ class GraphEditor {
 
     updatePropertiesPanel() {
         const panel = document.getElementById('propertiesContent');
+        const panelContainer = document.querySelector('.properties-panel');
         
         if (this.selectedNode) {
+            if (panelContainer) {
+                panelContainer.classList.remove('collapsed');
+            }
             // 找出所有从当前节点发出的关系
             const outgoingEdges = this.edges.filter(e => e.sourceId === this.selectedNode.id);
             // 获取节点的清单名称和事项
@@ -1362,6 +1494,9 @@ class GraphEditor {
                 this.autoResizeTextarea(textarea);
             });
         } else if (this.selectedEdge) {
+            if (panelContainer) {
+                panelContainer.classList.remove('collapsed');
+            }
             const source = this.nodes.find(n => n.id === this.selectedEdge.sourceId);
             const target = this.nodes.find(n => n.id === this.selectedEdge.targetId);
             const tasks = Array.isArray(this.selectedEdge.tasks) ? this.selectedEdge.tasks : [];
@@ -1416,7 +1551,15 @@ class GraphEditor {
             });
         } else {
             panel.innerHTML = '<p>请选择一个节点或关系</p>';
+            if (panelContainer) {
+                panelContainer.classList.add('collapsed');
+            }
         }
+        
+        // 更新属性面板高度（延迟执行，确保DOM更新完成）
+        setTimeout(() => {
+            this.updatePropertiesPanelHeight();
+        }, 0);
     }
     
     async deleteSelected() {
@@ -1433,6 +1576,12 @@ class GraphEditor {
     }
     
     render() {
+        // 保存当前变换状态
+        this.ctx.save();
+        
+        // 应用缩放变换（如果需要的话，但这里我们用 CSS transform，所以不需要）
+        // this.ctx.scale(this.zoomLevel, this.zoomLevel);
+        
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
         // 按节点对分组边，以便处理多条边的情况
@@ -1735,6 +1884,9 @@ class GraphEditor {
             this.ctx.stroke();
             this.ctx.globalAlpha = 1;
         }
+        
+        // 恢复变换状态
+        this.ctx.restore();
     }
 }
 

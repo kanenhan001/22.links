@@ -103,6 +103,7 @@ body {
     justify-content: flex-start;
     align-items: flex-start;
     overflow: auto; /* 画布容器可以滚动 */
+    position: relative; /* 为缩放控件定位 */
 }
 
 #graphCanvas {
@@ -117,13 +118,24 @@ body {
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    width: 380px; /* 再加宽一些，内容更舒展 */
+    width: 450px; /* 加宽属性看板 */
     position: fixed;
     right: 20px;
     top: 110px;
-    max-height: calc(100vh - 140px);
+    /* 高度由 JavaScript 动态设置，与画布容器保持一致 */
     overflow-y: auto;
     flex-shrink: 0;
+}
+
+/* 属性面板收起状态（未选择任何节点/关系时） */
+.properties-panel.collapsed {
+    width: 180px;
+    padding: 8px 12px;
+    max-height: 70px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    opacity: 0.85;
+    transition: all 0.2s ease;
 }
 
 .properties-panel h3 {
@@ -134,9 +146,23 @@ body {
     padding-bottom: 10px;
 }
 
+.properties-panel.collapsed h3 {
+    margin-bottom: 4px;
+    font-size: 14px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #667eea;
+}
+
 .properties-panel p {
     color: #666;
     font-size: 14px;
+}
+
+.properties-panel.collapsed p {
+    font-size: 12px;
+    color: #999;
+    margin: 0;
+    line-height: 1.4;
 }
 
 .property-group {
@@ -598,6 +624,65 @@ body {
     color: #999;
     font-size: 11px;
     font-style: italic;
+}
+
+/* 缩放控件样式 */
+.zoom-controls {
+    position: fixed; /* 固定定位，不随滚动移动 */
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+    user-select: none;
+}
+
+.zoom-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    color: #333;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.zoom-btn:hover {
+    background: #f5f5f5;
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.zoom-btn:active {
+    background: #e8e8e8;
+    transform: scale(0.95);
+}
+
+.zoom-level {
+    min-width: 50px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    padding: 0 4px;
+}
+
+.zoom-reset {
+    font-size: 16px;
+    margin-left: 4px;
 }
 
 @media (max-width: 1200px) {
