@@ -128,7 +128,14 @@ class GraphEditor {
         } catch (error) {
             console.error('加载数据失败:', error);
             this.showStatus('加载数据失败: ' + error.message);
-            showModal({ title: '加载失败', message: '加载数据失败，请确保服务器已启动', type: 'error' });
+            showModal({ 
+                title: '加载失败', 
+                message: '加载数据失败，请确保服务器已启动', 
+                type: 'error',
+                onConfirm: () => {
+                    window.location.href = '/login';
+                }
+            });
         }
     }
     
@@ -158,6 +165,23 @@ class GraphEditor {
             this.showStatus('保存节点失败: ' + error.message);
         }
     }
+    
+    async saveNodePartial(nodeData) {
+        console.log('saveNodePartial 被调用, 更新字段:', Object.keys(nodeData));
+        try {
+            const { id, graphId, ...updateFields } = nodeData;
+            if (id) {
+                console.log('部分更新节点:', id);
+                await this.apiPut(`/api/nodes/${id}`, updateFields);
+            }
+            this.showStatus('节点已保存');
+            // 生成缩略图
+            await this.generateAndUploadThumbnail();
+        } catch (error) {
+            console.error('保存节点失败:', error);
+            this.showStatus('保存节点失败: ' + error.message);
+        }
+    }
 
     async saveEdge(edge) {
         try {
@@ -167,6 +191,23 @@ class GraphEditor {
             } else {
                 const result = await this.apiPost('/api/edges', edge);
                 edge.id = result.id;
+            }
+            this.showStatus('关系已保存');
+            // 生成缩略图
+            await this.generateAndUploadThumbnail();
+        } catch (error) {
+            console.error('保存关系失败:', error);
+            this.showStatus('保存关系失败: ' + error.message);
+        }
+    }
+    
+    async saveEdgePartial(edgeData) {
+        console.log('saveEdgePartial 被调用, 更新字段:', Object.keys(edgeData));
+        try {
+            const { id, graphId, ...updateFields } = edgeData;
+            if (id) {
+                console.log('部分更新关系:', id);
+                await this.apiPut(`/api/edges/${id}`, updateFields);
             }
             this.showStatus('关系已保存');
             // 生成缩略图
@@ -330,8 +371,8 @@ class GraphEditor {
 
         tempCtx.restore();
 
-        // 转换为 base64
-        return tempCanvas.toDataURL('image/png');
+        // 转换为 base64，使用 JPEG 格式并设置压缩质量以减少数据大小
+        return tempCanvas.toDataURL('image/jpeg', 0.5);
     }
 
     async uploadThumbnail(thumbnailData) {
@@ -571,11 +612,31 @@ class GraphEditor {
 
         if (this.selectedNode) {
             this.selectedNode[prop] = e.target.value;
-            this.saveNode(this.selectedNode);
+            // 只发送需要更新的字段，而不是整个节点对象
+            const updateData = {
+                id: this.selectedNode.id,
+                graphId: this.graphId,
+                [prop]: e.target.value
+            };
+            // 如果更新的是任务清单相关字段，需要发送整个tasks数组
+            if (prop === 'taskListName') {
+                updateData.tasks = this.selectedNode.tasks;
+            }
+            this.saveNodePartial(updateData);
             this.render();
         } else if (this.selectedEdge) {
             this.selectedEdge[prop] = e.target.value;
-            this.saveEdge(this.selectedEdge);
+            // 只发送需要更新的字段，而不是整个关系对象
+            const updateData = {
+                id: this.selectedEdge.id,
+                graphId: this.graphId,
+                [prop]: e.target.value
+            };
+            // 如果更新的是任务清单相关字段，需要发送整个tasks数组
+            if (prop === 'taskListName') {
+                updateData.tasks = this.selectedEdge.tasks;
+            }
+            this.saveEdgePartial(updateData);
             this.render();
         }
     }
@@ -968,10 +1029,16 @@ class GraphEditor {
         }
 
         // 拖拽选中的节点
-        if (this.draggingSelectedNodes) {
-            const dx = x - this.dragOffset.x - (this.selectedNodes.length > 0 ? this.selectedNodes[0].x : 0);
-            const dy = y - this.dragOffset.y - (this.selectedNodes.length > 0 ? this.selectedNodes[0].y : 0);
+        if (this.draggingSelectedNodes && this.selectedNodes.length > 0) {
+            // 计算第一个节点的新位置
+            const firstNodeNewX = x - this.dragOffset.x;
+            const firstNodeNewY = y - this.dragOffset.y;
             
+            // 计算位移量
+            const dx = firstNodeNewX - this.selectedNodes[0].x;
+            const dy = firstNodeNewY - this.selectedNodes[0].y;
+            
+            // 应用位移到所有选中的节点
             for (let node of this.selectedNodes) {
                 node.x += dx;
                 node.y += dy;

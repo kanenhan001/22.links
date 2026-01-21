@@ -14,8 +14,48 @@ const app = express();
 const PORT = 3000;
 
 // 中间件
+// 日志中间件，用于记录请求体大小和内容
+app.use((req, res, next) => {
+    // 只记录PUT和POST请求，因为这些请求通常有较大的请求体
+    if (req.method === 'PUT' || req.method === 'POST') {
+        // 监听请求数据
+        let body = [];
+        req.on('data', chunk => {
+            body.push(chunk);
+        });
+        
+        req.on('end', () => {
+            // 计算请求体大小
+            const bodyBuffer = Buffer.concat(body);
+            const bodySize = bodyBuffer.length;
+            const bodySizeKB = (bodySize / 1024).toFixed(2);
+            const bodySizeMB = (bodySize / (1024 * 1024)).toFixed(2);
+            
+            // 记录请求信息
+            console.log(`[Request] ${req.method} ${req.url}`);
+            console.log(`[Request Body Size] ${bodySize} bytes (${bodySizeKB} KB, ${bodySizeMB} MB)`);
+            
+            // 尝试解析请求体内容，只记录前1000个字符，避免日志过大
+            try {
+                const bodyString = bodyBuffer.toString('utf8');
+                if (bodyString.length > 1000) {
+                    console.log(`[Request Body Preview] ${bodyString.substring(0, 1000)}... (truncated)`);
+                } else {
+                    console.log(`[Request Body] ${bodyString}`);
+                }
+            } catch (error) {
+                console.log(`[Request Body] Binary data or unparseable content`);
+            }
+            
+            console.log('--------------------------------------------------');
+        });
+    }
+    next();
+});
+
 app.use(cors());
-app.use(express.json());
+// 增加请求体大小限制，解决PayloadTooLargeError
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 登录页面路由
@@ -564,7 +604,14 @@ app.get('/api/nodes', async (req, res) => {
         const sql = 'SELECT * FROM nodes WHERE graphId = ?';
         console.log(`[SQL] ${sql} - params: [${graphId}]`);
         const nodes = await queryAll(sql, [graphId]);
-        res.json(nodes);
+        
+        // 解析 tasks 字段
+        const parsedNodes = nodes.map(node => ({
+            ...node,
+            tasks: node.tasks ? JSON.parse(node.tasks) : []
+        }));
+        
+        res.json(parsedNodes);
     } catch (e) {
         console.error('获取 nodes 失败:', e);
         res.status(500).json({ error: '获取节点失败' });
@@ -612,9 +659,12 @@ app.put('/api/nodes/:id', async (req, res) => {
             return res.status(403).json({ error: '无权限' });
         }
 
+        // 只有当tasks参数存在时才进行JSON序列化，否则使用数据库中现有的值
+        const tasksValue = tasks !== undefined ? JSON.stringify(tasks) : node.tasks;
+        
         await run(
             'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, tasks = ? WHERE id = ?',
-            [x, y, radius, name, type, color, taskListName || node.taskListName, JSON.stringify(tasks || node.tasks), id]
+            [x, y, radius, name, type, color, taskListName || node.taskListName, tasksValue, id]
         );
         const updatedNode = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
         res.json(updatedNode);
@@ -728,9 +778,13 @@ app.put('/api/edges/:id', async (req, res) => {
             return res.status(403).json({ error: '无权限' });
         }
 
+        // 只有当参数存在时才进行JSON序列化，否则使用数据库中现有的值
+        const bendPointsValue = bendPoints !== undefined ? JSON.stringify(bendPoints) : edge.bendPoints;
+        const tasksValue = tasks !== undefined ? JSON.stringify(tasks) : edge.tasks;
+        
         await run(
             'UPDATE edges SET sourceId = ?, targetId = ?, label = ?, color = ?, bendPoints = ?, tasks = ? WHERE id = ?',
-            [sourceId, targetId, label, color, JSON.stringify(bendPoints !== undefined ? bendPoints : edge.bendPoints), JSON.stringify(tasks !== undefined ? tasks : edge.tasks), id]
+            [sourceId, targetId, label, color, bendPointsValue, tasksValue, id]
         );
         const updatedEdge = await queryOne('SELECT * FROM edges WHERE id = ?', [id]);
         res.json(updatedEdge);
