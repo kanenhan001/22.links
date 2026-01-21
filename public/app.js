@@ -1863,8 +1863,10 @@ class GraphEditor {
                     <div class="property-inline-row">
                         <input type="text" id="propName" value="${this.selectedNode.name}" data-prop="name" placeholder="名称">
                         <select id="propType" data-prop="type">
-                            <option value="person" ${this.selectedNode.type === 'person' ? 'selected' : ''}>人物</option>
                             <option value="organization" ${this.selectedNode.type === 'organization' ? 'selected' : ''}>组织</option>
+                            <option value="person" ${this.selectedNode.type === 'person' ? 'selected' : ''}>人物</option>
+                            <option value="location" ${this.selectedNode.type === 'location' ? 'selected' : ''}>地点</option>
+                            <option value="time" ${this.selectedNode.type === 'time' ? 'selected' : ''}>时间</option>
                             <option value="event" ${this.selectedNode.type === 'event' ? 'selected' : ''}>事件</option>
                             <option value="concept" ${this.selectedNode.type === 'concept' ? 'selected' : ''}>概念</option>
                         </select>

@@ -659,12 +659,19 @@ app.put('/api/nodes/:id', async (req, res) => {
             return res.status(403).json({ error: '无权限' });
         }
 
-        // 只有当tasks参数存在时才进行JSON序列化，否则使用数据库中现有的值
+        // 确保所有参数都不是undefined，对于必需参数使用数据库中现有的值
+        const xValue = x !== undefined ? x : node.x;
+        const yValue = y !== undefined ? y : node.y;
+        const radiusValue = radius !== undefined ? radius : node.radius;
+        const nameValue = name !== undefined ? name : node.name;
+        const typeValue = type !== undefined ? type : node.type;
+        const colorValue = color !== undefined ? color : node.color;
+        const taskListNameValue = taskListName !== undefined ? taskListName : node.taskListName;
         const tasksValue = tasks !== undefined ? JSON.stringify(tasks) : node.tasks;
         
         await run(
             'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, tasks = ? WHERE id = ?',
-            [x, y, radius, name, type, color, taskListName || node.taskListName, tasksValue, id]
+            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, tasksValue, id]
         );
         const updatedNode = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
         res.json(updatedNode);
@@ -778,13 +785,17 @@ app.put('/api/edges/:id', async (req, res) => {
             return res.status(403).json({ error: '无权限' });
         }
 
-        // 只有当参数存在时才进行JSON序列化，否则使用数据库中现有的值
+        // 确保所有参数都不是undefined，对于必需参数使用数据库中现有的值
+        const sourceIdValue = sourceId !== undefined ? sourceId : edge.sourceId;
+        const targetIdValue = targetId !== undefined ? targetId : edge.targetId;
+        const labelValue = label !== undefined ? label : edge.label;
+        const colorValue = color !== undefined ? color : edge.color;
         const bendPointsValue = bendPoints !== undefined ? JSON.stringify(bendPoints) : edge.bendPoints;
         const tasksValue = tasks !== undefined ? JSON.stringify(tasks) : edge.tasks;
         
         await run(
             'UPDATE edges SET sourceId = ?, targetId = ?, label = ?, color = ?, bendPoints = ?, tasks = ? WHERE id = ?',
-            [sourceId, targetId, label, color, bendPointsValue, tasksValue, id]
+            [sourceIdValue, targetIdValue, labelValue, colorValue, bendPointsValue, tasksValue, id]
         );
         const updatedEdge = await queryOne('SELECT * FROM edges WHERE id = ?', [id]);
         res.json(updatedEdge);
