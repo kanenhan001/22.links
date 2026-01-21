@@ -412,7 +412,7 @@ app.get('/api/graphs', async (req, res) => {
         const sql = 'SELECT id, name, createdAt, thumbnail FROM graphs WHERE userId = ? ORDER BY id DESC';
         console.log(`[SQL] ${sql} - params: [${userId}]`);
         const [graphs] = await pool.execute(sql, [userId]);
-        console.log('关系图列表:', graphs);
+        // console.log('关系图列表:', graphs);
         res.json(graphs);
     } catch (e) {
         console.error('获取 graphs 失败:', e);
