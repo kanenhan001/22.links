@@ -764,6 +764,7 @@
     });
 
     ensureLogin().then(u => {
+      console.log('ensureLogin result:', u);
       if (u) loadGraphs();
     });
   </script>
