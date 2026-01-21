@@ -696,3 +696,106 @@ body {
         flex-direction: column;
     }
 }
+
+/* 自定义弹窗样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+}
+.modal-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+.modal {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  transform: scale(0.9) translateY(20px);
+  transition: all 0.2s ease;
+}
+.modal-overlay.show .modal {
+  transform: scale(1) translateY(0);
+}
+.modal-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+.modal-icon.info {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.modal-icon.success {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+.modal-icon.error {
+  background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+}
+.modal-icon.warning {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+.modal-icon svg {
+  width: 24px;
+  height: 24px;
+  color: #fff;
+}
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.modal-message {
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.modal-btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.modal-btn.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+.modal-btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+.modal-btn.secondary {
+  background: #f5f5f5;
+  color: #666;
+}
+.modal-btn.secondary:hover {
+  background: #eee;
+}
+

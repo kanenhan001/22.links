@@ -120,7 +120,7 @@ class GraphEditor {
         } catch (error) {
             console.error('加载数据失败:', error);
             this.showStatus('加载数据失败: ' + error.message);
-            alert('加载数据失败，请确保服务器已启动');
+            showModal({ title: '加载失败', message: '加载数据失败，请确保服务器已启动', type: 'error' });
         }
     }
     
@@ -143,12 +143,14 @@ class GraphEditor {
                 console.log('保存后 nodes 长度:', this.nodes.length);
             }
             this.showStatus('节点已保存');
+            // 生成缩略图
+            await this.generateAndUploadThumbnail();
         } catch (error) {
             console.error('保存节点失败:', error);
             this.showStatus('保存节点失败: ' + error.message);
         }
     }
-    
+
     async saveEdge(edge) {
         try {
             edge.graphId = this.graphId;
@@ -159,11 +161,183 @@ class GraphEditor {
                 edge.id = result.id;
             }
             this.showStatus('关系已保存');
+            // 生成缩略图
+            await this.generateAndUploadThumbnail();
         } catch (error) {
             console.error('保存关系失败:', error);
             this.showStatus('保存关系失败: ' + error.message);
         }
     }
+
+    async generateAndUploadThumbnail() {
+        try {
+            // 生成缩略图
+            const thumbnailData = await this.generateThumbnail();
+            if (!thumbnailData) {
+                console.log('未生成缩略图（画布为空）');
+                return;
+            }
+
+            // 上传缩略图
+            await this.uploadThumbnail(thumbnailData);
+            console.log('缩略图上传成功');
+        } catch (error) {
+            console.error('生成或上传缩略图失败:', error);
+        }
+    }
+
+    async generateThumbnail() {
+        // 如果没有节点和边，不生成缩略图
+        if (this.nodes.length === 0 && this.edges.length === 0) {
+            return null;
+        }
+
+        // 创建临时 canvas 用于生成缩略图
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+
+        // 缩略图尺寸（调整为更适合卡片的比例）
+        const thumbnailWidth = 400;
+        const thumbnailHeight = 250;
+        tempCanvas.width = thumbnailWidth;
+        tempCanvas.height = thumbnailHeight;
+
+        // 计算所有节点的边界框（包含文字）
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        this.nodes.forEach(node => {
+            const radius = node.radius || 40;
+            // 增加额外的 padding 以容纳文字
+            const padding = radius * 0.8;
+            minX = Math.min(minX, node.x - radius - padding);
+            minY = Math.min(minY, node.y - radius - padding);
+            maxX = Math.max(maxX, node.x + radius + padding);
+            maxY = Math.max(maxY, node.y + radius + padding);
+        });
+
+        // 如果没有节点，使用默认边界
+        if (this.nodes.length === 0) {
+            minX = 0;
+            minY = 0;
+            maxX = this.canvas.width;
+            maxY = this.canvas.height;
+        }
+
+        // 计算缩放比例和偏移
+        const contentWidth = maxX - minX;
+        const contentHeight = maxY - minY;
+        const scaleX = (thumbnailWidth - 20) / contentWidth; // 20 是 padding
+        const scaleY = (thumbnailHeight - 20) / contentHeight;
+        const scale = Math.min(scaleX, scaleY, 1); // 不放大，只缩小
+
+        const offsetX = (thumbnailWidth - contentWidth * scale) / 2 - minX * scale;
+        const offsetY = (thumbnailHeight - contentHeight * scale) / 2 - minY * scale;
+
+        // 绘制背景
+        tempCtx.fillStyle = '#ffffff';
+        tempCtx.fillRect(0, 0, thumbnailWidth, thumbnailHeight);
+
+        // 应用变换
+        tempCtx.save();
+        tempCtx.translate(offsetX, offsetY);
+        tempCtx.scale(scale, scale);
+
+        // 绘制边（与 render 方法一致）
+        this.edges.forEach(edge => {
+            const sourceNode = this.nodes.find(n => n.id === edge.sourceId);
+            const targetNode = this.nodes.find(n => n.id === edge.targetId);
+            if (!sourceNode || !targetNode) return;
+
+            tempCtx.strokeStyle = edge.color || '#e74c3c';
+            tempCtx.lineWidth = 2;
+            tempCtx.beginPath();
+            tempCtx.moveTo(sourceNode.x, sourceNode.y);
+            tempCtx.lineTo(targetNode.x, targetNode.y);
+            tempCtx.stroke();
+
+            // 绘制关系名称
+            const label = edge.name || edge.label || '';
+            if (label) {
+                // 计算边的中点
+                const midX = (sourceNode.x + targetNode.x) / 2;
+                const midY = (sourceNode.y + targetNode.y) / 2;
+
+                // 根据缩放比例调整字体大小
+                const fontSize = Math.max(8, 12 * scale);
+                tempCtx.font = `bold ${fontSize}px Arial`;
+                tempCtx.fillStyle = '#333333';
+                tempCtx.textAlign = 'center';
+                tempCtx.textBaseline = 'middle';
+
+                // 绘制文字背景（白色矩形）以提高可读性
+                const textWidth = tempCtx.measureText(label).width;
+                const bgPadding = 3;
+                tempCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                tempCtx.fillRect(
+                    midX - textWidth / 2 - bgPadding,
+                    midY - fontSize / 2 - bgPadding,
+                    textWidth + bgPadding * 2,
+                    fontSize + bgPadding * 2
+                );
+
+                // 绘制文字
+                tempCtx.fillStyle = '#333333';
+                tempCtx.fillText(label, midX, midY);
+            }
+        });
+
+        // 绘制节点（与 render 方法一致）
+        this.nodes.forEach(node => {
+            const radius = node.radius || 40;
+
+            // 绘制节点圆
+            tempCtx.fillStyle = node.color || '#3498db';
+            tempCtx.beginPath();
+            tempCtx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+            tempCtx.fill();
+
+            // 绘制节点名称
+            const name = node.name || '';
+            if (name) {
+                // 根据缩放比例调整字体大小
+                const fontSize = Math.max(10, radius * 0.4 * scale);
+                tempCtx.font = `bold ${fontSize}px Arial`;
+                tempCtx.fillStyle = '#ffffff';
+                tempCtx.textAlign = 'center';
+                tempCtx.textBaseline = 'middle';
+                
+                // 如果文字太长，截断并显示省略号
+                const maxWidth = radius * 1.8;
+                const measuredWidth = tempCtx.measureText(name).width;
+                if (measuredWidth > maxWidth) {
+                    let truncated = name;
+                    while (tempCtx.measureText(truncated + '...').width > maxWidth && truncated.length > 0) {
+                        truncated = truncated.slice(0, -1);
+                    }
+                    tempCtx.fillText(truncated + '...', node.x, node.y);
+                } else {
+                    tempCtx.fillText(name, node.x, node.y);
+                }
+            }
+        });
+
+        tempCtx.restore();
+
+        // 转换为 base64
+        return tempCanvas.toDataURL('image/png');
+    }
+
+    async uploadThumbnail(thumbnailData) {
+        try {
+            await this.apiPut(`/api/graphs/${this.graphId}`, {
+                thumbnail: thumbnailData
+            });
+        } catch (error) {
+            console.error('上传缩略图失败:', error);
+            throw error;
+        }
+    }
+    
+
     
     async deleteNode(node) {
         try {
@@ -1266,12 +1440,17 @@ class GraphEditor {
         if (this.selectedNode) {
             // 删除节点
             const nodeName = this.selectedNode.name;
-            if (confirm(`确定要删除节点"${nodeName}"吗？\n删除节点将同时删除与该节点相关的所有关系。`)) {
-                await this.deleteNode(this.selectedNode);
-                this.selectedNode = null;
-                this.updatePropertiesPanel();
-                this.render();
-            }
+            showModal({
+                title: '确认删除',
+                message: `确定要删除节点"${nodeName}"吗？删除节点将同时删除与该节点相关的所有关系。`,
+                type: 'warning',
+                onConfirm: async () => {
+                    await this.deleteNode(this.selectedNode);
+                    this.selectedNode = null;
+                    this.updatePropertiesPanel();
+                    this.render();
+                }
+            });
         } else if (this.selectedEdge) {
             // 删除关系
             console.log('Frontend: Attempting to delete selected edge with id:', this.selectedEdge.id);
@@ -1281,23 +1460,33 @@ class GraphEditor {
             const targetName = target ? target.name : '未知';
             const edgeLabel = this.selectedEdge.label || '关系';
             
-            if (confirm(`确定要删除关系"${edgeLabel}"吗？\n(${sourceName} -> ${targetName})`)) {
-                await this.deleteEdge(this.selectedEdge);
-                this.selectedEdge = null;
-                this.updatePropertiesPanel();
-                this.render();
-            }
+            showModal({
+                title: '确认删除',
+                message: `确定要删除关系"${edgeLabel}"吗？(${sourceName} -> ${targetName})`,
+                type: 'warning',
+                onConfirm: async () => {
+                    await this.deleteEdge(this.selectedEdge);
+                    this.selectedEdge = null;
+                    this.updatePropertiesPanel();
+                    this.render();
+                }
+            });
         }
     }
     
     async handleClear() {
-        if (confirm('确定要清空整个画布吗？')) {
-            await this.clearAll();
-            this.selectedNode = null;
-            this.selectedEdge = null;
-            this.updatePropertiesPanel();
-            this.render();
-        }
+        showModal({
+            title: '确认清空',
+            message: '确定要清空整个画布吗？',
+            type: 'warning',
+            onConfirm: async () => {
+                await this.clearAll();
+                this.selectedNode = null;
+                this.selectedEdge = null;
+                this.updatePropertiesPanel();
+                this.render();
+            }
+        });
     }
     
     exportDatabase() {
@@ -1322,11 +1511,11 @@ class GraphEditor {
             if (!response.ok) throw new Error('导入失败');
             
             await this.loadData();
-            alert('数据库导入成功');
+            showModal({ title: '导入成功', message: '数据库导入成功', type: 'success' });
             this.showStatus('导入成功');
         } catch (error) {
             console.error('导入失败:', error);
-            alert('导入数据库失败: ' + error.message);
+            showModal({ title: '导入失败', message: '导入数据库失败: ' + error.message, type: 'error' });
             this.showStatus('导入失败: ' + error.message);
         }
         
@@ -1969,7 +2158,7 @@ class GraphEditor {
             console.log('图片导出成功');
         } catch (err) {
             console.error('导出失败:', err);
-            alert('导出失败: ' + err.message);
+            showModal({ title: '导出失败', message: '导出失败: ' + err.message, type: 'error' });
         } finally {
             // 恢复原始状态
             this.ctx = this.ctx;
@@ -1999,3 +2188,70 @@ let editor;
         }, 500);
     }
 })();
+
+// 自定义弹窗函数
+function showModal(options) {
+  const {
+    title = '提示',
+    message = '',
+    type = 'info',
+    onConfirm = null
+  } = options || {};
+
+  const overlay = document.getElementById('modalOverlay');
+  if (!overlay) {
+    console.error('Modal overlay not found');
+    return;
+  }
+
+  const icon = document.getElementById('modalIcon');
+  const titleEl = document.getElementById('modalTitle');
+  const messageEl = document.getElementById('modalMessage');
+
+  icon.className = 'modal-icon ' + type;
+  let iconSvg = '';
+  switch (type) {
+    case 'success':
+      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+      break;
+    case 'error':
+      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      break;
+    case 'warning':
+      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+      break;
+    default:
+      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+  }
+  icon.innerHTML = iconSvg;
+
+  titleEl.textContent = title;
+  messageEl.textContent = message;
+
+  const buttons = document.querySelector('.modal-buttons');
+  const confirmBtn = buttons.querySelector('.modal-btn.primary');
+  confirmBtn.onclick = () => {
+    hideModal();
+    if (onConfirm) onConfirm();
+  };
+
+  overlay.classList.add('show');
+}
+
+function hideModal() {
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) {
+    overlay.classList.remove('show');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target.id === 'modalOverlay') {
+        hideModal();
+      }
+    });
+  }
+});

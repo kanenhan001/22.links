@@ -372,7 +372,23 @@
 
     </div>
 
-
+    <!-- 自定义弹窗 -->
+    <div id="modalOverlay" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-icon" id="modalIcon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+        </div>
+        <div class="modal-title" id="modalTitle">提示</div>
+        <div class="modal-message" id="modalMessage">消息内容</div>
+        <div class="modal-buttons">
+          <button class="modal-btn primary" onclick="hideModal()">确定</button>
+        </div>
+      </div>
+    </div>
 
 </body>
 
