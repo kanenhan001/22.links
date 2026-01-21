@@ -24,6 +24,12 @@ class GraphEditor {
         // 选中的转折点
         this.selectedBendPoint = null;
         this.selectedBendPointIndex = -1;
+        // 圈选相关状态
+        this.isDraggingSelection = false;
+        this.selectionStart = { x: 0, y: 0 };
+        this.selectionEnd = { x: 0, y: 0 };
+        this.selectedNodes = [];
+        this.draggingSelectedNodes = false;
         // 缩放相关状态
         // 默认缩放级别，稍后会尝试从本地缓存恢复
         this.zoomLevel = 1.0; // 当前缩放级别，1.0 = 100%
@@ -888,14 +894,39 @@ class GraphEditor {
             }
         }
 
-        // 正常的拖拽节点
-        for (let node of this.nodes) {
+        // 检查是否点击在已选中的节点上
+        let clickedOnSelectedNode = false;
+        for (let node of this.selectedNodes) {
             if (this.isPointInNode(x, y, node)) {
-                this.draggingNode = node;
+                clickedOnSelectedNode = true;
+                this.draggingSelectedNodes = true;
                 this.dragOffset = { x: x - node.x, y: y - node.y };
                 return;
             }
         }
+
+        // 检查是否点击在节点上
+        for (let node of this.nodes) {
+            if (this.isPointInNode(x, y, node)) {
+                this.draggingNode = node;
+                this.dragOffset = { x: x - node.x, y: y - node.y };
+                // 清除之前的选择
+                this.selectedNodes = [];
+                this.selectedNode = node;
+                this.updatePropertiesPanel();
+                return;
+            }
+        }
+
+        // 开始圈选
+        this.isDraggingSelection = true;
+        this.selectionStart = { x, y };
+        this.selectionEnd = { x, y };
+        // 清除之前的选择
+        this.selectedNodes = [];
+        this.selectedNode = null;
+        this.selectedEdge = null;
+        this.updatePropertiesPanel();
     }
     
     handleMouseMove(e) {
@@ -936,10 +967,30 @@ class GraphEditor {
             return;
         }
 
+        // 拖拽选中的节点
+        if (this.draggingSelectedNodes) {
+            const dx = x - this.dragOffset.x - (this.selectedNodes.length > 0 ? this.selectedNodes[0].x : 0);
+            const dy = y - this.dragOffset.y - (this.selectedNodes.length > 0 ? this.selectedNodes[0].y : 0);
+            
+            for (let node of this.selectedNodes) {
+                node.x += dx;
+                node.y += dy;
+            }
+            this.render();
+            return;
+        }
+
         // 正常的拖拽节点
         if (this.draggingNode) {
             this.draggingNode.x = x - this.dragOffset.x;
             this.draggingNode.y = y - this.dragOffset.y;
+            this.render();
+            return;
+        }
+
+        // 圈选过程中
+        if (this.isDraggingSelection) {
+            this.selectionEnd = { x, y };
             this.render();
         }
     }
@@ -1009,11 +1060,47 @@ class GraphEditor {
             return;
         }
 
+        // 拖拽选中的节点结束
+        if (this.draggingSelectedNodes) {
+            // 保存所有选中节点的位置
+            for (let node of this.selectedNodes) {
+                await this.saveNode(node);
+            }
+            this.draggingSelectedNodes = false;
+            return;
+        }
+
         // 正常的拖拽节点结束
         if (this.draggingNode) {
             await this.saveNode(this.draggingNode);
         }
         this.draggingNode = null;
+
+        // 圈选结束
+        if (this.isDraggingSelection) {
+            this.isDraggingSelection = false;
+            
+            // 计算选择矩形的边界
+            const minX = Math.min(this.selectionStart.x, this.selectionEnd.x);
+            const maxX = Math.max(this.selectionStart.x, this.selectionEnd.x);
+            const minY = Math.min(this.selectionStart.y, this.selectionEnd.y);
+            const maxY = Math.max(this.selectionStart.y, this.selectionEnd.y);
+            
+            // 检查哪些节点在选择矩形内
+            this.selectedNodes = this.nodes.filter(node => {
+                return node.x >= minX && node.x <= maxX && node.y >= minY && node.y <= maxY;
+            });
+            
+            // 如果只选中了一个节点，也设置selectedNode
+            if (this.selectedNodes.length === 1) {
+                this.selectedNode = this.selectedNodes[0];
+            } else {
+                this.selectedNode = null;
+            }
+            
+            this.updatePropertiesPanel();
+            this.render();
+        }
 
         // 如果当前是创建关系模式，且鼠标松开后没有创建成功，但已经选择了源节点，则可以认为是想切换源节点
         // 但由于双击已经进入了创建模式，所以这里的mouseUp不应该取消，否则会影响双击后的拖拽
@@ -1671,7 +1758,29 @@ class GraphEditor {
         const panel = document.getElementById('propertiesContent');
         const panelContainer = document.querySelector('.properties-panel');
         
-        if (this.selectedNode) {
+        // 检查是否选中了多个节点
+        if (this.selectedNodes.length > 1) {
+            if (panelContainer) {
+                panelContainer.classList.remove('collapsed');
+            }
+            
+            panel.innerHTML = `
+                <div class="property-group">
+                    <label>已选择 ${this.selectedNodes.length} 个节点</label>
+                    <p style="color: #666; font-size: 13px;">您可以拖拽这些节点进行整体移动</p>
+                </div>
+                <div class="property-group">
+                    <label>选中的节点:</label>
+                    <div class="selected-nodes-list">
+                        ${this.selectedNodes.map(node => `
+                            <div class="selected-node-item">
+                                <span class="selected-node-name">${node.name}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        } else if (this.selectedNode) {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
             }
@@ -1897,7 +2006,35 @@ class GraphEditor {
             }
         }
 
+        // 绘制节点
         this.nodes.forEach(node => this.drawNode(node));
+
+        // 绘制圈选矩形
+        if (this.isDraggingSelection) {
+            const minX = Math.min(this.selectionStart.x, this.selectionEnd.x);
+            const maxX = Math.max(this.selectionStart.x, this.selectionEnd.x);
+            const minY = Math.min(this.selectionStart.y, this.selectionEnd.y);
+            const maxY = Math.max(this.selectionStart.y, this.selectionEnd.y);
+            
+            this.ctx.strokeStyle = '#667eea';
+            this.ctx.lineWidth = 2;
+            this.ctx.setLineDash([5, 5]);
+            this.ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+            this.ctx.setLineDash([]);
+        }
+
+        // 绘制选中节点的高亮效果
+        this.selectedNodes.forEach(node => {
+            if (node !== this.selectedNode) {
+                this.ctx.beginPath();
+                this.ctx.arc(node.x, node.y, node.radius + 8, 0, Math.PI * 2);
+                this.ctx.strokeStyle = '#667eea';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+            }
+        });
     }
     
     drawTemporaryEdge(sourceNode, mousePos) {
@@ -1994,8 +2131,8 @@ class GraphEditor {
         this.ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
         this.ctx.fillStyle = node.color;
         this.ctx.fill();
-        this.ctx.strokeStyle = this.selectedNode === node ? '#667eea' : '#333';
-        this.ctx.lineWidth = this.selectedNode === node ? 4 : 2;
+        this.ctx.strokeStyle = (this.selectedNode === node || this.selectedNodes.includes(node)) ? '#667eea' : '#333';
+        this.ctx.lineWidth = (this.selectedNode === node || this.selectedNodes.includes(node)) ? 4 : 2;
         this.ctx.stroke();
         
         this.ctx.fillStyle = 'white';
@@ -2004,7 +2141,7 @@ class GraphEditor {
         this.ctx.textBaseline = 'middle';
         this.ctx.fillText(node.name, node.x, node.y);
         
-        if (this.selectedNode === node) {
+        if (this.selectedNode === node || this.selectedNodes.includes(node)) {
             this.ctx.beginPath();
             this.ctx.arc(node.x, node.y, node.radius + 8, 0, Math.PI * 2);
             this.ctx.strokeStyle = '#667eea';
