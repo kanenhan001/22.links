@@ -34,7 +34,6 @@ class GraphEditor {
         // 当前关系图ID（来自 URL /g/:id）
         this.graphId = this.getGraphIdFromUrl();
     }
-    
     static async create() {
         const editor = new GraphEditor();
 
