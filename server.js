@@ -412,7 +412,7 @@ app.get('/api/graphs', async (req, res) => {
         const sql = 'SELECT id, name, createdAt, thumbnail FROM graphs WHERE userId = ? ORDER BY id DESC';
         console.log(`[SQL] ${sql} - params: [${userId}]`);
         const [graphs] = await pool.execute(sql, [userId]);
-        console.log('关系图列表:', graphs);
+        // console.log('关系图列表:', graphs);
         res.json(graphs);
     } catch (e) {
         console.error('获取 graphs 失败:', e);
@@ -672,7 +672,15 @@ app.get('/api/edges', async (req, res) => {
         const sql = 'SELECT * FROM edges WHERE graphId = ?';
         console.log(`[SQL] ${sql} - params: [${graphId}]`);
         const edges = await queryAll(sql, [graphId]);
-        res.json(edges);
+        
+        // 解析 bendPoints 字段
+        const parsedEdges = edges.map(edge => ({
+            ...edge,
+            bendPoints: edge.bendPoints ? JSON.parse(edge.bendPoints) : [],
+            tasks: edge.tasks ? JSON.parse(edge.tasks) : []
+        }));
+        
+        res.json(parsedEdges);
     } catch (e) {
         console.error('获取 edges 失败:', e);
         res.status(500).json({ error: '获取边失败' });
@@ -722,7 +730,7 @@ app.put('/api/edges/:id', async (req, res) => {
 
         await run(
             'UPDATE edges SET sourceId = ?, targetId = ?, label = ?, color = ?, bendPoints = ?, tasks = ? WHERE id = ?',
-            [sourceId, targetId, label, color, JSON.stringify(bendPoints || edge.bendPoints), JSON.stringify(tasks || edge.tasks), id]
+            [sourceId, targetId, label, color, JSON.stringify(bendPoints !== undefined ? bendPoints : edge.bendPoints), JSON.stringify(tasks !== undefined ? tasks : edge.tasks), id]
         );
         const updatedEdge = await queryOne('SELECT * FROM edges WHERE id = ?', [id]);
         res.json(updatedEdge);

@@ -740,6 +740,36 @@ body {
     }
 }
 
+/* SweetAlert2 自定义样式 */
+.swal2-popup {
+  width: 350px !important;
+  padding: 15px !important;
+}
+.swal2-icon {
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 24px !important;
+  margin-top: 5px !important;
+}
+.swal2-icon .swal2-icon-content {
+  font-size: 24px !important;
+  line-height: 40px !important;
+}
+.swal2-title-sm {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  margin-bottom: 10px !important;
+}
+.swal2-content-sm {
+  font-size: 14px !important;
+  margin-bottom: 15px !important;
+}
+.swal2-btn-sm {
+  font-size: 13px !important;
+  padding: 6px 12px !important;
+  margin: 0 5px !important;
+}
+
 /* �Զ��嵯����ʽ */
 .modal-overlay {
   position: fixed;

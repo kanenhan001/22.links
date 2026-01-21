@@ -497,7 +497,7 @@
           }
         });
       } else if (action === 'rename') {
-        Swal.fire({
+        Sweetalert2.fire({
           title: '重命名',
           input: 'text',
           inputPlaceholder: '请输入新的关系图名称',
@@ -520,7 +520,7 @@
               body: JSON.stringify({ name: result.value.trim() })
             }).then(() => {
               loadGraphs();
-              Swal.fire({
+              Sweetalert2.fire({
                 title: '重命名成功',
                 text: '关系图名称已更新',
                 icon: 'success',
@@ -533,7 +533,7 @@
                 }
               });
             }).catch(err => {
-              Swal.fire({
+              Sweetalert2.fire({
                 title: '重命名失败',
                 text: err.message,
                 icon: 'error',
@@ -549,7 +549,7 @@
           }
         });
       } else if (action === 'copy') {
-        Swal.fire({
+        Sweetalert2.fire({
           title: '复制关系图',
           input: 'text',
           inputValue: '副本 - ',
@@ -573,7 +573,7 @@
               body: JSON.stringify({ name: result.value.trim() })
             }).then(() => {
               loadGraphs();
-              Swal.fire({
+              Sweetalert2.fire({
                 title: '复制成功',
                 text: '关系图已复制',
                 icon: 'success',
@@ -586,7 +586,7 @@
                 }
               });
             }).catch(err => {
-              Swal.fire({
+              Sweetalert2.fire({
                 title: '复制失败',
                 text: err.message,
                 icon: 'error',
@@ -701,7 +701,7 @@
         closeMenu();
       } catch (err) {
         console.error('导出失败:', err);
-        Swal.fire({
+        Sweetalert2.fire({
           title: '导出失败',
           text: err.message,
           icon: 'error',
@@ -730,7 +730,7 @@
         // 刷新关系图列表
         loadGraphs();
         // 显示成功提示
-        Swal.fire({
+        Sweetalert2.fire({
           title: '创建成功',
           text: '关系图已创建',
           icon: 'success',
@@ -743,7 +743,7 @@
           }
         });
       } catch (err) {
-        Swal.fire({
+        Sweetalert2.fire({
           title: '创建失败',
           text: err.message,
           icon: 'error',

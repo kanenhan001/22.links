@@ -21,6 +21,9 @@ class GraphEditor {
         this.draggingBendPoint = null;
         this.bendPointIndex = -1;
         this.bendPointEdge = null;
+        // 选中的转折点
+        this.selectedBendPoint = null;
+        this.selectedBendPointIndex = -1;
         // 缩放相关状态
         // 默认缩放级别，稍后会尝试从本地缓存恢复
         this.zoomLevel = 1.0; // 当前缩放级别，1.0 = 100%
@@ -808,7 +811,7 @@ class GraphEditor {
                 this.updatePropertiesPanel();
 
                 // 添加转折点
-                if (!edge.bendPoints) {
+                if (!Array.isArray(edge.bendPoints)) {
                     edge.bendPoints = [];
                 }
 
@@ -846,10 +849,22 @@ class GraphEditor {
             return;
         }
 
-        // 检查是否点击在转折点上（拖拽转折点）
+        // 检查是否点击在转折点上（选中或拖拽转折点）
         if (this.selectedEdge) {
             const bendPointHit = this.isPointOnBendPoint(x, y, this.selectedEdge);
             if (bendPointHit) {
+                // 选中转折点
+                this.selectedBendPoint = this.selectedEdge;
+                this.selectedBendPointIndex = bendPointHit.index;
+                this.updatePropertiesPanel();
+                
+                // 如果是双击，直接删除转折点
+                if (e.detail === 2) {
+                    this.deleteSelectedBendPoint();
+                    return;
+                }
+                
+                // 准备拖拽转折点
                 this.draggingBendPoint = this.selectedEdge;
                 this.bendPointIndex = bendPointHit.index;
                 this.bendPointEdge = this.selectedEdge;
@@ -1431,7 +1446,42 @@ class GraphEditor {
         this.render();
     }
     
+    async deleteSelectedBendPoint() {
+        if (!this.selectedBendPoint || this.selectedBendPointIndex === -1) {
+            return;
+        }
+        
+        const edge = this.selectedBendPoint;
+        const index = this.selectedBendPointIndex;
+        
+        showModal({
+            title: '确认删除',
+            message: '确定要删除这个转折点吗？',
+            type: 'warning',
+            showCancel: true,
+            onConfirm: async () => {
+                // 删除转折点
+                edge.bendPoints.splice(index, 1);
+                await this.saveEdge(edge);
+                
+                // 清除选中状态
+                this.selectedBendPoint = null;
+                this.selectedBendPointIndex = -1;
+                
+                this.updatePropertiesPanel();
+                this.render();
+                this.showStatus('转折点已删除');
+            }
+        });
+    }
+
     async handleDelete() {
+        // 先检查是否选中了转折点
+        if (this.selectedBendPoint && this.selectedBendPointIndex !== -1) {
+            await this.deleteSelectedBendPoint();
+            return;
+        }
+        
         if (!this.selectedNode && !this.selectedEdge) {
             this.showStatus('请先选择一个节点或关系');
             return;
@@ -1444,6 +1494,7 @@ class GraphEditor {
                 title: '确认删除',
                 message: `确定要删除节点"${nodeName}"吗？删除节点将同时删除与该节点相关的所有关系。`,
                 type: 'warning',
+                showCancel: true,
                 onConfirm: async () => {
                     await this.deleteNode(this.selectedNode);
                     this.selectedNode = null;
@@ -1462,8 +1513,9 @@ class GraphEditor {
             
             showModal({
                 title: '确认删除',
-                message: `确定要删除关系"${edgeLabel}"吗？(${sourceName} -> ${targetName})`,
+                message: `确定要删除关系"${edgeLabel}"（从"${sourceName}"到"${targetName}"）吗？`,
                 type: 'warning',
+                showCancel: true,
                 onConfirm: async () => {
                     await this.deleteEdge(this.selectedEdge);
                     this.selectedEdge = null;
@@ -1479,6 +1531,7 @@ class GraphEditor {
             title: '确认清空',
             message: '确定要清空整个画布吗？',
             type: 'warning',
+            showCancel: true,
             onConfirm: async () => {
                 await this.clearAll();
                 this.selectedNode = null;
@@ -2071,11 +2124,12 @@ class GraphEditor {
             for (let i = 0; i < bendPoints.length; i++) {
                 const bp = bendPoints[i];
                 const isDragging = this.draggingBendPoint === edge && this.bendPointIndex === i;
-                const pointRadius = isDragging ? 10 : 8;
+                const isSelected = this.selectedBendPoint === edge && this.selectedBendPointIndex === i;
+                const pointRadius = isDragging ? 10 : (isSelected ? 9 : 8);
 
                 this.ctx.beginPath();
                 this.ctx.arc(bp.x, bp.y, pointRadius, 0, Math.PI * 2);
-                this.ctx.fillStyle = isDragging ? '#667eea' : '#fff';
+                this.ctx.fillStyle = isDragging ? '#667eea' : (isSelected ? '#667eea' : '#fff');
                 this.ctx.fill();
                 this.ctx.strokeStyle = '#667eea';
                 this.ctx.lineWidth = 2;
@@ -2189,69 +2243,47 @@ let editor;
     }
 })();
 
-// 自定义弹窗函数
+// SweetAlert2 弹窗函数
 function showModal(options) {
   const {
     title = '提示',
     message = '',
     type = 'info',
-    onConfirm = null
+    onConfirm = null,
+    showCancel = false
   } = options || {};
 
-  const overlay = document.getElementById('modalOverlay');
-  if (!overlay) {
-    console.error('Modal overlay not found');
-    return;
-  }
-
-  const icon = document.getElementById('modalIcon');
-  const titleEl = document.getElementById('modalTitle');
-  const messageEl = document.getElementById('modalMessage');
-
-  icon.className = 'modal-icon ' + type;
-  let iconSvg = '';
-  switch (type) {
-    case 'success':
-      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
-      break;
-    case 'error':
-      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-      break;
-    case 'warning':
-      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-      break;
-    default:
-      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
-  }
-  icon.innerHTML = iconSvg;
-
-  titleEl.textContent = title;
-  messageEl.textContent = message;
-
-  const buttons = document.querySelector('.modal-buttons');
-  const confirmBtn = buttons.querySelector('.modal-btn.primary');
-  confirmBtn.onclick = () => {
-    hideModal();
-    if (onConfirm) onConfirm();
+  // 映射类型到 SweetAlert2 图标
+  const iconMap = {
+    'success': 'success',
+    'error': 'error',
+    'warning': 'warning',
+    'info': 'info'
   };
 
-  overlay.classList.add('show');
-}
+  const swalOptions = {
+    title: title,
+    text: message,
+    icon: iconMap[type] || 'info',
+    confirmButtonText: '确定',
+    customClass: {
+      title: 'swal2-title-sm',
+      content: 'swal2-content-sm',
+      confirmButton: 'swal2-btn-sm'
+    }
+  };
 
-function hideModal() {
-  const overlay = document.getElementById('modalOverlay');
-  if (overlay) {
-    overlay.classList.remove('show');
+  // 如果需要取消按钮
+  if (showCancel) {
+    swalOptions.showCancelButton = true;
+    swalOptions.cancelButtonText = '取消';
+    swalOptions.cancelButtonColor = '#666';
+    swalOptions.customClass.cancelButton = 'swal2-btn-sm';
   }
-}
 
-document.addEventListener('DOMContentLoaded', () => {
-  const overlay = document.getElementById('modalOverlay');
-  if (overlay) {
-    overlay.addEventListener('click', (e) => {
-      if (e.target.id === 'modalOverlay') {
-        hideModal();
-      }
-    });
-  }
-});
+  Swal.fire(swalOptions).then((result) => {
+    if (result.isConfirmed && onConfirm) {
+      onConfirm();
+    }
+  });
+}
