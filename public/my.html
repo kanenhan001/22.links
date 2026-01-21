@@ -81,10 +81,11 @@
     .search-box {
       flex: 1;
       max-width: 400px;
+      position: relative;
     }
     .search-input {
       width: 100%;
-      padding: 10px 14px;
+      padding: 10px 40px 10px 14px;
       border: 1px solid #ddd;
       border-radius: 8px;
       font-size: 14px;
@@ -93,6 +94,25 @@
       outline: none;
       border-color: #667eea;
       box-shadow: 0 0 0 2px rgba(102,126,234,0.18);
+    }
+    .search-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999;
+      cursor: pointer;
+      font-size: 16px;
+      transition: color 0.2s ease;
+      width: 20px;
+      height: 20px;
+    }
+    .search-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .search-icon:hover {
+      color: #667eea;
     }
     .header-right {
       display: flex;
@@ -356,7 +376,13 @@
       <div class="header">
         <div class="header-left">
           <div class="search-box">
-            <input type="text" class="search-input" placeholder="搜索关系图..." />
+            <input type="text" class="search-input" id="searchInput" placeholder="搜索关系图..." />
+            <div class="search-icon" id="searchIcon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
           </div>
         </div>
         <div class="header-right">
@@ -1036,6 +1062,60 @@
       await fetchJson('/api/auth/logout', { method: 'POST' });
       window.location.href = '/login';
     };
+
+    // 搜索功能
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchInput = document.getElementById('searchInput');
+      const searchIcon = document.getElementById('searchIcon');
+      
+      console.log('Search input element:', searchInput);
+      console.log('Search icon element:', searchIcon);
+      
+      if (!searchInput || !searchIcon) {
+        console.error('Search elements not found');
+        return;
+      }
+      
+      // 执行搜索
+      function performSearch() {
+        const searchTerm = searchInput.value.trim().toLowerCase();
+        console.log('Performing search for:', searchTerm);
+        
+        // 获取所有关系图卡片
+        const graphCards = document.querySelectorAll('.card');
+        console.log('Found graph cards:', graphCards.length);
+        
+        graphCards.forEach(card => {
+          // 获取卡片标题
+          const titleElement = card.querySelector('.name');
+          if (titleElement) {
+            const title = titleElement.textContent.trim().toLowerCase();
+            console.log('Card title:', title);
+            
+            // 模糊匹配
+            if (title.includes(searchTerm)) {
+              card.style.display = 'block';
+            } else {
+              card.style.display = 'none';
+            }
+          }
+        });
+      }
+      
+      // 回车搜索
+      searchInput.addEventListener('keypress', (e) => {
+        console.log('Key pressed:', e.key);
+        if (e.key === 'Enter') {
+          performSearch();
+        }
+      });
+      
+      // 点击搜索图标搜索
+      searchIcon.addEventListener('click', () => {
+        console.log('Search icon clicked');
+        performSearch();
+      });
+    });
 
     ensureLogin().then(u => {
       console.log('ensureLogin result:', u);
