@@ -249,7 +249,7 @@
   <div id="dropdownMenuContainer"></div>
 
   <!-- SweetAlert2 -->
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="sweetalert2@11.js"></script>
 
   <script>
     async function fetchJson(url, opts) {
@@ -329,6 +329,7 @@
 
     async function loadGraphs() {
       const list = await fetchJson('/api/graphs');
+      console.log('Loaded graphs:', list);
       renderCards(list);
     }
 

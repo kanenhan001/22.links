@@ -328,7 +328,7 @@ class GraphEditor {
 
     async uploadThumbnail(thumbnailData) {
         try {
-            await this.apiPut(`/api/graphs/${this.graphId}`, {
+            await this.apiPut(`/api/graphs/${this.graphId}/thumbnail`, {
                 thumbnail: thumbnailData
             });
         } catch (error) {

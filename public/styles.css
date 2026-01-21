@@ -257,6 +257,49 @@ body {
     animation: fadeIn 0.3s ease;
 }
 
+.modal-overlay {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+}
+
+.modal-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-overlay .modal {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    transform: scale(0.9) translateY(20px);
+    transition: all 0.2s ease;
+    display: block;
+    position: static;
+    z-index: auto;
+    background-color: transparent;
+    animation: none;
+}
+
+.modal-overlay.show .modal {
+    transform: scale(1) translateY(0);
+}
+
 .modal-content {
     background-color: white;
     margin: 10% auto;
@@ -697,7 +740,7 @@ body {
     }
 }
 
-/* ×Ô¶¨Òåµ¯´°ÑùÊ½ */
+/* ï¿½Ô¶ï¿½ï¿½åµ¯ï¿½ï¿½ï¿½ï¿½Ê½ */
 .modal-overlay {
   position: fixed;
   top: 0;

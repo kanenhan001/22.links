@@ -136,91 +136,29 @@
 
 
     <div id="nodeModal" class="modal">
-
-
-
         <div class="modal-content">
-
-                <div>
-
-                    <h2 id="modalTitle">新增节点</h2>
-
-                    <span class="close" data-modal-target="nodeModal">&times;</span>
-
-                </div>
-
+            <div>
+                <h2 id="modalTitle">新增节点</h2>
+                <span class="close" data-modal-target="nodeModal">&times;</span>
+            </div>
             <form id="nodeForm">
-
-
-
                 <label for="nodeName">节点名称:</label>
-
-
-
                 <input type="text" id="nodeName" required>
 
-
-
-                
-
-
-
                 <label for="nodeType">节点类型:</label>
-
-
-
                 <select id="nodeType">
-
-
-
                     <option value="person">人物</option>
-
-
-
                     <option value="organization">组织</option>
-
-
-
                     <option value="event">事件</option>
-
-
-
                     <option value="concept">概念</option>
-
-
-
                 </select>
 
-
-
-                
-
-
-
                 <label for="nodeColor">节点颜色:</label>
-
-
-
                 <input type="color" id="nodeColor" value="#3498db">
 
-
-
-                
-
-
-
                 <button type="submit">保存</button>
-
-
-
             </form>
-
-
-
         </div>
-
-
-
     </div>
 
 
@@ -230,83 +168,27 @@
 
 
     <div id="edgeModal" class="modal">
-
-
-
         <div class="modal-content">
-
-                <div>
-
-                    <h2 id="edgeModalTitle">新增关系</h2>
-
-                    <span class="close" data-modal-target="edgeModal">&times;</span>
-
-                </div>
-
+            <div>
+                <h2 id="edgeModalTitle">新增关系</h2>
+                <span class="close" data-modal-target="edgeModal">&times;</span>
+            </div>
             <form id="edgeForm">
-
-
-
                 <label for="edgeSource">源节点:</label>
-
-
-
                 <select id="edgeSource" required></select>
 
-
-
-                
-
-
-
                 <label for="edgeTarget">目标节点:</label>
-
-
-
                 <select id="edgeTarget" required></select>
 
-
-
-                
-
-
-
                 <label for="edgeLabel">关系标签:</label>
-
-
-
                 <input type="text" id="edgeLabel" required>
 
-
-
-                
-
-
-
                 <label for="edgeColor">关系颜色:</label>
-
-
-
                 <input type="color" id="edgeColor" value="#e74c3c">
 
-
-
-                
-
-
-
                 <button type="submit">保存</button>
-
-
-
             </form>
-
-
-
         </div>
-
-
-
     </div>
 
 
@@ -330,21 +212,12 @@
 
 
     <div id="helpModal" class="modal">
-
-
-
         <div class="modal-content">
-
-                <div>
-
-                    <h2>使用帮助</h2>
-
-                    <span class="close" data-modal-target="helpModal">&times;</span>
-
-                </div>
-
+            <div>
+                <h2>使用帮助</h2>
+                <span class="close" data-modal-target="helpModal">&times;</span>
+            </div>
             <div class="help-content">
-
                 <ul>
                     <li><strong>用途:</strong> 梳理对象间的关系，如：组织架构、人物关系、事件关系、企业关联、族谱等。</li>
                     <li><strong>点击定增节点按钮:</strong> 新增节点。</li>
@@ -357,19 +230,9 @@
                     <li><strong>取消创建关系模式:</strong> 按键盘的 `ESC` 键。</li>
                 </ul>
 
-
                 <p>享受梳理关系的乐趣！</p>
-
-
-
             </div>
-
-
-
         </div>
-
-
-
     </div>
 
     <!-- 自定义弹窗 -->

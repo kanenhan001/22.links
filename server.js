@@ -202,7 +202,9 @@ async function initDatabase() {
 
 function getAuthedUserId(req) {
     // 未登录时，回退到默认用户 1（兼容旧用法）。上线可改为必须登录。
-    return req.session?.userId || 1;
+    const userId = req.session?.userId || 1;
+    console.log(`[Auth] User ID: ${userId}, Session:`, req.session);
+    return userId;
 }
 
 function requireLogin(req, res, next) {
@@ -317,7 +319,9 @@ app.get('/api/auth/wechat/callback', async (req, res) => {
 app.get('/api/graphs', (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const graphs = queryAll('SELECT id, name, createdAt, thumbnail FROM graphs WHERE userId = ? ORDER BY id DESC', [userId]);
+        const sql = 'SELECT id, name, createdAt, thumbnail FROM graphs WHERE userId = ? ORDER BY id DESC';
+        console.log(`[SQL] ${sql} - params: [${userId}]`);
+        const graphs = queryAll(sql, [userId]);
         res.json(graphs);
     } catch (e) {
         console.error('获取 graphs 失败:', e);
@@ -357,14 +361,28 @@ app.put('/api/graphs/:id', (req, res) => {
         const graph = queryOne('SELECT id, userId FROM graphs WHERE id = ?', [req.params.id]);
         if (!graph || graph.userId !== userId) return res.status(404).json({ error: '关系图不存在' });
         const name = (req.body?.name || '').toString().slice(0, 80);
-        const thumbnail = (req.body?.thumbnail || '').toString();
         if (name) run('UPDATE graphs SET name = ? WHERE id = ?', [name, graph.id]);
-        if (thumbnail !== undefined) run('UPDATE graphs SET thumbnail = ? WHERE id = ?', [thumbnail, graph.id]);
         const updated = queryOne('SELECT id, name, createdAt, thumbnail FROM graphs WHERE id = ?', [graph.id]);
         res.json(updated);
     } catch (e) {
         console.error('更新 graph 失败:', e);
         res.status(500).json({ error: '更新关系图失败' });
+    }
+});
+
+// 更新缩略图的专用接口
+app.put('/api/graphs/:id/thumbnail', (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const graph = queryOne('SELECT id, userId FROM graphs WHERE id = ?', [req.params.id]);
+        if (!graph || graph.userId !== userId) return res.status(404).json({ error: '关系图不存在' });
+        const thumbnail = (req.body?.thumbnail || '').toString();
+        if (thumbnail !== undefined) run('UPDATE graphs SET thumbnail = ? WHERE id = ?', [thumbnail, graph.id]);
+        const updated = queryOne('SELECT id, name, createdAt, thumbnail FROM graphs WHERE id = ?', [graph.id]);
+        res.json(updated);
+    } catch (e) {
+        console.error('更新缩略图失败:', e);
+        res.status(500).json({ error: '更新缩略图失败' });
     }
 });
 
