@@ -6,68 +6,189 @@
   <title>我的关系图 - 关系图编辑器</title>
   <link rel="stylesheet" href="/styles.css" />
   <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+    }
     .page {
-      max-width: 1400px;
-      margin: 0 auto;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+    /* 左侧边栏 */
+    .sidebar {
+      width: 280px;
+      background: #fff;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
       padding: 20px;
-      height: calc(100vh - 40px);
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
     }
-    .topbar {
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.10);
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .logo {
+      font-size: 24px;
+      font-weight: 900;
+      color: #333;
+      text-align: center;
+      padding: 10px 0;
     }
-    .brand { font-weight: 800; color: #333; }
-    .spacer { flex: 1; }
-    .user {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: #555;
-      font-weight: 600;
-    }
-    .avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: #eee;
-      object-fit: cover;
-    }
-    .btn {
-      padding: 10px 14px;
+    .create-btn {
+      width: 100%;
+      padding: 14px;
       border: none;
       border-radius: 8px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #fff;
-      cursor: pointer;
+      font-size: 16px;
       font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s ease;
     }
-    .btn.secondary {
+    .create-btn:hover {
+      transform: translateY(-1px);
+    }
+    /* 右侧内容区 */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    /* 右侧顶部栏 */
+    .header {
       background: #fff;
-      color: #444;
-      border: 1px solid #ddd;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
     }
-    .btn.secondary:hover { border-color: #667eea; color: #667eea; }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      flex: 1;
+    }
+    .logo-text {
+      font-size: 18px;
+      font-weight: 800;
+      color: #333;
+    }
+    .search-box {
+      flex: 1;
+      max-width: 400px;
+    }
+    .search-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 2px rgba(102,126,234,0.18);
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+    }
+    /* 用户菜单 */
+    .user-menu {
+      position: relative;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: background-color 0.2s ease;
+    }
+    .user-info:hover {
+      background-color: #f5f5f5;
+    }
+    .user-name {
+      font-weight: 600;
+      color: #333;
+    }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #eee;
+      object-fit: cover;
+    }
+    /* 用户下拉菜单 */
+    .user-dropdown {
+      position: fixed;
+      min-width: 180px;
+      z-index: 999999;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      padding: 12px 0;
+      border: 1px solid #e5e7eb;
+      opacity: 1;
+      visibility: visible;
+      transition: all 0.2s ease;
+      min-height: 100px;
+    }
+    
+    .user-dropdown.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(-10px);
+    }
+    
+    /* 确保下拉菜单项可见 */
+    .user-dropdown .dropdown-item {
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #333;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    .user-dropdown .dropdown-item:hover {
+      background-color: #f5f5f5;
+    }
+    
+    .user-dropdown .dropdown-divider {
+      height: 1px;
+      background-color: #e5e7eb;
+      margin: 8px 0;
+    }
+    /* 右侧内容区 */
     .content {
       flex: 1;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.10);
-      padding: 16px;
+      padding: 24px;
       overflow: auto;
+      background-color: #f5f5f5;
     }
+    .content-header {
+      margin-bottom: 20px;
+    }
+    .content-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #333;
+      margin: 0;
+    }
+    /* 关系图网格 */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 14px;
+      gap: 16px;
     }
+    /* 关系图卡片 */
     .card {
       border: 1px solid #eee;
       border-radius: 12px;
@@ -97,20 +218,10 @@
     .empty {
       color: #666;
       text-align: center;
-      padding: 30px 0;
-    }
-    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    input[type="text"]{
-      padding: 10px 12px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      min-width: 260px;
-      font-size: 14px;
-    }
-    input[type="text"]:focus{
-      outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 2px rgba(102,126,234,0.18);
+      padding: 60px 0;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
     }
     /* 卡片更多按钮样式 */
     .card { position: relative; }
@@ -215,30 +326,58 @@
       padding: 8px 16px !important;
     }
 
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 240px;
+      }
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .content {
+        padding: 16px;
+      }
+    }
+
   </style>
 </head>
 <body>
   <div class="page">
-    <div class="topbar">
-      <div class="brand">我的关系图</div>
-      <div class="spacer"></div>
-      <div class="user">
-        <img id="avatar" class="avatar" alt="" />
-        <span id="nickname">未登录</span>
-      </div>
-      <button id="btnLogout" class="btn secondary">退出</button>
+    <!-- 左侧边栏 -->
+    <div class="sidebar">
+      <div class="logo">关系图编辑器</div>
+      <button id="btnCreate" class="create-btn">新建关系图</button>
     </div>
 
-    <div class="topbar">
-      <div class="row">
-        <input id="graphName" type="text" placeholder="关系图名称（例如：项目协作关系）" />
-        <button id="btnCreate" class="btn">新建关系图</button>
+    <!-- 右侧内容区 -->
+    <div class="main-content">
+      <!-- 右侧顶部栏 -->
+      <div class="header">
+        <div class="header-left">
+          <div class="search-box">
+            <input type="text" class="search-input" placeholder="搜索关系图..." />
+          </div>
+        </div>
+        <div class="header-right">
+          <!-- 用户信息 -->
+          <div class="user-menu">
+            <div class="user-info" id="userInfo">
+              <span id="nickname" class="user-name">未登录</span>
+              <img id="avatar" class="avatar" alt="" />
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="content">
-      <div id="grid" class="grid"></div>
-      <div id="empty" class="empty" style="display:none;">还没有关系图，先创建一个吧。</div>
+      <!-- 右侧内容区 -->
+      <div class="content">
+        <div class="content-header">
+          <h2 class="content-title">我的关系图</h2>
+        </div>
+        <div id="grid" class="grid"></div>
+        <div id="empty" class="empty" style="display:none;">还没有关系图，先创建一个吧。</div>
+      </div>
     </div>
   </div>
 
@@ -247,6 +386,26 @@
 
   <!-- 全局下拉菜单容器 -->
   <div id="dropdownMenuContainer"></div>
+
+  <!-- 用户下拉菜单 -->
+  <div class="dropdown-menu user-dropdown hidden" id="userDropdown">
+    <div class="dropdown-item" onclick="navigateToProfile()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      个人中心
+    </div>
+    <div class="dropdown-divider"></div>
+    <div class="dropdown-item" onclick="handleLogout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      退出登录
+    </div>
+  </div>
 
   <!-- SweetAlert2 -->
   <script src="sweetalert2@11.js"></script>
@@ -497,7 +656,7 @@
           }
         });
       } else if (action === 'rename') {
-        Sweetalert2.fire({
+        Swal.fire({
           title: '重命名',
           input: 'text',
           inputPlaceholder: '请输入新的关系图名称',
@@ -520,7 +679,7 @@
               body: JSON.stringify({ name: result.value.trim() })
             }).then(() => {
               loadGraphs();
-              Sweetalert2.fire({
+              Swal.fire({
                 title: '重命名成功',
                 text: '关系图名称已更新',
                 icon: 'success',
@@ -533,7 +692,7 @@
                 }
               });
             }).catch(err => {
-              Sweetalert2.fire({
+              Swal.fire({
                 title: '重命名失败',
                 text: err.message,
                 icon: 'error',
@@ -549,7 +708,7 @@
           }
         });
       } else if (action === 'copy') {
-        Sweetalert2.fire({
+        Swal.fire({
           title: '复制关系图',
           input: 'text',
           inputValue: '副本 - ',
@@ -573,7 +732,7 @@
               body: JSON.stringify({ name: result.value.trim() })
             }).then(() => {
               loadGraphs();
-              Sweetalert2.fire({
+              Swal.fire({
                 title: '复制成功',
                 text: '关系图已复制',
                 icon: 'success',
@@ -586,7 +745,7 @@
                 }
               });
             }).catch(err => {
-              Sweetalert2.fire({
+              Swal.fire({
                 title: '复制失败',
                 text: err.message,
                 icon: 'error',
@@ -701,7 +860,7 @@
         closeMenu();
       } catch (err) {
         console.error('导出失败:', err);
-        Sweetalert2.fire({
+        Swal.fire({
           title: '导出失败',
           text: err.message,
           icon: 'error',
@@ -718,50 +877,165 @@
     };
 
     document.getElementById('btnCreate').addEventListener('click', async () => {
-      const name = document.getElementById('graphName').value.trim() || '未命名关系图';
-      try {
-        const g = await fetchJson('/api/graphs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name })
-        });
-        // 清空输入框
-        document.getElementById('graphName').value = '';
-        // 刷新关系图列表
-        loadGraphs();
-        // 显示成功提示
-        Sweetalert2.fire({
-          title: '创建成功',
-          text: '关系图已创建',
-          icon: 'success',
-          confirmButtonColor: '#667eea',
-          width: '280px',
-          customClass: {
-            title: 'swal2-title-sm',
-            content: 'swal2-content-sm',
-            confirmButton: 'swal2-btn-sm'
+      // 弹出输入框让用户输入关系图名称
+      Swal.fire({
+        title: '新建关系图',
+        input: 'text',
+        inputPlaceholder: '请输入关系图名称（例如：项目协作关系）',
+        showCancelButton: true,
+        confirmButtonColor: '#667eea',
+        cancelButtonColor: '#666',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        width: '300px',
+        customClass: {
+          title: 'swal2-title-sm',
+          confirmButton: 'swal2-btn-sm',
+          cancelButton: 'swal2-btn-sm'
+        }
+      }).then(async (result) => {
+        if (result.isConfirmed && result.value && result.value.trim()) {
+          const name = result.value.trim() || '未命名关系图';
+          try {
+            const g = await fetchJson('/api/graphs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name })
+            });
+            // 刷新关系图列表
+            loadGraphs();
+            // 显示成功提示
+            Swal.fire({
+              title: '创建成功',
+              text: '关系图已创建',
+              icon: 'success',
+              confirmButtonColor: '#667eea',
+              width: '280px',
+              customClass: {
+                title: 'swal2-title-sm',
+                content: 'swal2-content-sm',
+                confirmButton: 'swal2-btn-sm'
+              }
+            });
+          } catch (err) {
+            Swal.fire({
+              title: '创建失败',
+              text: err.message,
+              icon: 'error',
+              confirmButtonColor: '#667eea',
+              width: '280px',
+              customClass: {
+                title: 'swal2-title-sm',
+                content: 'swal2-content-sm',
+                confirmButton: 'swal2-btn-sm'
+              }
+            });
           }
-        });
-      } catch (err) {
-        Sweetalert2.fire({
-          title: '创建失败',
-          text: err.message,
-          icon: 'error',
-          confirmButtonColor: '#667eea',
-          width: '280px',
-          customClass: {
-            title: 'swal2-title-sm',
-            content: 'swal2-content-sm',
-            confirmButton: 'swal2-btn-sm'
-          }
-        });
+        }
+      });
+    });
+
+    // 处理用户下拉菜单
+    const userInfo = document.getElementById('userInfo');
+    const userDropdown = document.getElementById('userDropdown');
+
+    console.log('User info element:', userInfo);
+    console.log('User dropdown element:', userDropdown);
+
+    // 切换用户下拉菜单
+    userInfo.addEventListener('click', (e) => {
+      console.log('User info clicked!');
+      e.stopPropagation();
+      // 直接切换显示状态，不依赖于当前值的判断
+      console.log('Current dropdown hidden:', userDropdown.classList.contains('hidden'));
+      if (userDropdown.classList.contains('hidden')) {
+        console.log('Showing dropdown');
+        // 计算用户信息的位置，将下拉菜单定位到用户信息的下方
+        const rect = userInfo.getBoundingClientRect();
+        console.log('User info rect:', rect);
+        console.log('Window scrollY:', window.scrollY);
+        console.log('Window scrollX:', window.scrollX);
+        console.log('Window innerWidth:', window.innerWidth);
+        
+        const topPosition = rect.bottom + window.scrollY + 8;
+        const rightPosition = window.innerWidth - rect.right + window.scrollX;
+        
+        console.log('Calculated top:', topPosition);
+        console.log('Calculated right:', rightPosition);
+        
+        userDropdown.style.top = topPosition + 'px';
+        userDropdown.style.right = rightPosition + 'px';
+        
+        // 强制设置下拉菜单的样式，确保它可见
+        userDropdown.style.display = 'block';
+        userDropdown.style.opacity = '1';
+        userDropdown.style.visibility = 'visible';
+        
+        userDropdown.classList.remove('hidden');
+        
+        // 打印下拉菜单的最终样式
+        console.log('Dropdown computed style:');
+        console.log('  display:', getComputedStyle(userDropdown).display);
+        console.log('  opacity:', getComputedStyle(userDropdown).opacity);
+        console.log('  visibility:', getComputedStyle(userDropdown).visibility);
+        console.log('  top:', getComputedStyle(userDropdown).top);
+        console.log('  right:', getComputedStyle(userDropdown).right);
+        console.log('  z-index:', getComputedStyle(userDropdown).zIndex);
+      } else {
+        console.log('Hiding dropdown');
+        userDropdown.classList.add('hidden');
+        // 强制设置下拉菜单的样式，确保它被隐藏
+        userDropdown.style.display = 'none';
+        userDropdown.style.opacity = '0';
+        userDropdown.style.visibility = 'hidden';
+      }
+      console.log('Updated dropdown hidden:', userDropdown.classList.contains('hidden'));
+    });
+
+    // 点击页面其他地方关闭下拉菜单
+    document.addEventListener('click', () => {
+      if (!userDropdown.classList.contains('hidden')) {
+        console.log('Hiding dropdown on document click');
+        userDropdown.classList.add('hidden');
+        // 强制设置下拉菜单的样式，确保它被隐藏
+        userDropdown.style.display = 'none';
+        userDropdown.style.opacity = '0';
+        userDropdown.style.visibility = 'hidden';
       }
     });
 
-    document.getElementById('btnLogout').addEventListener('click', async () => {
+    // 个人中心导航
+    window.navigateToProfile = () => {
+      userDropdown.classList.add('hidden');
+      // 强制设置下拉菜单的样式，确保它被隐藏
+      userDropdown.style.display = 'none';
+      userDropdown.style.opacity = '0';
+      userDropdown.style.visibility = 'hidden';
+      // 这里可以添加个人中心页面的导航逻辑
+      Swal.fire({
+        title: '个人中心',
+        text: '个人中心功能正在开发中',
+        icon: 'info',
+        confirmButtonColor: '#667eea',
+        width: '280px',
+        customClass: {
+          title: 'swal2-title-sm',
+          content: 'swal2-content-sm',
+          confirmButton: 'swal2-btn-sm'
+        }
+      });
+    };
+
+    // 退出登录处理
+    window.handleLogout = async () => {
+      userDropdown.classList.add('hidden');
+      // 强制设置下拉菜单的样式，确保它被隐藏
+      userDropdown.style.display = 'none';
+      userDropdown.style.opacity = '0';
+      userDropdown.style.visibility = 'hidden';
       await fetchJson('/api/auth/logout', { method: 'POST' });
       window.location.href = '/login';
-    });
+    };
 
     ensureLogin().then(u => {
       console.log('ensureLogin result:', u);
