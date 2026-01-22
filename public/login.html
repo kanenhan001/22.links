@@ -148,6 +148,35 @@
       display: flex;
       flex-direction: column;
       gap: 24px;
+      min-height: 350px;
+    }
+    .tab-buttons {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .tab-button {
+      padding: 12px 24px;
+      background: none;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      color: #999;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border-bottom: 2px solid transparent;
+    }
+    .tab-button.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+    .login-section {
+      display: none;
+      min-height: 280px;
+    }
+    .login-section.active {
+      display: block;
     }
     .wechat-login-section {
       text-align: center;
@@ -199,7 +228,7 @@
       border-radius: 16px;
       padding: 20px;
       text-align: center;
-      min-height: 220px;
+      min-height: 200px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -244,6 +273,54 @@
     }
     .btn-secondary:hover {
       background: #e5e7eb;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+    .form-actions {
+      margin-top: 24px;
+    }
+    .login-button {
+      width: 100%;
+      padding: 14px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .login-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(102,126,234,0.4);
+    }
+    .login-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
     }
 
     .footer {
@@ -311,10 +388,26 @@
     </div>
     <div class="right-panel">
       <div class="login-methods">
-        <div class="wechat-login-section">
-          <div class="wechat-header">
-            <div class="wechat-title">微信扫码登录</div>
+        <div class="tab-buttons">
+          <button class="tab-button active" onclick="switchTab('password')">账号密码登录</button>
+          <button class="tab-button" onclick="switchTab('wechat')">微信扫码登录</button>
+        </div>
+        
+        <div class="login-section active" id="password-login-section">
+          <div class="form-group">
+            <label class="form-label" for="username">用户名</label>
+            <input type="text" id="username" class="form-input" placeholder="请输入用户名">
           </div>
+          <div class="form-group">
+            <label class="form-label" for="password">密码</label>
+            <input type="password" id="password" class="form-input" placeholder="请输入密码">
+          </div>
+          <div class="form-actions">
+            <button class="login-button" onclick="handlePasswordLogin()">登录</button>
+          </div>
+        </div>
+        
+        <div class="login-section" id="wechat-login-section">
           <div class="qr-box">
             <div class="qr-status" id="qrStatus">正在获取二维码…</div>
             <img id="qrImage" class="qr-image" style="display: none;" alt="微信二维码">
@@ -323,9 +416,6 @@
           <div class="qr-actions">
             <button class="btn btn-secondary" id="btnRefreshQr">刷新二维码</button>
           </div>
-        </div>
-        <div class="dev-login-link" onclick="handleMockLogin()">
-          <span>🔧 开发模式登录</span>
         </div>
       </div>
       <div class="footer">
@@ -347,6 +437,28 @@
       if (s.loggedIn) window.location.href = '/my';
     }
 
+    // 轮询检查登录状态
+    let statusCheckInterval;
+    
+    function startStatusCheck() {
+      // 清除之前的轮询
+      if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+      }
+      // 每2秒检查一次登录状态
+      statusCheckInterval = setInterval(async () => {
+        try {
+          const s = await fetchJson('/api/auth/status');
+          if (s.loggedIn) {
+            clearInterval(statusCheckInterval);
+            window.location.href = '/my';
+          }
+        } catch (err) {
+          console.error('检查登录状态失败:', err);
+        }
+      }, 2000);
+    }
+    
     async function refreshQr() {
       const qrStatus = document.getElementById('qrStatus');
       const qrImage = document.getElementById('qrImage');
@@ -358,15 +470,13 @@
       
       try {
         const qr = await fetchJson('/api/auth/wechat-qr');
-        if (qr.imageUrl) {
-          qrStatus.textContent = '请使用微信扫码关注公众号';
-          qrImage.src = qr.imageUrl;
-          qrImage.style.display = 'block';
-        } else if (qr.url) {
-          qrStatus.textContent = '请使用微信扫码关注公众号';
+        if (qr.url) {
+          qrStatus.textContent = '请使用微信扫码登录';
           qrLink.href = qr.url;
           qrLink.textContent = '打开微信扫码链接';
           qrLink.style.display = 'block';
+          // 开始轮询检查登录状态
+          startStatusCheck();
         } else {
           qrStatus.textContent = '微信登录未配置，请使用开发模式登录';
         }
@@ -375,12 +485,38 @@
       }
     }
 
-    async function handleMockLogin() {
+    function switchTab(tabName) {
+      // 切换标签按钮状态
+      const tabButtons = document.querySelectorAll('.tab-button');
+      tabButtons.forEach(button => button.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      // 切换登录区域
+      const loginSections = document.querySelectorAll('.login-section');
+      loginSections.forEach(section => section.classList.remove('active'));
+      document.getElementById(`${tabName}-login-section`).classList.add('active');
+    }
+
+    async function handlePasswordLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      
+      if (!username || !password) {
+        Sweetalert2.fire({
+          title: '登录失败',
+          text: '用户名和密码不能为空',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
       try {
-        await fetchJson('/api/auth/mock-login', {
+        await fetchJson('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nickname: '测试用户' })
+          body: JSON.stringify({ username, password })
         });
         window.location.href = '/my';
       } catch (err) {

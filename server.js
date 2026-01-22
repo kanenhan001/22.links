@@ -5,6 +5,8 @@ const fs = require('fs');
 const multer = require('multer');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 // 导入数据库配置
 const DB_CONFIG = require('./config/database');
 // nanoid v5.x 是 ES Module，使用动态导入
@@ -82,13 +84,36 @@ async function initDatabase() {
         await pool.execute(`
             CREATE TABLE IF NOT EXISTS users (
                 id INT PRIMARY KEY AUTO_INCREMENT,
-                provider VARCHAR(50), -- wechat / mock
+                provider VARCHAR(50), -- wechat / mock / local
                 providerUserId VARCHAR(255), -- openid 等
+                username VARCHAR(50), -- 账号密码登录时的用户名
+                password VARCHAR(255), -- 账号密码登录时的密码
                 nickname VARCHAR(255),
                 avatarUrl TEXT,
-                createdAt DATETIME
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         `);
+        
+        // 检查并添加缺失的字段（兼容所有MySQL版本）
+        try {
+            // 检查username字段是否存在
+            const [usernameExists] = await pool.execute(
+                `SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'username'`
+            );
+            if (usernameExists.length === 0) {
+                await pool.execute(`ALTER TABLE users ADD COLUMN username VARCHAR(50) AFTER providerUserId`);
+            }
+            
+            // 检查password字段是否存在
+            const [passwordExists] = await pool.execute(
+                `SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'password'`
+            );
+            if (passwordExists.length === 0) {
+                await pool.execute(`ALTER TABLE users ADD COLUMN password VARCHAR(255) AFTER username`);
+            }
+        } catch (error) {
+            console.error('添加字段失败:', error);
+        }
 
         await pool.execute(`
             CREATE TABLE IF NOT EXISTS graphs (
@@ -320,6 +345,76 @@ app.post('/api/auth/mock-login', async (req, res) => {
     }
 });
 
+// 账号密码登录
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) {
+            return res.status(400).json({ error: '用户名和密码不能为空' });
+        }
+
+        // 查找用户
+        let user = await queryOne('SELECT * FROM users WHERE username = ?', [username]);
+        
+        if (!user) {
+            // 如果用户不存在，返回错误
+            return res.status(401).json({ error: '账号不存在或密码不正确' });
+        } else {
+            // 验证密码
+            const passwordMatch = await bcrypt.compare(password, user.password);
+            if (!passwordMatch) {
+                // 如果密码不正确，返回错误
+                return res.status(401).json({ error: '账号不存在或密码不正确' });
+            }
+        }
+        
+        // 设置会话
+        req.session.userId = user.id;
+        res.json({ success: true, user: { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl } });
+    } catch (error) {
+        console.error('登录失败:', error);
+        res.status(500).json({ error: '登录失败' });
+    }
+});
+
+// 修改密码
+app.post('/api/auth/change-password', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: '当前密码和新密码不能为空' });
+        }
+        
+        // 查找用户
+        const user = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        if (!user) {
+            return res.status(401).json({ error: '用户不存在' });
+        }
+        
+        // 验证当前密码
+        const passwordMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!passwordMatch) {
+            return res.status(401).json({ error: '当前密码不正确' });
+        }
+        
+        // 加密新密码
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+        
+        // 更新密码
+        await run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('修改密码失败:', error);
+        res.status(500).json({ error: '修改密码失败' });
+    }
+});
+
 // 微信扫码登录：仅在配置了环境变量时启用（未配置则前端提示）
 app.get('/api/auth/wechat/start', (req, res) => {
     const appid = process.env.WECHAT_APPID;
@@ -330,8 +425,30 @@ app.get('/api/auth/wechat/start', (req, res) => {
     const state = nanoid(16);
     req.session.wechatState = state;
     const redirectUri = encodeURIComponent(callback);
-    const qrUrl = `https://open.weixin.qq.com/connect/qrconnect?appid=${encodeURIComponent(appid)}&redirect_uri=${redirect_uri}&response_type=code&scope=snsapi_login&state=${encodeURIComponent(state)}#wechat_redirect`;
+    const qrUrl = `https://open.weixin.qq.com/connect/qrconnect?appid=${encodeURIComponent(appid)}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_login&state=${encodeURIComponent(state)}#wechat_redirect`;
     res.json({ qrUrl });
+});
+
+// 微信扫码登录二维码接口（前端调用）
+app.get('/api/auth/wechat-qr', async (req, res) => {
+    try {
+        // 调用现有的微信登录开始接口来获取二维码链接
+        const appid = process.env.WECHAT_APPID;
+        const callback = process.env.WECHAT_CALLBACK_URL;
+        if (!appid || !callback) {
+            return res.json({ error: '微信登录未配置（缺少 WECHAT_APPID / WECHAT_CALLBACK_URL）' });
+        }
+        const state = nanoid(16);
+        req.session.wechatState = state;
+        const redirectUri = encodeURIComponent(callback);
+        const qrUrl = `https://open.weixin.qq.com/connect/qrconnect?appid=${encodeURIComponent(appid)}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_login&state=${encodeURIComponent(state)}#wechat_redirect`;
+        
+        // 返回二维码链接给前端
+        res.json({ url: qrUrl });
+    } catch (error) {
+        console.error('获取微信二维码失败:', error);
+        res.json({ error: error.message });
+    }
 });
 
 // 微信回调（示例，需根据实际情况实现）
