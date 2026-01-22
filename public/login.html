@@ -3,85 +3,333 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>登录 - 关系图编辑器</title>
+  <title>脉图 - 让关系，一目了然</title>
   <link rel="stylesheet" href="/styles.css" />
   <style>
-    .auth-page {
-      max-width: 1100px;
-      margin: 0 auto;
-      height: calc(100vh - 40px);
-      display: grid;
-      grid-template-columns: 1.3fr 1fr;
-      gap: 24px;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 20px;
     }
-    .auth-card {
+    .login-container {
+      display: flex;
       background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-      padding: 22px 24px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+      max-width: 900px;
+      width: 100%;
+      min-height: 500px;
+      max-height: 90vh;
     }
-    .auth-card h1 { font-size: 22px; margin-bottom: 8px; color: #222; }
-    .auth-card p { color: #666; line-height: 1.6; margin-bottom: 14px; }
-    .feature-list { margin-top: 10px; display: grid; gap: 10px; }
-    .feature-item { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 12px 12px; }
-    .feature-item b { color: #333; }
-    .qr-box {
-      border: 1px dashed #cfd3ff;
+    .left-panel {
+      flex: 1.1;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      padding: 40px 32px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .left-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/><circle cx="10" cy="50" r="0.5" fill="rgba(255,255,255,0.05)"/><circle cx="90" cy="30" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+      opacity: 0.3;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .logo-icon {
+      width: 48px;
+      height: 48px;
       border-radius: 12px;
-      padding: 16px;
-      background: linear-gradient(180deg, rgba(102,126,234,0.06), rgba(118,75,162,0.04));
-      min-height: 260px;
-      display: grid;
-      place-items: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .logo-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .logo-text {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .slogan {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 1;
+    }
+    .description {
+      font-size: 15px;
+      line-height: 1.7;
+      opacity: 0.9;
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+    }
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .feature-icon {
+      width: 24px;
+      height: 24px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .feature-text {
+      font-size: 14px;
+      line-height: 1.6;
+      opacity: 0.95;
+    }
+    .right-panel {
+      flex: 1;
+      padding: 40px 32px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .login-header {
       text-align: center;
-      gap: 10px;
+      margin-bottom: 24px;
     }
-    .qr-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
-    .btn-secondary {
-      padding: 10px 14px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background: #fff;
-      cursor: pointer;
+    .login-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .login-subtitle {
+      font-size: 14px;
+      color: #999;
+    }
+    .login-methods {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .wechat-login-section {
+      text-align: center;
+    }
+    .wechat-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .wechat-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: #fff;
+    }
+    .wechat-title {
+      font-size: 20px;
       font-weight: 600;
+      color: #333;
     }
-    .btn-secondary:hover { border-color: #667eea; color: #667eea; }
-    .small-note { font-size: 12px; color: #999; margin-top: 10px; }
-    #qrLink { word-break: break-all; font-size: 12px; color: #667eea; display: none; }
-    @media (max-width: 1000px) {
-      .auth-page { grid-template-columns: 1fr; height: auto; }
+    .wechat-desc {
+      font-size: 13px;
+      color: #999;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+    .dev-login-link {
+      text-align: center;
+      color: #667eea;
+      font-size: 13px;
+      cursor: pointer;
+      transition: color 0.3s ease;
+    }
+    .dev-login-link:hover {
+      color: #764ba2;
+      text-decoration: underline;
+    }
+
+    .qr-box {
+      background: #f9fafb;
+      border: 2px dashed #d1d5db;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .qr-status {
+      font-size: 14px;
+      color: #666;
+    }
+    .qr-image {
+      max-width: 160px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .qr-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .btn {
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(102,126,234,0.4);
+    }
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #666;
+    }
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer-text {
+      font-size: 12px;
+      color: #999;
+    }
+    @media (max-width: 768px) {
+      .login-container {
+        flex-direction: column;
+        min-height: auto;
+      }
+      .left-panel {
+        padding: 40px 24px;
+        min-height: 300px;
+      }
+      .right-panel {
+        padding: 40px 24px;
+      }
+      .slogan {
+        font-size: 28px;
+      }
+      .logo-text {
+        font-size: 24px;
+      }
     }
   </style>
-
-    <!-- SweetAlert2 -->
   <script src="sweetalert2@11.js"></script>
 </head>
 <body>
-  <div class="auth-page">
-    <div class="auth-card">
-      <h1>关系图编辑器</h1>
-      <p>用“图”的方式把复杂关系讲清楚：节点、关系、任务清单、转折点路径，一目了然。</p>
-      <div class="feature-list">
-        <div class="feature-item"><b>快速梳理</b>：双击创建关系，拖拽转折点调整走向。</div>
-        <div class="feature-item"><b>结构化记录</b>：节点/关系都有事项清单，追踪关键目标与行动。</div>
-        <div class="feature-item"><b>多关系图管理</b>：登录后可管理“我的关系图”，随时打开继续编辑。</div>
+  <div class="login-container">
+    <div class="left-panel">
+      <div class="logo">
+        <div class="logo-icon">
+          <img src="images/logo.png" alt="脉图">
+        </div>
+        <div class="logo-text">MindMaple | 脉图</div>
+      </div>
+      <h1 class="slogan">让关系，一目了然</h1>
+      <p class="description">世上无难事，只要肯梳理。脉图，用“图”的方式把复杂关系理清楚。</p>
+      <div class="features">
+        <div class="feature-item">
+          <div class="feature-icon">🏢</div>
+          <div class="feature-text">组织结构：如集团、公司、部门、岗位、角色，梳理清楚各自的目标、职责、权力，提高组织运转效率</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">👤</div>
+          <div class="feature-text">人物关系：如亲友、合作、竞争、依赖等，梳理清楚人物之间的关系，祝您理清事情背后的原因</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">📈</div>
+          <div class="feature-text">事件发展：如项目、任务、事件等，做好预测、预判，提前规避风险</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">🌐</div>
+          <div class="feature-text">其他：时间轴、族谱、树图等等，更多场景待您发现
+          </div>
+        </div>
       </div>
     </div>
-
-    <div class="auth-card">
-      <h1>微信扫码登录</h1>
-      <p>登录后进入“我的关系图”，选择或新建一个关系图开始编辑。</p>
-      <div class="qr-box">
-        <div id="qrStatus">正在获取二维码…</div>
-        <a id="qrLink" href="#" target="_blank" rel="noreferrer">打开微信扫码链接</a>
+    <div class="right-panel">
+      <div class="login-methods">
+        <div class="wechat-login-section">
+          <div class="wechat-header">
+            <div class="wechat-title">微信扫码登录</div>
+          </div>
+          <div class="qr-box">
+            <div class="qr-status" id="qrStatus">正在获取二维码…</div>
+            <img id="qrImage" class="qr-image" style="display: none;" alt="微信二维码">
+            <a id="qrLink" href="#" target="_blank" rel="noreferrer" style="display: none; color: #667eea; text-decoration: none; font-size: 13px;">打开微信扫码链接</a>
+          </div>
+          <div class="qr-actions">
+            <button class="btn btn-secondary" id="btnRefreshQr">刷新二维码</button>
+          </div>
+        </div>
+        <div class="dev-login-link" onclick="handleMockLogin()">
+          <span>🔧 开发模式登录</span>
+        </div>
       </div>
-      <div class="qr-actions">
-        <button id="btnRefreshQr" class="btn-secondary">刷新二维码</button>
-        <button id="btnMockLogin" class="btn-secondary">开发模式登录</button>
-      </div>
-      <div class="small-note">
-        说明：微信扫码登录需要配置 `WECHAT_APPID/WECHAT_SECRET/WECHAT_CALLBACK_URL`。未配置时可先用“开发模式登录”体验完整流程。
+      <div class="footer">
+        <p class="footer-text">登录即表示您同意<a href="#" style="color: #667eea; text-decoration: none;">《用户协议》</a>和<a href="#" style="color: #667eea; text-decoration: none;">《隐私政策》</a></p>
       </div>
     </div>
   </div>
@@ -99,34 +347,61 @@
       if (s.loggedIn) window.location.href = '/my';
     }
 
-    async function loadQr() {
-      const statusEl = document.getElementById('qrStatus');
-      const linkEl = document.getElementById('qrLink');
-      linkEl.style.display = 'none';
-      statusEl.textContent = '正在获取二维码…';
+    async function refreshQr() {
+      const qrStatus = document.getElementById('qrStatus');
+      const qrImage = document.getElementById('qrImage');
+      const qrLink = document.getElementById('qrLink');
+      
+      qrStatus.textContent = '正在获取二维码…';
+      qrImage.style.display = 'none';
+      qrLink.style.display = 'none';
+      
       try {
-        const { qrUrl } = await fetchJson('/api/auth/wechat/start');
-        statusEl.textContent = '请使用微信扫码登录';
-        linkEl.href = qrUrl;
-        linkEl.style.display = 'block';
-      } catch (e) {
-        statusEl.textContent = '微信扫码登录未配置或暂不可用';
+        const qr = await fetchJson('/api/auth/wechat-qr');
+        if (qr.imageUrl) {
+          qrStatus.textContent = '请使用微信扫码关注公众号';
+          qrImage.src = qr.imageUrl;
+          qrImage.style.display = 'block';
+        } else if (qr.url) {
+          qrStatus.textContent = '请使用微信扫码关注公众号';
+          qrLink.href = qr.url;
+          qrLink.textContent = '打开微信扫码链接';
+          qrLink.style.display = 'block';
+        } else {
+          qrStatus.textContent = '微信登录未配置，请使用开发模式登录';
+        }
+      } catch (err) {
+        qrStatus.textContent = '获取二维码失败：' + err.message;
       }
     }
 
-    document.getElementById('btnRefreshQr').addEventListener('click', loadQr);
-    document.getElementById('btnMockLogin').addEventListener('click', async () => {
-      await fetchJson('/api/auth/mock-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname: '测试用户' })
-      });
-      window.location.href = '/my';
-    });
+    async function handleMockLogin() {
+      try {
+        await fetchJson('/api/auth/mock-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname: '测试用户' })
+        });
+        window.location.href = '/my';
+      } catch (err) {
+        Sweetalert2.fire({
+          title: '登录失败',
+          text: err.message,
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+      }
+    }
 
-    checkStatus().then(loadQr);
+    // 检查登录状态
+    checkStatus();
+    
+    // 初始化二维码
+    refreshQr();
+    
+    // 绑定事件
+    document.getElementById('btnRefreshQr').addEventListener('click', refreshQr);
   </script>
 </body>
 </html>
-
-
