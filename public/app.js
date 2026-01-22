@@ -1537,30 +1537,40 @@ class GraphEditor {
         const nodeId = form.dataset.nodeId;
         console.log('handleNodeFormSubmit, nodeId:', nodeId);
         
-        const nodeData = {
-            name: document.getElementById('nodeName').value,
-            type: document.getElementById('nodeType').value,
-            color: document.getElementById('nodeColor').value
-        };
+        const nodeName = document.getElementById('nodeName').value;
+        const nodeType = document.getElementById('nodeType').value;
+        const nodeColor = document.getElementById('nodeColor').value;
         
         // 检查是否是有效的编辑模式
         if (nodeId && nodeId !== 'undefined' && nodeId.trim() !== '') {
             console.log('编辑模式, nodeId =', nodeId);
             const node = this.nodes.find(n => n.id === parseInt(nodeId));
             if (node) {
-                Object.assign(node, nodeData);
+                Object.assign(node, {
+                    name: nodeName,
+                    type: nodeType,
+                    color: nodeColor
+                });
                 await this.saveNode(node);
             }
         } else {
             console.log('新增模式');
-            const newNode = {
-                x: Math.random() * (this.canvas.width - 200) + 100,
-                y: Math.random() * (this.canvas.height - 200) + 100,
-                radius: 40,
-                ...nodeData
-            };
-            this.nodes.push(newNode);
-            await this.saveNode(newNode);
+            // 支持批量新增，多个名称用逗号或顿号分隔
+            const nodeNames = nodeName.split(/[,，、]/).map(name => name.trim()).filter(name => name);
+            
+            for (let i = 0; i < nodeNames.length; i++) {
+                const name = nodeNames[i];
+                const newNode = {
+                    x: Math.random() * (this.canvas.width - 200) + 100,
+                    y: Math.random() * (this.canvas.height - 200) + 100,
+                    radius: 40,
+                    name: name,
+                    type: nodeType,
+                    color: nodeColor
+                };
+                this.nodes.push(newNode);
+                await this.saveNode(newNode);
+            }
         }
         
         form.reset();

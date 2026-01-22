@@ -144,20 +144,25 @@
             </div>
             <form id="nodeForm">
                 <label for="nodeName">节点名称:</label>
-                <input type="text" id="nodeName" required>
+                <input type="text" id="nodeName" required placeholder="支持批量新增，多个名称用逗号或顿号分隔（如：张三,李四,王五 或 张三、李四、王五）">
 
-                <label for="nodeType">节点类型:</label>
-                <select id="nodeType">
-                    <option value="organization">组织</option>
-                    <option value="person">人物</option>
-                    <option value="location">地点</option>
-                    <option value="time">时间</option>
-                    <option value="event">事件</option>
-                    <option value="concept">概念</option>
-                </select>
-
-                <label for="nodeColor">节点颜色:</label>
-                <input type="color" id="nodeColor" value="#3498db">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nodeType">节点类型:</label>
+                        <select id="nodeType">
+                            <option value="organization">组织</option>
+                            <option value="person">人物</option>
+                            <option value="location">地点</option>
+                            <option value="time">时间</option>
+                            <option value="event">事件</option>
+                            <option value="concept">概念</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="nodeColor">节点颜色:</label>
+                        <input type="color" id="nodeColor" value="#3498db">
+                    </div>
+                </div>
 
                 <button type="submit">保存</button>
             </form>

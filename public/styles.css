@@ -285,8 +285,10 @@ body {
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     padding: 24px;
-    max-width: 400px;
+    max-width: 720px;
+    max-height: 80vh;
     width: 90%;
+    overflow-y: auto;
     transform: scale(0.9) translateY(20px);
     transition: all 0.2s ease;
     display: block;
@@ -307,6 +309,8 @@ body {
     border-radius: 10px;
     width: 90%;
     max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     animation: slideIn 0.3s ease;
     position: relative;
@@ -323,6 +327,16 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px; /* 标题与内容之间的间距 */
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.form-group {
+    flex: 1;
 }
 
 .close {
@@ -810,7 +824,7 @@ body {
   opacity: 1;
   visibility: visible;
 }
-.modal {
+.modal-overlay .modal {
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
