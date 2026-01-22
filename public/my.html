@@ -20,7 +20,7 @@
     }
     /* 左侧边栏 */
     .sidebar {
-      width: 280px;
+      width: 250px;
       background: #fff;
       box-shadow: 2px 0 8px rgba(0,0,0,0.1);
       padding: 20px;
@@ -29,23 +29,46 @@
       gap: 20px;
     }
     .logo {
-      font-size: 24px;
-      font-weight: 900;
-      color: #333;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
       padding: 10px 0;
     }
+    .logo img {
+      height: 80px;
+      width: auto;
+    }
+    .logo-text-container {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .logo-text-cn {
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+      line-height: 1.2;
+    }
+    .logo-text-en {
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      line-height: 1.2;
+    }
     .create-btn {
-      width: 100%;
-      padding: 14px;
+      width: 90%;
+      padding: 8px;
+      text-align: center;
       border: none;
       border-radius: 8px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: #fff;
-      font-size: 16px;
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
       transition: transform 0.1s ease;
+      margin: 0 auto;
     }
     .create-btn:hover {
       transform: translateY(-1px);
@@ -197,8 +220,8 @@
       margin-bottom: 20px;
     }
     .content-title {
-      font-size: 20px;
-      font-weight: 800;
+      font-size: 14px;
+      font-weight: 500;
       color: #333;
       margin: 0;
     }
@@ -366,7 +389,13 @@
   <div class="page">
     <!-- 左侧边栏 -->
     <div class="sidebar">
-      <div class="logo">关系图编辑器</div>
+      <div class="logo">
+        <img src="images/logo.png" alt="Logo">
+        <div class="logo-text-container">
+          <div class="logo-text-cn">脉图</div>
+          <div class="logo-text-en">MindMaple</div>
+        </div>
+      </div>
       <button id="btnCreate" class="create-btn">+&nbsp;&nbsp;&nbsp;新建关系图</button>
     </div>
 
@@ -907,7 +936,7 @@
       Swal.fire({
         title: '新建关系图',
         input: 'text',
-        inputPlaceholder: '请输入关系图名称（例如：项目协作关系）',
+        inputPlaceholder: '请输入关系图名称',
         showCancelButton: true,
         confirmButtonColor: '#667eea',
         cancelButtonColor: '#666',
