@@ -22,60 +22,6 @@
 3. **事务支持** - 导入数据时使用事务，确保数据一致性
 4. **外键约束** - 使用 InnoDB 引擎，支持外键和级联删除
 
-### 数据库表结构
-
-```sql
--- 用户表
-CREATE TABLE users (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    provider VARCHAR(50),           -- 登录方式 (wechat / mock)
-    providerUserId VARCHAR(255),    -- 第三方用户ID
-    nickname VARCHAR(255),          -- 昵称
-    avatarUrl TEXT,                 -- 头像URL
-    createdAt DATETIME              -- 创建时间
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 关系图表
-CREATE TABLE graphs (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    userId INT,                     -- 所属用户ID
-    name VARCHAR(255),              -- 关系图名称
-    createdAt DATETIME,             -- 创建时间
-    thumbnail TEXT,                 -- 缩略图
-    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 节点表
-CREATE TABLE nodes (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    graphId INT,                    -- 所属关系图ID
-    x DOUBLE,                       -- X坐标
-    y DOUBLE,                       -- Y坐标
-    radius DOUBLE,                  -- 半径
-    name VARCHAR(255),              -- 节点名称
-    type VARCHAR(50),               -- 节点类型
-    color VARCHAR(50),              -- 节点颜色
-    taskListName VARCHAR(255),      -- 事项清单名称
-    tasks TEXT,                     -- 事项清单 (JSON字符串)
-    FOREIGN KEY (graphId) REFERENCES graphs(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 边表
-CREATE TABLE edges (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    graphId INT,                    -- 所属关系图ID
-    sourceId INT,                   -- 源节点ID
-    targetId INT,                   -- 目标节点ID
-    label VARCHAR(255),             -- 边标签
-    color VARCHAR(50),              -- 边颜色
-    bendPoints TEXT,                -- 转折点 (JSON字符串)
-    tasks TEXT,                     -- 事项清单 (JSON字符串)
-    FOREIGN KEY (sourceId) REFERENCES nodes(id) ON DELETE CASCADE,
-    FOREIGN KEY (targetId) REFERENCES nodes(id) ON DELETE CASCADE,
-    FOREIGN KEY (graphId) REFERENCES graphs(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-```
-
 ## 安装说明
 
 ### 前置条件
