@@ -245,6 +245,54 @@
       border-color: rgba(102,126,234,0.6);
       box-shadow: 0 10px 22px rgba(0,0,0,0.10);
     }
+    .card.dragging {
+      opacity: 0.5;
+      transform: rotate(2deg);
+      cursor: grabbing;
+    }
+    .card.drag-over {
+      border-color: #667eea;
+      border-width: 2px;
+      background-color: rgba(102,126,234,0.05);
+    }
+    .drag-indicator {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #667eea, #764ba2);
+      border-radius: 2px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 10001;
+    }
+    .drag-indicator.show {
+      opacity: 1;
+    }
+    .drag-indicator-left {
+      left: -2px;
+    }
+    .drag-indicator-right {
+      right: -2px;
+    }
+    .drag-handle {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      cursor: grab;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      color: #999;
+      background: rgba(255,255,255,0.9);
+      border-radius: 4px;
+      padding: 2px;
+    }
+    .card:hover .drag-handle {
+      opacity: 1;
+    }
+    .drag-handle:active {
+      cursor: grabbing;
+    }
     .thumb {
       height: 180px;
       background: linear-gradient(135deg, rgba(102,126,234,0.10), rgba(118,75,162,0.06));
@@ -499,10 +547,21 @@
       return s.user;
     }
 
+    // 拖拽排序相关变量
+    let draggedGraphId = null;
+    let draggedElement = null;
+    let originalGraphs = [];
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let currentIndicator = null;
+    let insertBeforeId = null;
+
     function renderCards(list) {
       const grid = document.getElementById('grid');
       const empty = document.getElementById('empty');
       grid.innerHTML = '';
+      originalGraphs = list;
       if (!list || list.length === 0) {
         empty.style.display = 'block';
         return;
@@ -511,9 +570,16 @@
       for (const g of list) {
         const card = document.createElement('div');
         card.className = 'card';
+        card.dataset.graphId = g.id;
+        card.dataset.sortOrder = g.sort_order;
         // 阻止点击菜单时触发卡片跳转
         card.addEventListener('click', (e) => {
-          if (!e.target.closest('.card-more') && !e.target.closest('.dropdown-menu')) {
+          if (isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          if (!e.target.closest('.card-more') && !e.target.closest('.dropdown-menu') && !e.target.closest('.drag-handle')) {
             window.location.href = '/g/' + g.id;
           }
         });
@@ -523,6 +589,12 @@
           : `<div class="thumb">${first}</div>`;
         card.innerHTML = `
           ${thumbHtml}
+          <!-- 拖拽手柄 -->
+          <div class="drag-handle" data-graph-id="${g.id}" title="拖拽排序">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+              <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+          </div>
           <!-- 更多按钮 -->
           <button class="card-more" data-graph-id="${g.id}" title="更多操作">
             <svg viewBox="0 0 24 24" fill="currentColor">
@@ -537,7 +609,242 @@
           </div>
         `;
 
+        // 添加拖拽事件
+        const dragHandle = card.querySelector('.drag-handle');
+        dragHandle.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          setTimeout(() => startDrag(g.id, card), 0);
+        });
+
         grid.appendChild(card);
+      }
+    }
+
+    function createDragIndicator() {
+      const indicator = document.createElement('div');
+      indicator.className = 'drag-indicator';
+      return indicator;
+    }
+
+    function showInsertIndicator(card, position) {
+  if (!isDragging) {
+    console.log('Not dragging, skipping indicator');
+    return;
+  }
+  
+  console.log('showInsertIndicator:', card ? card.dataset.graphId : null, position);
+  
+  // 移除之前的指示器
+  if (currentIndicator) {
+    currentIndicator.remove();
+    currentIndicator = null;
+  }
+
+  if (!card) {
+    insertBeforeId = null;
+    return;
+  }
+
+  // 创建新的指示器
+  currentIndicator = createDragIndicator();
+  card.style.position = 'relative';
+  
+  if (position === 'left') {
+    currentIndicator.classList.add('drag-indicator-left');
+    insertBeforeId = parseInt(card.dataset.graphId);
+    console.log('Insert before:', insertBeforeId);
+  } else {
+    currentIndicator.classList.add('drag-indicator-right');
+    insertBeforeId = parseInt(card.dataset.graphId) + 10000; // 表示插入到后面
+    console.log('Insert after:', insertBeforeId - 10000);
+  }
+  
+  card.appendChild(currentIndicator);
+  setTimeout(() => {
+    if (currentIndicator) {
+      currentIndicator.classList.add('show');
+    }
+  }, 10);
+}
+
+    function startDrag(graphId, element) {
+      isDragging = true;
+      draggedGraphId = graphId;
+      draggedElement = element;
+      element.classList.add('dragging');
+
+      function onMouseMove(e) {
+        if (!isDragging) return;
+        
+        element.style.position = 'fixed';
+        element.style.zIndex = '10000';
+        element.style.left = (e.clientX - element.offsetWidth / 2) + 'px';
+        element.style.top = (e.clientY - element.offsetHeight / 2) + 'px';
+
+        // 计算拖拽距离
+        const dragDistance = Math.sqrt(
+          Math.pow(e.clientX - dragStartX, 2) + 
+          Math.pow(e.clientY - dragStartY, 2)
+        );
+
+        // 只有当拖拽距离超过10px时才显示插入位置
+        if (dragDistance > 10) {
+          const cards = document.querySelectorAll('.card:not(.dragging)');
+          let targetCard = null;
+          let insertPosition = 'top';
+
+          // 找到鼠标下方的卡片
+          cards.forEach(card => {
+            const rect = card.getBoundingClientRect();
+            if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                e.clientY >= rect.top && e.clientY <= rect.bottom) {
+              targetCard = card;
+              // 根据鼠标在卡片中的位置决定插入左边还是右边
+              const cardCenterX = rect.left + rect.width / 2;
+              insertPosition = e.clientX < cardCenterX ? 'left' : 'right';
+              console.log('Mouse over card:', card.dataset.graphId, 'position:', insertPosition);
+            }
+          });
+
+          showInsertIndicator(targetCard, insertPosition);
+        }
+      }
+
+      function onMouseUp(e) {
+        console.log('onMouseUp - isDragging:', isDragging);
+        
+        if (!isDragging) return;
+        
+        // 阻止事件传播，防止触发点击事件
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // 延迟设置 isDragging 为 false，确保点击事件处理程序能够检查到
+        setTimeout(() => {
+          isDragging = false;
+        }, 100);
+        
+        // 先移除事件监听器
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('mouseleave', onMouseUp);
+
+        // 恢复卡片样式
+        element.classList.remove('dragging');
+        element.style.position = '';
+        element.style.zIndex = '';
+        element.style.left = '';
+        element.style.top = '';
+
+        // 移除指示器
+        if (currentIndicator) {
+          currentIndicator.remove();
+          currentIndicator = null;
+        }
+
+        // 计算拖拽距离
+        const dragDistance = Math.sqrt(
+          Math.pow(e.clientX - dragStartX, 2) + 
+          Math.pow(e.clientY - dragStartY, 2)
+        );
+        
+        console.log('Drag distance:', dragDistance);
+        console.log('insertBeforeId:', insertBeforeId);
+
+        // 如果拖拽距离小于10px，认为是点击，不执行排序
+        if (dragDistance < 10) {
+          console.log('Drag distance too small, treating as click');
+          insertBeforeId = null;
+          return;
+        }
+
+        // 执行排序
+        if (insertBeforeId !== null) {
+          console.log('Executing reorder...');
+          const allCards = Array.from(document.querySelectorAll('.card'));
+          
+          if (insertBeforeId > 1000) {
+            // 插入到目标卡片后面
+            const targetCardId = insertBeforeId - 10000;
+            const targetCard = allCards.find(card => parseInt(card.dataset.graphId) === targetCardId);
+            if (targetCard) {
+              const targetIndex = allCards.findIndex(card => card === targetCard);
+              console.log('Inserting after card', targetCardId, 'at index', targetIndex + 1);
+              reorderGraphs(draggedGraphId, targetIndex + 1);
+            } else {
+              console.log('Target card not found:', targetCardId);
+            }
+          } else {
+            // 插入到目标卡片前面
+            const targetCard = allCards.find(card => parseInt(card.dataset.graphId) === insertBeforeId);
+            if (targetCard) {
+              const targetIndex = allCards.findIndex(card => card === targetCard);
+              console.log('Inserting before card', insertBeforeId, 'at index', targetIndex);
+              reorderGraphs(draggedGraphId, targetIndex);
+            } else {
+              console.log('Target card not found:', insertBeforeId);
+            }
+          }
+          
+          insertBeforeId = null;
+        } else {
+          console.log('No insert position found');
+        }
+      }
+
+      // 添加事件监听器
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('mouseleave', onMouseUp); // 防止鼠标移出窗口
+    }
+
+    async function reorderGraphs(movedGraphId, newIndex) {
+      // 从DOM获取当前所有卡片的顺序
+      const cards = Array.from(document.querySelectorAll('.card'));
+      
+      // 找到移动的图在当前列表中的位置
+      const oldIndex = cards.findIndex(card => parseInt(card.dataset.graphId) === movedGraphId);
+      if (oldIndex === -1 || oldIndex === newIndex) return;
+
+      // 创建新的排序数组
+      const newList = [...cards];
+      const [movedCard] = newList.splice(oldIndex, 1);
+      newList.splice(newIndex, 0, movedCard);
+
+      // 更新排序值
+      const updatedGraphs = newList.map((card, index) => ({
+        id: parseInt(card.dataset.graphId),
+        sort_order: index
+      }));
+
+      console.log('Reordering graphs:', updatedGraphs);
+
+      try {
+        await fetchJson('/api/graphs/sort-orders', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ graphs: updatedGraphs })
+        });
+
+        // 刷新列表
+        loadGraphs();
+      } catch (err) {
+        console.error('更新排序失败:', err);
+        Swal.fire({
+          title: '排序失败',
+          text: '更新关系图排序失败，请重试',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '280px',
+          customClass: {
+            title: 'swal2-title-sm',
+            content: 'swal2-content-sm',
+            confirmButton: 'swal2-btn-sm'
+          }
+        });
       }
     }
 
@@ -932,62 +1239,80 @@
     };
 
     document.getElementById('btnCreate').addEventListener('click', async () => {
-      // 弹出输入框让用户输入关系图名称
-      Swal.fire({
+      // 弹出输入框让用户输入关系图名称和描述
+      const { value: formValues } = await Swal.fire({
         title: '新建关系图',
-        input: 'text',
-        inputPlaceholder: '请输入关系图名称',
+        html: `
+          <div style="width: 100%; max-width: 100%; overflow: hidden;">
+            <div style="margin-bottom: 10px;">
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">图名</label>
+              <input type="text" id="graphName" placeholder="请输入关系图名称" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">描述</label>
+              <textarea id="graphDescription" placeholder="请输入关系图描述（可选）" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; min-height: 60px; resize: vertical; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+            </div>
+          </div>
+        `,
         showCancelButton: true,
         confirmButtonColor: '#667eea',
         cancelButtonColor: '#666',
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        width: '300px',
         customClass: {
+          popup: 'swal2-popup-wide',
           title: 'swal2-title-sm',
           confirmButton: 'swal2-btn-sm',
           cancelButton: 'swal2-btn-sm'
-        }
-      }).then(async (result) => {
-        if (result.isConfirmed && result.value && result.value.trim()) {
-          const name = result.value.trim() || '未命名关系图';
-          try {
-            const g = await fetchJson('/api/graphs', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name })
-            });
-            // 刷新关系图列表
-            loadGraphs();
-            // 显示成功提示
-            Swal.fire({
-              title: '创建成功',
-              text: '关系图已创建',
-              icon: 'success',
-              confirmButtonColor: '#667eea',
-              width: '280px',
-              customClass: {
-                title: 'swal2-title-sm',
-                content: 'swal2-content-sm',
-                confirmButton: 'swal2-btn-sm'
-              }
-            });
-          } catch (err) {
-            Swal.fire({
-              title: '创建失败',
-              text: err.message,
-              icon: 'error',
-              confirmButtonColor: '#667eea',
-              width: '280px',
-              customClass: {
-                title: 'swal2-title-sm',
-                content: 'swal2-content-sm',
-                confirmButton: 'swal2-btn-sm'
-              }
-            });
+        },
+        preConfirm: () => {
+          const name = document.getElementById('graphName').value.trim();
+          const description = document.getElementById('graphDescription').value.trim();
+          if (!name) {
+            Swal.showValidationMessage('请输入关系图名称');
+            return false;
           }
+          return { name, description };
         }
       });
+
+      if (formValues) {
+        try {
+          const g = await fetchJson('/api/graphs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: formValues.name, description: formValues.description })
+          });
+          // 刷新关系图列表
+          loadGraphs();
+          // 显示成功提示
+          Swal.fire({
+            title: '创建成功',
+            text: '关系图已创建',
+            icon: 'success',
+            confirmButtonColor: '#667eea',
+            width: '280px',
+            customClass: {
+              title: 'swal2-title-sm',
+              content: 'swal2-content-sm',
+              confirmButton: 'swal2-btn-sm'
+            }
+          });
+        } catch (err) {
+          Swal.fire({
+            title: '创建失败',
+            text: err.message,
+            icon: 'error',
+            confirmButtonColor: '#667eea',
+            width: '280px',
+            customClass: {
+              title: 'swal2-title-sm',
+              content: 'swal2-content-sm',
+              confirmButton: 'swal2-btn-sm'
+            }
+          });
+        }
+      }
     });
 
     // 处理用户下拉菜单

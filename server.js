@@ -15,44 +15,6 @@ const PORT = 3000;
 
 // 中间件
 // 日志中间件，用于记录请求体大小和内容
-app.use((req, res, next) => {
-    // 只记录PUT和POST请求，因为这些请求通常有较大的请求体
-    if (req.method === 'PUT' || req.method === 'POST') {
-        // 监听请求数据
-        let body = [];
-        req.on('data', chunk => {
-            body.push(chunk);
-        });
-        
-        req.on('end', () => {
-            // 计算请求体大小
-            const bodyBuffer = Buffer.concat(body);
-            const bodySize = bodyBuffer.length;
-            const bodySizeKB = (bodySize / 1024).toFixed(2);
-            const bodySizeMB = (bodySize / (1024 * 1024)).toFixed(2);
-            
-            // 记录请求信息
-            console.log(`[Request] ${req.method} ${req.url}`);
-            console.log(`[Request Body Size] ${bodySize} bytes (${bodySizeKB} KB, ${bodySizeMB} MB)`);
-            
-            // 尝试解析请求体内容，只记录前1000个字符，避免日志过大
-            try {
-                const bodyString = bodyBuffer.toString('utf8');
-                if (bodyString.length > 1000) {
-                    console.log(`[Request Body Preview] ${bodyString.substring(0, 1000)}... (truncated)`);
-                } else {
-                    console.log(`[Request Body] ${bodyString}`);
-                }
-            } catch (error) {
-                console.log(`[Request Body] Binary data or unparseable content`);
-            }
-            
-            console.log('--------------------------------------------------');
-        });
-    }
-    next();
-});
-
 app.use(cors());
 // 增加请求体大小限制，解决PayloadTooLargeError
 app.use(express.json({ limit: '50mb' }));
@@ -127,6 +89,8 @@ async function initDatabase() {
                 id INT PRIMARY KEY AUTO_INCREMENT,
                 userId INT,
                 name VARCHAR(255),
+                description TEXT,
+                sort_order INT DEFAULT 0,
                 createdAt DATETIME,
                 thumbnail TEXT,
                 FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
@@ -207,6 +171,29 @@ async function initDatabase() {
             console.log('成功为 edges 表添加 graphId 列');
         } catch (e) {
             console.log('edges 表的 graphId 列可能已存在:', e.message);
+        }
+
+        // 为 graphs 表添加新字段
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN description TEXT');
+            console.log('成功为 graphs 表添加 description 列');
+        } catch (e) {
+            console.log('graphs 表的 description 列可能已存在:', e.message);
+        }
+
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN sort_order INT DEFAULT 0');
+            console.log('成功为 graphs 表添加 sort_order 列');
+        } catch (e) {
+            console.log('graphs 表的 sort_order 列可能已存在:', e.message);
+        }
+
+        // 为现有数据设置默认排序值
+        try {
+            await pool.execute('UPDATE graphs SET sort_order = id WHERE sort_order IS NULL OR sort_order = 0');
+            console.log('成功为现有关系图设置默认排序值');
+        } catch (e) {
+            console.log('设置默认排序值失败（可能已设置）:', e.message);
         }
 
         // 确保至少有一个默认用户和默认关系图（用于旧数据迁移 / 未登录体验）
@@ -449,7 +436,7 @@ app.get('/api/auth/status', async (req, res) => {
 app.get('/api/graphs', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const sql = 'SELECT id, name, createdAt, thumbnail FROM graphs WHERE userId = ? ORDER BY id DESC';
+        const sql = 'SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE userId = ? ORDER BY sort_order ASC, id DESC';
         console.log(`[SQL] ${sql} - params: [${userId}]`);
         const [graphs] = await pool.execute(sql, [userId]);
         // console.log('关系图列表:', graphs);
@@ -464,14 +451,23 @@ app.get('/api/graphs', async (req, res) => {
 app.post('/api/graphs', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const { name, thumbnail } = req.body;
+        const { name, description, thumbnail } = req.body;
         const now = new Date();
+        
+        // 获取当前用户的最大排序值
+        const [maxSortResult] = await pool.execute(
+            'SELECT MAX(sort_order) as maxSort FROM graphs WHERE userId = ?',
+            [userId]
+        );
+        const maxSort = maxSortResult[0].maxSort || 0;
+        const newSortOrder = maxSort + 1;
+        
         const [result] = await pool.execute(
-            'INSERT INTO graphs (userId, name, createdAt, thumbnail) VALUES (?, ?, ?, ?)',
-            [userId, name, now, thumbnail || '']
+            'INSERT INTO graphs (userId, name, description, sort_order, createdAt, thumbnail) VALUES (?, ?, ?, ?, ?, ?)',
+            [userId, name, description || '', newSortOrder, now, thumbnail || '']
         );
         const newId = result.insertId;
-        const graph = await queryOne('SELECT id, name, createdAt, thumbnail FROM graphs WHERE id = ?', [newId]);
+        const graph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE id = ?', [newId]);
         res.json(graph);
     } catch (e) {
         console.error('创建关系图失败:', e);
@@ -480,11 +476,75 @@ app.post('/api/graphs', async (req, res) => {
 });
 
 // 更新关系图
+// 更新关系图排序
+// 批量更新关系图排序
+app.put('/api/graphs/sort-orders', async (req, res) => {
+    console.log('====================================');
+    console.log('[Sort API] START - Received request');
+    console.log('[Sort API] Method:', req.method);
+    console.log('[Sort API] URL:', req.url);
+    console.log('[Sort API] Headers:', req.headers);
+    console.log('[Sort API] Body:', req.body);
+    console.log('[Sort API] Session:', req.session);
+    try {
+        const userId = getAuthedUserId(req);
+        console.log('[Sort API] userId:', userId);
+        const { graphs } = req.body; // 格式: [{ id: 1, sort_order: 0 }, { id: 2, sort_order: 1 }, ...]
+        
+        if (!graphs || !Array.isArray(graphs)) {
+            console.log('[Sort API] Error: graphs is not an array');
+            return res.status(400).json({ error: 'graphs 参数必须是数组' });
+        }
+        
+        console.log('[Sort API] Graphs to update:', graphs);
+        
+        // 查看数据库中的关系图
+        const [allGraphs] = await pool.execute('SELECT id, name, userId, sort_order FROM graphs');
+        console.log('[Sort API] All graphs in DB:', allGraphs);
+        
+        // 查看当前用户的关系图
+        const [userGraphs] = await pool.execute('SELECT id, name, userId, sort_order FROM graphs WHERE userId = ?', [userId]);
+        console.log('[Sort API] User graphs (userId=' + userId + '):', userGraphs);
+
+        // 开启事务
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        try {
+            for (const graph of graphs) {
+                console.log('[Sort API] Updating graph', graph.id, 'to sort_order', graph.sort_order, 'for userId', userId);
+                // 更新排序（不检查权限，因为这是用户自己的关系图）
+                const [result] = await connection.execute(
+                    'UPDATE graphs SET sort_order = ? WHERE id = ? AND userId = ?',
+                    [graph.sort_order, graph.id, userId]
+                );
+                console.log('[Sort API] Updated graph', graph.id, 'affectedRows:', result.affectedRows);
+                if (result.affectedRows === 0) {
+                    throw new Error(`关系图 ${graph.id} 不存在或无权限`);
+                }
+            }
+
+            await connection.commit();
+            console.log('[Sort API] Commit successful');
+            res.json({ success: true });
+        } catch (e) {
+            await connection.rollback();
+            console.log('[Sort API] Rollback due to error:', e.message);
+            throw e;
+        } finally {
+            connection.release();
+        }
+    } catch (e) {
+        console.error('批量更新排序失败:', e);
+        res.status(500).json({ error: '批量更新排序失败: ' + e.message });
+    }
+});
+
 app.put('/api/graphs/:id', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
         const id = parseInt(req.params.id);
-        const { name, thumbnail } = req.body;
+        const { name, description, thumbnail } = req.body;
 
         // 检查是否有权限
         const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
@@ -493,14 +553,37 @@ app.put('/api/graphs/:id', async (req, res) => {
         }
 
         await run(
-            'UPDATE graphs SET name = ?, thumbnail = ? WHERE id = ?',
-            [name, thumbnail || graph.thumbnail, id]
+            'UPDATE graphs SET name = ?, description = ?, thumbnail = ? WHERE id = ?',
+            [name, description || graph.description, thumbnail || graph.thumbnail, id]
         );
-        const updatedGraph = await queryOne('SELECT id, name, createdAt, thumbnail FROM graphs WHERE id = ?', [id]);
+        const updatedGraph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE id = ?', [id]);
         res.json(updatedGraph);
     } catch (e) {
         console.error('更新关系图失败:', e);
         res.status(500).json({ error: '更新关系图失败' });
+    }
+});
+
+app.put('/api/graphs/:id/sort-order', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const id = parseInt(req.params.id);
+        const { sort_order } = req.body;
+
+        // 检查是否有权限
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        await run(
+            'UPDATE graphs SET sort_order = ? WHERE id = ?',
+            [sort_order, id]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        console.error('更新排序失败:', e);
+        res.status(500).json({ error: '更新排序失败' });
     }
 });
 

@@ -770,6 +770,26 @@ body {
   margin: 0 5px !important;
 }
 
+/* 宽弹窗样式 - 用于新建关系图 */
+.swal2-popup-wide {
+  width: 420px !important;
+  padding: 20px !important;
+  overflow: hidden !important;
+}
+
+.swal2-popup-wide .swal2-content {
+  width: 100% !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.swal2-popup-wide .swal2-input,
+.swal2-popup-wide .swal2-textarea {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-width: auto !important;
+}
+
 /* �Զ��嵯����ʽ */
 .modal-overlay {
   position: fixed;
