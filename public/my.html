@@ -547,6 +547,11 @@
       return s.user;
     }
 
+    // 页面加载时检查登录状态
+    document.addEventListener('DOMContentLoaded', async () => {
+      await ensureLogin();
+    });
+
     // 拖拽排序相关变量
     let draggedGraphId = null;
     let draggedElement = null;

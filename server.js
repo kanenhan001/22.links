@@ -18,7 +18,11 @@ const PORT = 3000;
 app.use(cors());
 // 增加请求体大小限制，解决PayloadTooLargeError
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// 根路由重定向到我的关系图页面
+app.get('/', (req, res) => {
+    res.redirect('/my');
+});
 
 // 登录页面路由
 app.get('/login', (req, res) => {
@@ -29,6 +33,8 @@ app.get('/login', (req, res) => {
 app.get('/my', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'my.html'));
 });
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'graph-editor-dev-secret',
