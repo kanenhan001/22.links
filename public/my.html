@@ -362,6 +362,8 @@
     .dropdown-item svg { width: 16px; height: 16px; color: #666; }
     .dropdown-item.danger { color: #e53935; }
     .dropdown-item.danger svg { color: #e53935; }
+    .dropdown-item.admin-only { display: none; }
+    body.admin-user .dropdown-item.admin-only { display: flex; }
     /* 导出选择样式 */
     .dropdown-with-select {
       flex-wrap: wrap;
@@ -465,6 +467,147 @@
       max-height: 90vh;
       overflow-y: auto;
       z-index: 1001;
+    }
+    .modal-content-large {
+      max-width: 800px;
+    }
+    .user-management-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .user-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .user-list-container {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .user-list-header {
+      display: flex;
+      align-items: center;
+      background: #f9fafb;
+      padding: 14px 20px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #666;
+    }
+    .user-list-header-cell {
+      display: flex;
+      align-items: center;
+    }
+    .user-list-header-avatar {
+      width: 40px;
+    }
+    .user-list-header-info {
+      flex: 1.5;
+    }
+    .user-list-header-username {
+      flex: 1.2;
+    }
+    .user-list-header-time {
+      flex: 1.5;
+    }
+    .user-list-header-status {
+      flex: 0.8;
+    }
+    .user-list-header-actions {
+      flex: 2.5;
+    }
+    .user-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.2s ease;
+    }
+    .user-item:hover {
+      background: #f9fafb;
+    }
+    .user-item-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .user-item-info {
+      flex: 1.5;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-item-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .user-item-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+    .user-item-username {
+      flex: 1.2;
+      font-size: 13px;
+      color: #666;
+    }
+    .user-item-time {
+      flex: 1.5;
+      font-size: 13px;
+      color: #666;
+    }
+    .user-item-status {
+      flex: 0.8;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+      text-align: center;
+    }
+    .user-item-status.active {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .user-item-status.disabled {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .user-item-actions {
+      flex: 2.5;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .user-item-btn {
+      padding: 4px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #fff;
+      color: #666;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .user-item-btn:hover {
+      background: #f5f5f5;
+    }
+    .user-item-btn.danger {
+      color: #e53935;
+      border-color: #fecaca;
+    }
+    .user-item-btn.danger:hover {
+      background: #fef2f2;
     }
     .modal-header {
       padding: 24px;
@@ -623,6 +766,15 @@
       </svg>
       个人中心
     </div>
+    <div class="dropdown-item admin-only" onclick="openUserManagementModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-4-4h-3"/>
+        <circle cx="17" cy="7" r="4"/>
+      </svg>
+      用户管理
+    </div>
     <div class="dropdown-item" onclick="openChangePasswordModal()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -662,13 +814,76 @@
           <input type="password" id="newPassword" class="form-input" placeholder="请输入新密码">
         </div>
         <div class="form-group">
-          <label class="form-label" for="confirmPassword">确认新密码</label>
-          <input type="password" id="confirmPassword" class="form-input" placeholder="请再次输入新密码">
+          <label class="form-label" for="changeConfirmPassword">确认新密码</label>
+          <input type="password" id="changeConfirmPassword" class="form-input" placeholder="请再次输入新密码">
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeChangePasswordModal()">取消</button>
         <button class="btn btn-primary" onclick="handleChangePassword()">确认修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户管理模态框 -->
+  <div class="modal hidden" id="userManagementModal">
+    <div class="modal-overlay" onclick="closeUserManagementModal()"></div>
+    <div class="modal-content modal-content-large">
+      <div class="modal-header">
+        <h3>用户管理</h3>
+        <button class="modal-close" onclick="closeUserManagementModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="user-management-toolbar">
+          <button class="btn btn-primary" onclick="openAddUserModal()">新增用户</button>
+        </div>
+        <div class="user-list-container">
+          <div class="user-list-header">
+            <div class="user-list-header-cell user-list-header-info">用户信息</div>
+            <div class="user-list-header-cell user-list-header-username">账号</div>
+            <div class="user-list-header-cell user-list-header-time">创建时间</div>
+            <div class="user-list-header-cell user-list-header-status">状态</div>
+            <div class="user-list-header-cell user-list-header-actions">操作</div>
+          </div>
+          <div class="user-list" id="userList"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeUserManagementModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增/编辑用户模态框 -->
+  <div class="modal hidden" id="userFormModal">
+    <div class="modal-overlay" onclick="closeUserFormModal()"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="userFormTitle">新增用户</h3>
+        <button class="modal-close" onclick="closeUserFormModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="userId">
+        <div class="form-group">
+          <label class="form-label" for="username">用户名</label>
+          <input type="text" id="username" class="form-input" placeholder="请输入用户名">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="userNickname">昵称</label>
+          <input type="text" id="userNickname" class="form-input" placeholder="请输入昵称">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">密码</label>
+          <input type="password" id="password" class="form-input" placeholder="请输入密码">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="confirmPassword">确认密码</label>
+          <input type="password" id="confirmPassword" class="form-input" placeholder="请再次输入密码">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeUserFormModal()">取消</button>
+        <button class="btn btn-primary" onclick="handleSaveUser()">保存</button>
       </div>
     </div>
   </div>
@@ -692,6 +907,7 @@
 
     async function ensureLogin() {
       const s = await fetchJson('/api/auth/status');
+      console.log('登录状态:', s);
       if (!s.loggedIn) {
         window.location.href = '/login';
         return null;
@@ -704,7 +920,310 @@
       } else {
         avatar.removeAttribute('src');
       }
+      
+      console.log('当前用户信息:', s.user);
+      console.log('用户名:', s.user?.username);
+      console.log('是否为admin:', s.user?.username === 'admin');
+      
+      // 检查是否是 admin 用户
+      if (s.user?.username === 'admin') {
+        document.body.classList.add('admin-user');
+        console.log('已添加 admin-user 类');
+      }
+      
       return s.user;
+    }
+
+    // 用户管理相关函数
+    function openUserManagementModal() {
+      document.getElementById('userManagementModal').classList.remove('hidden');
+      loadUsers();
+    }
+
+    function closeUserManagementModal() {
+      document.getElementById('userManagementModal').classList.add('hidden');
+    }
+
+    async function loadUsers() {
+      try {
+        const users = await fetchJson('/api/users');
+        renderUserList(users);
+      } catch (err) {
+        Sweetalert2.fire({
+          title: '加载失败',
+          text: '加载用户列表失败：' + err.message,
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+      }
+    }
+
+    function renderUserList(users) {
+      const userList = document.getElementById('userList');
+      userList.innerHTML = '';
+      
+      if (!users || users.length === 0) {
+        userList.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">暂无用户</div>';
+        return;
+      }
+      
+      for (const user of users) {
+        const userItem = document.createElement('div');
+        userItem.className = 'user-item';
+        userItem.innerHTML = `
+          <div class="user-item-info">
+            <div class="user-item-name">${user.nickname && user.nickname !== 'None' ? user.nickname : '未命名用户'}</div>
+          </div>
+          <div class="user-item-username">${user.username}</div>
+          <div class="user-item-time">${formatDate(user.createdAt)}</div>
+          <div class="user-item-status ${user.isActive !== false ? 'active' : 'disabled'}">
+            ${user.isActive !== false ? '正常' : '已停用'}
+          </div>
+          <div class="user-item-actions">
+            <button class="user-item-btn" onclick="openEditUserModal(${user.id})">编辑</button>
+            <button class="user-item-btn" onclick="openResetPasswordModal(${user.id})">重置密码</button>
+            ${user.username !== 'admin' ? `<button class="user-item-btn danger" onclick="toggleUserStatus(${user.id}, ${user.isActive !== false})">${user.isActive !== false ? '停用' : '启用'}</button>` : ''}
+            ${user.username !== 'admin' ? `<button class="user-item-btn danger" onclick="deleteUser(${user.id})">删除</button>` : ''}
+          </div>
+        `;
+        userList.appendChild(userItem);
+      }
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    }
+
+    function openAddUserModal() {
+      document.getElementById('userFormTitle').textContent = '新增用户';
+      document.getElementById('userId').value = '';
+      document.getElementById('username').value = '';
+      document.getElementById('userNickname').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('confirmPassword').value = '';
+      document.getElementById('userFormModal').classList.remove('hidden');
+    }
+
+    function openEditUserModal(userId) {
+      document.getElementById('userFormTitle').textContent = '编辑用户';
+      document.getElementById('userId').value = userId;
+      
+      fetchJson('/api/users/' + userId).then(user => {
+        document.getElementById('username').value = user.username;
+        document.getElementById('userNickname').value = (user.nickname && user.nickname !== 'None') ? user.nickname : '';
+        document.getElementById('password').value = '';
+        document.getElementById('confirmPassword').value = '';
+        document.getElementById('userFormModal').classList.remove('hidden');
+      }).catch(err => {
+        Sweetalert2.fire({
+          title: '加载失败',
+          text: '加载用户信息失败：' + err.message,
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+      });
+    }
+
+    function closeUserFormModal() {
+      document.getElementById('userFormModal').classList.add('hidden');
+    }
+
+    async function handleSaveUser() {
+      const userId = document.getElementById('userId').value;
+      const username = document.getElementById('username').value.trim();
+      const nickname = document.getElementById('userNickname').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const confirmPassword = document.getElementById('confirmPassword').value.trim();
+      
+      if (!username) {
+        Sweetalert2.fire({
+          title: '验证失败',
+          text: '用户名不能为空',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
+      if (password && password !== confirmPassword) {
+        Sweetalert2.fire({
+          title: '验证失败',
+          text: '两次输入的密码不一致',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
+      if (userId && !password) {
+        Sweetalert2.fire({
+          title: '验证失败',
+          text: '编辑用户时必须输入密码',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
+      try {
+        const userData = {
+          username: username,
+          nickname: nickname
+        };
+        
+        if (password) {
+          userData.password = password;
+        }
+        
+        if (userId) {
+          await fetchJson('/api/users/' + userId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+        } else {
+          await fetchJson('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+        }
+        
+        closeUserFormModal();
+        loadUsers();
+        
+        Sweetalert2.fire({
+          title: '保存成功',
+          text: userId ? '用户信息已更新' : '用户已创建',
+          icon: 'success',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+      } catch (err) {
+        Sweetalert2.fire({
+          title: '保存失败',
+          text: err.message,
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+      }
+    }
+
+    async function deleteUser(userId) {
+      Sweetalert2.fire({
+        title: '确认删除',
+        text: '确定要删除该用户吗？此操作不可恢复。',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        confirmButtonColor: '#e53935',
+        cancelButtonColor: '#666',
+        width: '320px'
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          try {
+            await fetchJson('/api/users/' + userId, {
+              method: 'DELETE'
+            });
+            loadUsers();
+            
+            Sweetalert2.fire({
+              title: '删除成功',
+              text: '用户已删除',
+              icon: 'success',
+              confirmButtonColor: '#667eea',
+              width: '320px'
+            });
+          } catch (err) {
+            Sweetalert2.fire({
+              title: '删除失败',
+              text: err.message,
+              icon: 'error',
+              confirmButtonColor: '#667eea',
+              width: '320px'
+            });
+          }
+        }
+      });
+    }
+
+    async function toggleUserStatus(userId, isActive) {
+      try {
+        await fetchJson('/api/users/' + userId + '/status', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive })
+        });
+        loadUsers();
+        
+        Sweetalert2.fire({
+          title: '操作成功',
+          text: isActive ? '用户已启用' : '用户已停用',
+          icon: 'success',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+      } catch (err) {
+        Sweetalert2.fire({
+          title: '操作失败',
+          text: err.message,
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+      }
+    }
+
+    async function openResetPasswordModal(userId) {
+      Sweetalert2.fire({
+        title: '重置密码',
+        text: '确定要重置该用户的密码吗？',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        confirmButtonColor: '#667eea',
+        cancelButtonColor: '#666',
+        width: '320px'
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          try {
+            await fetchJson('/api/users/' + userId + '/reset-password', {
+              method: 'POST'
+            });
+            
+            Sweetalert2.fire({
+              title: '重置成功',
+              text: '密码已重置为：123456',
+              icon: 'success',
+              confirmButtonColor: '#667eea',
+              width: '320px'
+            });
+          } catch (err) {
+            Sweetalert2.fire({
+              title: '重置失败',
+              text: err.message,
+              icon: 'error',
+              confirmButtonColor: '#667eea',
+              width: '320px'
+            });
+          }
+        }
+      });
     }
 
     // 页面加载时检查登录状态
@@ -1597,7 +2116,7 @@
     async function handleChangePassword() {
       const currentPassword = document.getElementById('currentPassword').value.trim();
       const newPassword = document.getElementById('newPassword').value.trim();
-      const confirmPassword = document.getElementById('confirmPassword').value.trim();
+      const confirmPassword = document.getElementById('changeConfirmPassword').value.trim();
       
       if (!currentPassword || !newPassword || !confirmPassword) {
         Sweetalert2.fire({

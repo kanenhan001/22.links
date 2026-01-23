@@ -338,7 +338,7 @@ app.post('/api/auth/mock-login', async (req, res) => {
             user = await queryOne('SELECT * FROM users WHERE id = ?', [user.id]);
         }
         req.session.userId = user.id;
-        res.json({ success: true, user: { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl } });
+        res.json({ success: true, user: { id: user.id, username: user.username, nickname: user.nickname, avatarUrl: user.avatarUrl } });
     } catch (error) {
         console.error('登录失败:', error);
         res.status(500).json({ error: '登录失败' });
@@ -370,7 +370,7 @@ app.post('/api/auth/login', async (req, res) => {
         
         // 设置会话
         req.session.userId = user.id;
-        res.json({ success: true, user: { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl } });
+        res.json({ success: true, user: { id: user.id, username: user.username, nickname: user.nickname, avatarUrl: user.avatarUrl } });
     } catch (error) {
         console.error('登录失败:', error);
         res.status(500).json({ error: '登录失败' });
@@ -539,17 +539,251 @@ app.get('/api/auth/status', async (req, res) => {
             userId: userId,
             user: user ? {
                 id: user.id,
+                username: user.username,
                 nickname: user.nickname,
                 avatarUrl: user.avatarUrl
             } : null
         });
     } catch (error) {
-        console.error('获取登录状态失败:', error);
-        res.json({
-            loggedIn: !!req.session.userId,
-            userId: req.session.userId,
-            user: null
-        });
+        console.error('检查登录状态失败:', error);
+        res.status(500).json({ error: '检查登录状态失败' });
+    }
+});
+
+// 用户管理 API - 获取所有用户列表
+app.get('/api/users', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const currentUser = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        
+        if (!currentUser || currentUser.username !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const users = await queryAll('SELECT id, username, nickname, avatarUrl, isActive, createdAt FROM users ORDER BY id');
+        res.json(users);
+    } catch (error) {
+        console.error('获取用户列表失败:', error);
+        res.status(500).json({ error: '获取用户列表失败' });
+    }
+});
+
+// 用户管理 API - 获取单个用户
+app.get('/api/users/:id', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const currentUser = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        
+        if (!currentUser || currentUser.username !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const targetUserId = parseInt(req.params.id);
+        const user = await queryOne('SELECT id, username, nickname, avatarUrl, isActive, createdAt FROM users WHERE id = ?', [targetUserId]);
+        
+        if (!user) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        res.json(user);
+    } catch (error) {
+        console.error('获取用户信息失败:', error);
+        res.status(500).json({ error: '获取用户信息失败' });
+    }
+});
+
+// 用户管理 API - 创建新用户
+app.post('/api/users', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const currentUser = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        
+        if (!currentUser || currentUser.username !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const { username, nickname, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ error: '用户名和密码不能为空' });
+        }
+        
+        const existingUser = await queryOne('SELECT * FROM users WHERE username = ?', [username]);
+        if (existingUser) {
+            return res.status(400).json({ error: '用户名已存在' });
+        }
+        
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        const now = new Date();
+        
+        const result = await run(
+            'INSERT INTO users (username, nickname, password, isActive, createdAt) VALUES (?, ?, ?, ?, ?)',
+            [username, nickname || null, hashedPassword, true, now]
+        );
+        
+        res.json({ success: true, id: result.insertId });
+    } catch (error) {
+        console.error('创建用户失败:', error);
+        res.status(500).json({ error: '创建用户失败' });
+    }
+});
+
+// 用户管理 API - 更新用户信息
+app.put('/api/users/:id', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const currentUser = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        
+        if (!currentUser || currentUser.username !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const targetUserId = parseInt(req.params.id);
+        const targetUser = await queryOne('SELECT * FROM users WHERE id = ?', [targetUserId]);
+        
+        if (!targetUser) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        if (targetUser.username === 'admin') {
+            return res.status(403).json({ error: '不能修改 admin 用户' });
+        }
+        
+        const { username, nickname, password } = req.body;
+        
+        if (username && username !== targetUser.username) {
+            const existingUser = await queryOne('SELECT * FROM users WHERE username = ? AND id != ?', [username, targetUserId]);
+            if (existingUser) {
+                return res.status(400).json({ error: '用户名已存在' });
+            }
+        }
+        
+        const updates = [];
+        const values = [];
+        
+        if (username) {
+            updates.push('username = ?');
+            values.push(username);
+        }
+        
+        if (nickname !== undefined) {
+            updates.push('nickname = ?');
+            values.push(nickname || null);
+        }
+        
+        if (password) {
+            const hashedPassword = await bcrypt.hash(password, saltRounds);
+            updates.push('password = ?');
+            values.push(hashedPassword);
+        }
+        
+        if (updates.length === 0) {
+            return res.status(400).json({ error: '没有要更新的内容' });
+        }
+        
+        values.push(targetUserId);
+        
+        await run(
+            `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+            values
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('更新用户失败:', error);
+        res.status(500).json({ error: '更新用户失败' });
+    }
+});
+
+// 用户管理 API - 删除用户
+app.delete('/api/users/:id', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const currentUser = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        
+        if (!currentUser || currentUser.username !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const targetUserId = parseInt(req.params.id);
+        const targetUser = await queryOne('SELECT * FROM users WHERE id = ?', [targetUserId]);
+        
+        if (!targetUser) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        if (targetUser.username === 'admin') {
+            return res.status(403).json({ error: '不能删除 admin 用户' });
+        }
+        
+        await run('DELETE FROM users WHERE id = ?', [targetUserId]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('删除用户失败:', error);
+        res.status(500).json({ error: '删除用户失败' });
+    }
+});
+
+// 用户管理 API - 启用/停用用户
+app.put('/api/users/:id/status', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const currentUser = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        
+        if (!currentUser || currentUser.username !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const targetUserId = parseInt(req.params.id);
+        const targetUser = await queryOne('SELECT * FROM users WHERE id = ?', [targetUserId]);
+        
+        if (!targetUser) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        if (targetUser.username === 'admin') {
+            return res.status(403).json({ error: '不能停用 admin 用户' });
+        }
+        
+        const { isActive } = req.body;
+        
+        await run('UPDATE users SET isActive = ? WHERE id = ?', [isActive, targetUserId]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('更新用户状态失败:', error);
+        res.status(500).json({ error: '更新用户状态失败' });
+    }
+});
+
+// 用户管理 API - 重置用户密码
+app.post('/api/users/:id/reset-password', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const currentUser = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        
+        if (!currentUser || currentUser.username !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const targetUserId = parseInt(req.params.id);
+        const targetUser = await queryOne('SELECT * FROM users WHERE id = ?', [targetUserId]);
+        
+        if (!targetUser) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        if (targetUser.username === 'admin') {
+            return res.status(403).json({ error: '不能重置 admin 用户密码' });
+        }
+        
+        const defaultPassword = '123456';
+        const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
+        
+        await run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, targetUserId]);
+        res.json({ success: true, defaultPassword });
+    } catch (error) {
+        console.error('重置用户密码失败:', error);
+        res.status(500).json({ error: '重置用户密码失败' });
     }
 });
 
