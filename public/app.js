@@ -148,12 +148,15 @@ class GraphEditor {
     async loadData() {
         try {
             this.showStatus('正在加载数据...');
-            const [nodes, edges] = await Promise.all([
+            const [graphData, nodes, edges] = await Promise.all([
+                this.apiGet(`/api/graphs/${this.graphId}`),
                 this.apiGet(`/api/nodes?graphId=${this.graphId}`),
                 this.apiGet(`/api/edges?graphId=${this.graphId}`)
             ]);
             this.nodes = nodes;
             this.edges = edges;
+            this.graphInfo = graphData.graph;
+            this.showGraphDescription();
             this.showStatus(`已加载 ${nodes.length} 个节点, ${edges.length} 个关系`);
             this.render();
         } catch (error) {
@@ -167,6 +170,16 @@ class GraphEditor {
                     window.location.href = '/login';
                 }
             });
+        }
+    }
+    
+    showGraphDescription() {
+        const descriptionElement = document.getElementById('graphDescription');
+        if (descriptionElement && this.graphInfo) {
+            const description = this.graphInfo.description;
+            const hasDescription = description && description !== 'None' && description !== null;
+            descriptionElement.textContent = hasDescription ? description : '暂无描述';
+            descriptionElement.style.display = hasDescription ? 'block' : 'none';
         }
     }
     

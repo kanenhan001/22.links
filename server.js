@@ -997,6 +997,7 @@ app.get('/api/graphs/:id', async (req, res) => {
             graph: {
                 id: graph.id,
                 name: graph.name,
+                description: graph.description,
                 createdAt: graph.createdAt,
                 thumbnail: graph.thumbnail
             },
