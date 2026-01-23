@@ -2,6 +2,16 @@ class GraphEditor {
     constructor() {
         this.canvas = document.getElementById('graphCanvas');
         this.ctx = this.canvas.getContext('2d');
+        
+        this.dpr = window.devicePixelRatio || 1;
+        this.canvasWidth = 0;
+        this.canvasHeight = 0;
+        
+        this.renderRequested = false;
+        this.rafId = null;
+        
+        this.setupHighDPICanvas();
+        
         this.nodes = [];
         this.edges = [];
         this.selectedNode = null;
@@ -39,6 +49,27 @@ class GraphEditor {
 
         // 当前关系图ID（来自 URL /g/:id）
         this.graphId = this.getGraphIdFromUrl();
+    }
+    
+    setupHighDPICanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = this.canvas.getBoundingClientRect();
+        const newWidth = rect.width * dpr;
+        const newHeight = rect.height * dpr;
+        
+        if (this.canvasWidth === newWidth && this.canvasHeight === newHeight) {
+            return;
+        }
+        
+        this.canvasWidth = newWidth;
+        this.canvasHeight = newHeight;
+        
+        this.canvas.width = newWidth;
+        this.canvas.height = newHeight;
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        
+        this.ctx.scale(dpr, dpr);
     }
     static async create() {
         const editor = new GraphEditor();
@@ -477,6 +508,8 @@ class GraphEditor {
             positionUpdateTimer = setTimeout(() => {
                 this.updateZoomControlsPosition();
                 this.updatePropertiesPanelHeight();
+                this.setupHighDPICanvas();
+                this.render();
             }, 10);
         };
         
@@ -1129,19 +1162,26 @@ class GraphEditor {
 
         // 拖拽选中的节点结束
         if (this.draggingSelectedNodes) {
-            // 保存所有选中节点的位置
-            for (let node of this.selectedNodes) {
-                await this.saveNode(node);
-            }
             this.draggingSelectedNodes = false;
+            
+            requestAnimationFrame(async () => {
+                for (let node of this.selectedNodes) {
+                    await this.saveNode(node);
+                }
+            });
             return;
         }
 
         // 正常的拖拽节点结束
         if (this.draggingNode) {
-            await this.saveNode(this.draggingNode);
+            const nodeToSave = this.draggingNode;
+            this.draggingNode = null;
+            
+            requestAnimationFrame(async () => {
+                await this.saveNode(nodeToSave);
+            });
+            return;
         }
-        this.draggingNode = null;
 
         // 圈选结束
         if (this.isDraggingSelection) {
@@ -2029,6 +2069,25 @@ class GraphEditor {
     }
     
     render() {
+        if (this.renderRequested) {
+            return;
+        }
+        
+        this.renderRequested = true;
+        
+        if (this.rafId) {
+            cancelAnimationFrame(this.rafId);
+        }
+        
+        this.rafId = requestAnimationFrame(() => {
+            this.renderRequested = false;
+            this.rafId = null;
+            
+            this.doRender();
+        });
+    }
+    
+    doRender() {
         // 保存当前变换状态
         this.ctx.save();
         
@@ -2208,23 +2267,42 @@ class GraphEditor {
     drawNode(node) {
         this.ctx.beginPath();
         this.ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+        
         this.ctx.fillStyle = node.color;
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        this.ctx.shadowBlur = 4;
+        this.ctx.shadowOffsetX = 2;
+        this.ctx.shadowOffsetY = 2;
         this.ctx.fill();
+        
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 0;
+        
         this.ctx.strokeStyle = (this.selectedNode === node || this.selectedNodes.includes(node)) ? '#667eea' : '#333';
-        this.ctx.lineWidth = (this.selectedNode === node || this.selectedNodes.includes(node)) ? 4 : 2;
+        this.ctx.lineWidth = (this.selectedNode === node || this.selectedNodes.includes(node)) ? 4 : 2.5;
         this.ctx.stroke();
         
         this.ctx.fillStyle = 'white';
-        this.ctx.font = 'bold 14px Arial';
+        this.ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
+        
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.shadowBlur = 3;
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 1;
         this.ctx.fillText(node.name, node.x, node.y);
+        
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
         
         if (this.selectedNode === node || this.selectedNodes.includes(node)) {
             this.ctx.beginPath();
             this.ctx.arc(node.x, node.y, node.radius + 8, 0, Math.PI * 2);
             this.ctx.strokeStyle = '#667eea';
-            this.ctx.lineWidth = 2;
+            this.ctx.lineWidth = 2.5;
             this.ctx.setLineDash([5, 5]);
             this.ctx.stroke();
             this.ctx.setLineDash([]);
@@ -2266,8 +2344,14 @@ class GraphEditor {
         }
         this.ctx.lineTo(targetX, targetY);
         this.ctx.strokeStyle = edge.color;
-        this.ctx.lineWidth = this.selectedEdge === edge ? 4 : 2;
+        this.ctx.lineWidth = this.selectedEdge === edge ? 4 : 3;
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+        this.ctx.shadowBlur = 3;
+        this.ctx.shadowOffsetX = 1;
+        this.ctx.shadowOffsetY = 1;
         this.ctx.stroke();
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
 
         // 计算终点的箭头角度（最后一段的方向）
         let arrowAngle = angle;
@@ -2292,7 +2376,13 @@ class GraphEditor {
         );
         this.ctx.closePath();
         this.ctx.fillStyle = edge.color;
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        this.ctx.shadowBlur = 2;
+        this.ctx.shadowOffsetX = 1;
+        this.ctx.shadowOffsetY = 1;
         this.ctx.fill();
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
 
         // 计算标签位置（第一个转折点位置或中点）
         let labelX, labelY;
@@ -2315,18 +2405,28 @@ class GraphEditor {
         }
 
         // 绘制标签背景（白色半透明，提高可读性）
-        this.ctx.font = '12px Arial';
+        this.ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
         const textMetrics = this.ctx.measureText(displayLabel);
         const textWidth = textMetrics.width;
-        const textHeight = 12;
+        const textHeight = 14;
+        const padding = 7;
 
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.fillRect(
-            labelX - textWidth / 2 - 4,
-            labelY - textHeight / 2 - 2,
-            textWidth + 8,
-            textHeight + 4
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        this.ctx.shadowBlur = 5;
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 2;
+        this.ctx.beginPath();
+        this.ctx.roundRect(
+            labelX - textWidth / 2 - padding,
+            labelY - textHeight / 2 - padding / 2,
+            textWidth + padding * 2,
+            textHeight + padding,
+            4
         );
+        this.ctx.fill();
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
 
         // 绘制标签文字
         this.ctx.fillStyle = edge.color;
