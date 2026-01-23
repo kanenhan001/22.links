@@ -227,23 +227,6 @@ async function initDatabase() {
             console.log('设置默认排序值失败（可能已设置）:', e.message);
         }
 
-        // 确保至少有一个默认用户和默认关系图（用于旧数据迁移 / 未登录体验）
-        const now = new Date();
-        const [defaultUser] = await pool.execute('SELECT * FROM users WHERE id = 1');
-        if (!defaultUser[0]) {
-            await pool.execute(
-                'INSERT INTO users (id, provider, providerUserId, nickname, avatarUrl, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-                [1, 'mock', 'local', '本地用户', '', now]
-            );
-        }
-        const [defaultGraph] = await pool.execute('SELECT * FROM graphs WHERE id = 1');
-        if (!defaultGraph[0]) {
-            await pool.execute(
-                'INSERT INTO graphs (id, userId, name, createdAt, thumbnail) VALUES (?, ?, ?, ?, ?)',
-                [1, 1, '默认关系图', now, '']
-            );
-        }
-
         // 迁移旧数据：如果 nodes/edges 的 graphId 为空，则设为默认关系图 1
         try {
             await pool.execute('UPDATE nodes SET graphId = 1 WHERE graphId IS NULL');
@@ -311,8 +294,11 @@ async function run(sql, params = []) {
 
 // 获取认证用户ID
 function getAuthedUserId(req) {
-    const userId = req.session?.userId || 1;
+    const userId = req.session?.userId;
     console.log(`[Auth] User ID: ${userId}, Session:`, req.session);
+    if (!userId) {
+        return null;
+    }
     return userId;
 }
 

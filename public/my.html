@@ -977,13 +977,13 @@
           </div>
           <div class="user-item-username">${user.username}</div>
           <div class="user-item-time">${formatDate(user.createdAt)}</div>
-          <div class="user-item-status ${user.isActive !== false ? 'active' : 'disabled'}">
-            ${user.isActive !== false ? '正常' : '已停用'}
+          <div class="user-item-status ${user.isActive ? 'active' : 'disabled'}">
+            ${user.isActive ? '正常' : '已停用'}
           </div>
           <div class="user-item-actions">
             <button class="user-item-btn" onclick="openEditUserModal(${user.id})">编辑</button>
             <button class="user-item-btn" onclick="openResetPasswordModal(${user.id})">重置密码</button>
-            ${user.username !== 'admin' ? `<button class="user-item-btn danger" onclick="toggleUserStatus(${user.id}, ${user.isActive !== false})">${user.isActive !== false ? '停用' : '启用'}</button>` : ''}
+            ${user.username !== 'admin' ? `<button class="user-item-btn danger" onclick="toggleUserStatus(${user.id}, ${user.isActive ? 0 : 1})">${user.isActive ? '停用' : '启用'}</button>` : ''}
             ${user.username !== 'admin' ? `<button class="user-item-btn danger" onclick="deleteUser(${user.id})">删除</button>` : ''}
           </div>
         `;
