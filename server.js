@@ -1049,7 +1049,7 @@ app.get('/api/nodes', async (req, res) => {
 app.post('/api/nodes', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const { graphId, x, y, radius, name, type, color, taskListName, tasks } = req.body;
+        const { graphId, x, y, radius, name, type, color, taskListName, tasks, image } = req.body;
 
         // 检查是否有权限
         const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [graphId, userId]);
@@ -1058,8 +1058,8 @@ app.post('/api/nodes', async (req, res) => {
         }
 
         const newId = await run(
-            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [graphId, x, y, radius, name, type, color, taskListName || '', JSON.stringify(tasks || [])]
+            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [graphId, x, y, radius, name, type, color, taskListName || '', JSON.stringify(tasks || []), image || '']
         );
         const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [newId]);
         res.json(node);
@@ -1074,7 +1074,7 @@ app.put('/api/nodes/:id', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
         const id = parseInt(req.params.id);
-        const { x, y, radius, name, type, color, taskListName, tasks } = req.body;
+        const { x, y, radius, name, type, color, taskListName, tasks, image } = req.body;
 
         // 检查是否有权限
         const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
@@ -1095,10 +1095,11 @@ app.put('/api/nodes/:id', async (req, res) => {
         const colorValue = color !== undefined ? color : node.color;
         const taskListNameValue = taskListName !== undefined ? taskListName : node.taskListName;
         const tasksValue = tasks !== undefined ? JSON.stringify(tasks) : node.tasks;
+        const imageValue = image !== undefined ? image : node.image;
         
         await run(
-            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, tasks = ? WHERE id = ?',
-            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, tasksValue, id]
+            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, tasks = ?, image = ? WHERE id = ?',
+            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, tasksValue, imageValue, id]
         );
         const updatedNode = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
         res.json(updatedNode);
@@ -1323,8 +1324,8 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
                 const graphNodes = importData.nodes.filter(n => n.graphId === graph.id);
                 for (const node of graphNodes) {
                     await run(
-                        'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                        [newId, node.x, node.y, node.radius, node.name, node.type, node.color, node.taskListName || '', node.tasks || '[]']
+                        'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [newId, node.x, node.y, node.radius, node.name, node.type, node.color, node.taskListName || '', node.tasks || '[]', node.image || '']
                     );
                 }
 

@@ -49,6 +49,9 @@ class GraphEditor {
 
         // 当前关系图ID（来自 URL /g/:id）
         this.graphId = this.getGraphIdFromUrl();
+
+        // 节点图片缓存
+        this.nodeImageCache = new Map();
     }
     
     setupHighDPICanvas() {
@@ -593,6 +596,39 @@ class GraphEditor {
                 }
             }
         });
+
+        // 图片上传相关事件（使用事件委托，避免重复绑定）
+        document.getElementById('propertiesContent').addEventListener('click', (e) => {
+            if (e.target.id === 'uploadNodeImageBtn') {
+                e.stopPropagation();
+                document.getElementById('nodeImageInput').click();
+            } else if (e.target.id === 'removeNodeImageBtn') {
+                e.stopPropagation();
+                this.selectedNode.image = '';
+                this.saveNode(this.selectedNode);
+                this.updatePropertiesPanel();
+                this.render();
+            } else if (e.target.closest('#nodeImagePreview') && !this.selectedNode.image) {
+                document.getElementById('nodeImageInput').click();
+            }
+        });
+
+        document.getElementById('propertiesContent').addEventListener('change', (e) => {
+            if (e.target.id === 'nodeImageInput') {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const imageData = event.target.result;
+                        this.selectedNode.image = imageData;
+                        this.saveNode(this.selectedNode);
+                        this.updatePropertiesPanel();
+                        this.render();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        });
     }
     
     handlePropertyChange(e) {
@@ -736,7 +772,7 @@ class GraphEditor {
         if (editBtn) {
             const header = editBtn.closest('.task-list-header');
             if (header) {
-                const currentTitle = this.selectedNode.taskListName || '';
+                const currentTitle = this.selectedNode.taskListName || '关键事项';
                 header.innerHTML = `
                     <input type="text" class="task-list-name-input" 
                         data-prop="taskListName" 
@@ -1906,23 +1942,35 @@ class GraphEditor {
             // 找出所有从当前节点发出的关系
             const outgoingEdges = this.edges.filter(e => e.sourceId === this.selectedNode.id);
             // 获取节点的清单名称和事项
-            const taskListName = this.selectedNode.taskListName || '';
+            const taskListName = this.selectedNode.taskListName || '关键事项';
             const nodeTasks = Array.isArray(this.selectedNode.tasks) ? this.selectedNode.tasks : [];
             
             panel.innerHTML = `
                 <div class="property-group">
-                    <label>基本信息:</label>
-                    <div class="property-inline-row">
-                        <input type="text" id="propName" value="${this.selectedNode.name}" data-prop="name" placeholder="名称">
-                        <select id="propType" data-prop="type">
-                            <option value="organization" ${this.selectedNode.type === 'organization' ? 'selected' : ''}>组织</option>
-                            <option value="person" ${this.selectedNode.type === 'person' ? 'selected' : ''}>人物</option>
-                            <option value="location" ${this.selectedNode.type === 'location' ? 'selected' : ''}>地点</option>
-                            <option value="time" ${this.selectedNode.type === 'time' ? 'selected' : ''}>时间</option>
-                            <option value="event" ${this.selectedNode.type === 'event' ? 'selected' : ''}>事件</option>
-                            <option value="concept" ${this.selectedNode.type === 'concept' ? 'selected' : ''}>概念</option>
-                        </select>
-                        <input type="color" id="propColor" value="${this.selectedNode.color}" data-prop="color" class="inline-color-input">
+                    
+                    <div class="node-basic-info">
+                        <div class="image-preview" id="nodeImagePreview">
+                            ${this.selectedNode.image ? `<img src="${this.selectedNode.image}" alt="节点图片">` : '<span class="image-placeholder">暂无图片</span>'}
+                            <div class="image-overlay">
+                                <button type="button" id="uploadNodeImageBtn" class="overlay-btn">上传</button>
+                                ${this.selectedNode.image ? '<button type="button" id="removeNodeImageBtn" class="overlay-btn delete">删除</button>' : ''}
+                            </div>
+                        </div>
+                        <input type="file" id="nodeImageInput" accept="image/*" style="display: none;">
+                        <div class="node-info-right">
+                            <input type="text" id="propName" class="node-name-input" value="${this.selectedNode.name}" data-prop="name" placeholder="节点名称">
+                            <div class="node-info-row">
+                                <select id="propType" data-prop="type">
+                                    <option value="organization" ${this.selectedNode.type === 'organization' ? 'selected' : ''}>组织</option>
+                                    <option value="person" ${this.selectedNode.type === 'person' ? 'selected' : ''}>人物</option>
+                                    <option value="location" ${this.selectedNode.type === 'location' ? 'selected' : ''}>地点</option>
+                                    <option value="time" ${this.selectedNode.type === 'time' ? 'selected' : ''}>时间</option>
+                                    <option value="event" ${this.selectedNode.type === 'event' ? 'selected' : ''}>事件</option>
+                                    <option value="concept" ${this.selectedNode.type === 'concept' ? 'selected' : ''}>概念</option>
+                                </select>
+                                <input type="color" id="propColor" value="${this.selectedNode.color}" data-prop="color" class="inline-color-input">
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="property-group">
@@ -2286,19 +2334,40 @@ class GraphEditor {
         this.ctx.lineWidth = (this.selectedNode === node || this.selectedNodes.includes(node)) ? 4 : 2.5;
         this.ctx.stroke();
         
-        this.ctx.fillStyle = 'white';
-        this.ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        
-        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        this.ctx.shadowBlur = 3;
-        this.ctx.shadowOffsetX = 0;
-        this.ctx.shadowOffsetY = 1;
-        this.ctx.fillText(node.name, node.x, node.y);
-        
-        this.ctx.shadowColor = 'transparent';
-        this.ctx.shadowBlur = 0;
+        if (node.image) {
+            let img = this.nodeImageCache.get(node.image);
+            if (!img) {
+                img = new Image();
+                img.src = node.image;
+                img.onload = () => {
+                    this.render();
+                };
+                this.nodeImageCache.set(node.image, img);
+            }
+            
+            if (img.complete) {
+                this.ctx.save();
+                this.ctx.beginPath();
+                this.ctx.arc(node.x, node.y, node.radius - 2, 0, Math.PI * 2);
+                this.ctx.clip();
+                this.ctx.drawImage(img, node.x - node.radius + 2, node.y - node.radius + 2, (node.radius - 2) * 2, (node.radius - 2) * 2);
+                this.ctx.restore();
+            }
+        } else {
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            
+            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            this.ctx.shadowBlur = 3;
+            this.ctx.shadowOffsetX = 0;
+            this.ctx.shadowOffsetY = 1;
+            this.ctx.fillText(node.name, node.x, node.y);
+            
+            this.ctx.shadowColor = 'transparent';
+            this.ctx.shadowBlur = 0;
+        }
         
         if (this.selectedNode === node || this.selectedNodes.includes(node)) {
             this.ctx.beginPath();
