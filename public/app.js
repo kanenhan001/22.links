@@ -2369,6 +2369,8 @@ class GraphEditor {
             this.ctx.shadowBlur = 0;
         }
         
+        this.drawNodeInfo(node);
+        
         if (this.selectedNode === node || this.selectedNodes.includes(node)) {
             this.ctx.beginPath();
             this.ctx.arc(node.x, node.y, node.radius + 8, 0, Math.PI * 2);
@@ -2379,6 +2381,74 @@ class GraphEditor {
             this.ctx.setLineDash([]);
         }
     }
+
+    drawNodeInfo(node) {
+        const tasks = Array.isArray(node.tasks) ? node.tasks : [];
+        const hasTasks = tasks.length > 0;
+
+        if (!hasTasks) return;
+
+        const lineHeight = 18;
+        const padding = 6;
+        const maxWidth = 180;
+        const minWidth = 80;
+
+        this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+        this.ctx.textBaseline = 'top';
+
+        const title = node.name;
+        const taskItems = tasks.slice(0, 3).map(t => {
+            const prefix = t.done ? '✓' : '○';
+            return `${prefix} ${t.title || ''}`;
+        });
+
+        const allLines = [title, ...taskItems];
+        const lineWidths = allLines.map(line => this.ctx.measureText(line).width);
+        const boxWidth = Math.max(Math.max(...lineWidths) + padding * 2, minWidth);
+        const boxHeight = allLines.length * lineHeight + padding * 2;
+
+        const boxX = node.x + node.radius + 10;
+        const boxY = node.y - boxHeight / 2;
+
+        this.ctx.save();
+
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+        this.ctx.shadowBlur = 8;
+        this.ctx.shadowOffsetX = 2;
+        this.ctx.shadowOffsetY = 2;
+
+        this.ctx.beginPath();
+        this.ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
+        this.ctx.fill();
+
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 0;
+
+        this.ctx.beginPath();
+        this.ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
+        this.ctx.clip();
+
+        this.ctx.fillStyle = '#333';
+        this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+        this.ctx.fillText(title, boxX + padding, boxY + padding);
+
+        this.ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+        taskItems.forEach((item, index) => {
+            const itemY = boxY + padding + lineHeight * (index + 1);
+            if (item.startsWith('✓')) {
+                this.ctx.fillStyle = '#27ae60';
+            } else {
+                this.ctx.fillStyle = '#666';
+            }
+            this.ctx.fillText(item, boxX + padding, itemY);
+        });
+
+        this.ctx.restore();
+    }
+}
     
     drawEdge(edge, offset = 0, totalEdgesInGroup = 1, unifiedPerpAngle = null) {
         const source = this.nodes.find(n => n.id === edge.sourceId);
