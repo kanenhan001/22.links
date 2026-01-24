@@ -2448,8 +2448,7 @@ class GraphEditor {
 
         this.ctx.restore();
     }
-}
-    
+
     drawEdge(edge, offset = 0, totalEdgesInGroup = 1, unifiedPerpAngle = null) {
         const source = this.nodes.find(n => n.id === edge.sourceId);
         const target = this.nodes.find(n => n.id === edge.targetId);
