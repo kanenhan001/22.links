@@ -645,6 +645,25 @@ body {
     gap: 8px;
 }
 
+.task-item.dragging {
+    opacity: 0.5;
+    background: #f0f0f0;
+}
+
+.task-drag-handle {
+    cursor: grab;
+    color: #999;
+    font-size: 12px;
+    line-height: 1;
+    user-select: none;
+    padding: 0 2px;
+    align-self: center;
+}
+
+.task-drag-handle:active {
+    cursor: grabbing;
+}
+
 .task-checkbox {
     align-self: center !important;
     display: flex !important;
@@ -801,6 +820,26 @@ body {
 }
 
 .task-list-edit-btn:hover {
+    background: #f0f0f0;
+    color: #667eea;
+}
+
+.task-list-sort-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.task-list-sort-btn:hover {
     background: #f0f0f0;
     color: #667eea;
 }

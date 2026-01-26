@@ -787,6 +787,12 @@ class GraphEditor {
             return;
         }
 
+        // 点击排序按钮，切换排序方式
+        if (e.target.id === 'taskListSortBtn' || e.target.closest('#taskListSortBtn')) {
+            this.sortNodeTasks();
+            return;
+        }
+
         // 新增节点事项
         if (e.target.id === 'addNodeTaskBtn') {
             const textarea = document.getElementById('newNodeTaskTitle');
@@ -1907,6 +1913,97 @@ class GraphEditor {
         textarea.style.height = textarea.scrollHeight + 'px';
     }
 
+    sortNodeTasks() {
+        if (!this.selectedNode || !Array.isArray(this.selectedNode.tasks)) return;
+
+        const tasks = this.selectedNode.tasks;
+        
+        if (tasks.length <= 1) return;
+
+        const hasDone = tasks.some(t => t.done);
+        
+        if (hasDone) {
+            tasks.sort((a, b) => {
+                if (a.done === b.done) {
+                    return 0;
+                }
+                return a.done ? 1 : -1;
+            });
+        } else {
+            tasks.reverse();
+        }
+
+        this.saveNode(this.selectedNode);
+        this.updatePropertiesPanel();
+    }
+
+    setupTaskDragSort(panel) {
+        const taskList = panel.querySelector('#nodeTaskList');
+        if (!taskList) return;
+
+        const taskItems = taskList.querySelectorAll('.task-item');
+        let draggedItem = null;
+
+        taskItems.forEach(item => {
+            const dragHandle = item.querySelector('.task-drag-handle');
+            if (!dragHandle) return;
+
+            dragHandle.addEventListener('dragstart', (e) => {
+                draggedItem = item;
+                e.dataTransfer.setData('text/plain', item.dataset.nodeTaskIndex);
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => {
+                    item.classList.add('dragging');
+                }, 0);
+            });
+
+            dragHandle.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+                draggedItem = null;
+            });
+
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (!draggedItem || draggedItem === item) return;
+
+                const rect = item.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+
+                if (e.clientY < midY) {
+                    taskList.insertBefore(draggedItem, item);
+                } else {
+                    taskList.insertBefore(draggedItem, item.nextSibling);
+                }
+            });
+
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                this.saveTaskOrder(taskList);
+            });
+        });
+    }
+
+    saveTaskOrder(taskList) {
+        if (!this.selectedNode || !Array.isArray(this.selectedNode.tasks)) return;
+
+        const taskItems = taskList.querySelectorAll('.task-item');
+        const newOrder = [];
+
+        taskItems.forEach(item => {
+            const index = parseInt(item.dataset.nodeTaskIndex);
+            if (!isNaN(index) && this.selectedNode.tasks[index]) {
+                newOrder.push(this.selectedNode.tasks[index]);
+            }
+        });
+
+        if (newOrder.length === this.selectedNode.tasks.length) {
+            this.selectedNode.tasks = newOrder;
+            this.saveNode(this.selectedNode);
+            this.updatePropertiesPanel();
+        }
+    }
+
     updatePropertiesPanel() {
         const panel = document.getElementById('propertiesContent');
         const panelContainer = document.querySelector('.properties-panel');
@@ -1981,13 +2078,19 @@ class GraphEditor {
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                 </svg>
                             </button>
+                            <button type="button" class="task-list-sort-btn" id="taskListSortBtn" title="排序" style="display: none;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18M6 12h12M9 18h6"></path>
+                                </svg>
+                            </button>
                         ` : `
                             <input type="text" class="task-list-name-input" data-prop="taskListName" placeholder="请输入事项清单名称（如：目标、待办等）" value="">
                         `}
                     </div>
                     <div class="task-list" id="nodeTaskList">
                         ${nodeTasks.map((task, index) => `
-                            <div class="task-item ${task.done ? 'done' : ''}" data-node-task-index="${index}">
+                            <div class="task-item ${task.done ? 'done' : ''}" data-node-task-index="${index}" draggable="false">
+                                <span class="task-drag-handle" title="拖拽排序" draggable="true">⋮⋮</span>
                                 <label class="task-checkbox">
                                     <input type="checkbox" data-node-task-field="done" ${task.done ? 'checked' : ''}>
                                     <span class="checkmark"></span>
@@ -2038,6 +2141,9 @@ class GraphEditor {
             panel.querySelectorAll('.task-textarea').forEach(textarea => {
                 this.autoResizeTextarea(textarea);
             });
+
+            // 添加任务拖拽排序功能
+            this.setupTaskDragSort(panel);
         } else if (this.selectedEdge) {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
