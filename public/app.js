@@ -2007,11 +2007,16 @@ class GraphEditor {
     updatePropertiesPanel() {
         const panel = document.getElementById('propertiesContent');
         const panelContainer = document.querySelector('.properties-panel');
+        const panelTitle = document.getElementById('propertiesPanelTitle');
         
         // 检查是否选中了多个节点
         if (this.selectedNodes.length > 1) {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
+            }
+            
+            if (panelTitle) {
+                panelTitle.textContent = '对象属性面板';
             }
             
             panel.innerHTML = `
@@ -2033,6 +2038,10 @@ class GraphEditor {
         } else if (this.selectedNode) {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
+            }
+            
+            if (panelTitle) {
+                panelTitle.textContent = '对象属性面板';
             }
             // 找出所有从当前节点发出的关系
             const outgoingEdges = this.edges.filter(e => e.sourceId === this.selectedNode.id);
@@ -2148,10 +2157,14 @@ class GraphEditor {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
             }
+            
+            if (panelTitle) {
+                panelTitle.textContent = '关系属性面板';
+            }
+            
             const source = this.nodes.find(n => n.id === this.selectedEdge.sourceId);
             const target = this.nodes.find(n => n.id === this.selectedEdge.targetId);
             const tasks = Array.isArray(this.selectedEdge.tasks) ? this.selectedEdge.tasks : [];
-            console.log('关系属性面板 - 当前关系任务列表:', this.selectedEdge.id, tasks);
             
             panel.innerHTML = `
                 <div class="property-group">
@@ -2204,6 +2217,10 @@ class GraphEditor {
             panel.innerHTML = '<p>请选择一个节点或关系</p>';
             if (panelContainer) {
                 panelContainer.classList.add('collapsed');
+            }
+            
+            if (panelTitle) {
+                panelTitle.textContent = '属性面板';
             }
         }
         
