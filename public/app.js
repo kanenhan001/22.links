@@ -2389,7 +2389,7 @@ class GraphEditor {
         if (!hasTasks) return;
 
         const lineHeight = 18;
-        const padding = 6;
+        const padding = 20;
         const maxWidth = 180;
         const minWidth = 80;
 
@@ -2407,8 +2407,8 @@ class GraphEditor {
         const boxWidth = Math.max(Math.max(...lineWidths) + padding * 2, minWidth);
         const boxHeight = allLines.length * lineHeight + padding * 2;
 
-        const boxX = node.x + node.radius + 10;
-        const boxY = node.y - boxHeight / 2;
+        const boxX = node.x + node.radius + 10;// 信息框左边缘
+        const boxY = node.y - boxHeight / 2;// 信息框上边缘
 
         this.ctx.save();
 
@@ -2433,7 +2433,7 @@ class GraphEditor {
 
         this.ctx.fillStyle = '#333';
         this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-        this.ctx.fillText(title, boxX + padding, boxY + padding);
+        this.ctx.fillText(title, boxX + padding, boxY + padding);// 标题位置
 
         this.ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
         taskItems.forEach((item, index) => {
@@ -2443,7 +2443,8 @@ class GraphEditor {
             } else {
                 this.ctx.fillStyle = '#666';
             }
-            this.ctx.fillText(item, boxX + padding, itemY);
+            this.ctx.textAlign = 'left';  // 左对齐
+            this.ctx.fillText(item, boxX + padding, itemY);// 任务项位置
         });
 
         this.ctx.restore();
