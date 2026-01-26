@@ -641,8 +641,29 @@ body {
 
 .task-item {
     display: flex;
-    align-items: stretch; /* 让子元素拉伸到相同高度 */
+    align-items: center; /* 所有子元素垂直居中 */
     gap: 8px;
+}
+
+.task-checkbox {
+    align-self: center !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer;
+    height: 30px;
+}
+
+.task-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #667eea;
+    margin: 0;
+}
+
+.task-checkbox .checkmark {
+    display: none; /* 隐藏 checkmark，使用原生 checkbox */
 }
 
 .task-item textarea {

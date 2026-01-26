@@ -262,10 +262,8 @@ class GraphEditor {
                 console.log('未生成缩略图（画布为空）');
                 return;
             }
-
             // 上传缩略图
             await this.uploadThumbnail(thumbnailData);
-            console.log('缩略图上传成功');
         } catch (error) {
             console.error('生成或上传缩略图失败:', error);
         }
@@ -2393,7 +2391,7 @@ class GraphEditor {
         if (!hasTasks) return;
 
         const lineHeight = 18;
-        const padding = 20;
+        const padding = 14;
         const maxWidth = 180;
         const minWidth = 80;
 
@@ -2436,6 +2434,7 @@ class GraphEditor {
         this.ctx.clip();
 
         this.ctx.fillStyle = '#333';
+         this.ctx.textAlign = 'left';  // 左对齐
         this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
         this.ctx.fillText(title, boxX + padding, boxY + padding);// 标题位置
 
@@ -2689,8 +2688,6 @@ class GraphEditor {
 let editor;
 (async () => {
     editor = await GraphEditor.create();
-    console.log('GraphEditor initialized successfully');
-
     // 检查是否为导出模式
     const urlParams = new URLSearchParams(window.location.search);
     const exportFormat = urlParams.get('export');
