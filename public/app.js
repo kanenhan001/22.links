@@ -1989,7 +1989,11 @@ class GraphEditor {
                     </div>
                     <div class="task-list" id="nodeTaskList">
                         ${nodeTasks.map((task, index) => `
-                            <div class="task-item" data-node-task-index="${index}">
+                            <div class="task-item ${task.done ? 'done' : ''}" data-node-task-index="${index}">
+                                <label class="task-checkbox">
+                                    <input type="checkbox" data-node-task-field="done" ${task.done ? 'checked' : ''}>
+                                    <span class="checkmark"></span>
+                                </label>
                                 <textarea class="task-textarea" data-node-task-field="title" placeholder="事项内容">${task.title || ''}</textarea>
                                 <button type="button" class="task-delete-btn" data-node-task-action="delete">删</button>
                             </div>
