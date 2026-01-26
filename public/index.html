@@ -63,7 +63,8 @@
 
 
 
-            <button id="helpBtn" style="margin-left: auto;">帮助</button>
+            <button id="settingsBtn" style="margin-left: auto;">设置</button>
+            <button id="helpBtn" style="margin-left: 10px;">帮助</button>
             <button id="myGraphsBtn" style="margin-left: 10px;">我的</button>
 
 
@@ -74,7 +75,7 @@
 
 
 
-            <canvas id="graphCanvas" width="1600" height="1200"></canvas>
+            <canvas id="graphCanvas" width="1600" height="1400"></canvas>
             
             <!-- 缩放控件 -->
             <div class="zoom-controls">
@@ -216,6 +217,42 @@
                 </ul>
 
                 <p>享受梳理关系的乐趣！</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div>
+                <h2>画布设置</h2>
+                <span class="close" data-modal-target="settingsModal">&times;</span>
+            </div>
+            <div class="settings-content">
+                <div class="setting-item">
+                    <label for="canvasWidth">画布宽度 (px):</label>
+                    <input type="number" id="canvasWidth" min="800" max="5000" value="1600">
+                </div>
+                <div class="setting-item">
+                    <label for="canvasHeight">画布高度 (px):</label>
+                    <input type="number" id="canvasHeight" min="600" max="5000" value="1400">
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="showNodeInfo">
+                        显示节点信息框
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label for="backgroundImage">背景图片:</label>
+                    <input type="file" id="backgroundImage" accept="image/*">
+                    <div id="backgroundImagePreview" class="background-preview"></div>
+                    <button type="button" id="clearBackground">清除背景</button>
+                </div>
+                <div class="setting-buttons">
+                    <button type="button" id="saveSettings" class="modal-btn primary">保存</button>
+                    <button type="button" id="cancelSettings" class="modal-btn">取消</button>
+                </div>
             </div>
         </div>
     </div>

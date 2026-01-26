@@ -46,6 +46,15 @@ class GraphEditor {
         this.minZoom = 0.25; // 最小缩放 25%
         this.maxZoom = 3.0; // 最大缩放 300%
         this.zoomStep = 0.1; // 每次缩放步长
+        this.panOffset = { x: 0, y: 0 }; // 画布平移偏移量
+        this.isPanning = false; // 是否正在平移
+        this.lastPanPosition = { x: 0, y: 0 }; // 上一次平移位置
+
+        // 画布设置
+        this.canvasWidth = 1600;
+        this.canvasHeight = 1400;
+        this.showNodeInfo = true;
+        this.backgroundImage = null;
 
         // 当前关系图ID（来自 URL /g/:id）
         this.graphId = this.getGraphIdFromUrl();
@@ -76,19 +85,6 @@ class GraphEditor {
     }
     static async create() {
         const editor = new GraphEditor();
-
-        // 在初始化时尝试从 localStorage 恢复缩放比例
-        try {
-            const storedZoom = window.localStorage.getItem('graphEditor.zoomLevel');
-            if (storedZoom) {
-                const parsed = parseFloat(storedZoom);
-                if (!Number.isNaN(parsed) && parsed > 0) {
-                    editor.zoomLevel = Math.max(editor.minZoom, Math.min(editor.maxZoom, parsed));
-                }
-            }
-        } catch (err) {
-            console.warn('读取缩放缓存失败:', err);
-        }
 
         editor.setupEventListeners();
         await editor.loadData();
@@ -159,7 +155,38 @@ class GraphEditor {
             this.nodes = nodes;
             this.edges = edges;
             this.graphInfo = graphData;
+            
+            // 恢复缩放和平移状态
+            if (graphData.zoomLevel) {
+                this.zoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, graphData.zoomLevel));
+            }
+            if (graphData.panOffsetX !== undefined && graphData.panOffsetY !== undefined) {
+                this.panOffset = { x: graphData.panOffsetX || 0, y: graphData.panOffsetY || 0 };
+            }
+            
+            // 恢复画布设置
+            if (graphData.canvasWidth) {
+                this.canvasWidth = graphData.canvasWidth;
+            }
+            if (graphData.canvasHeight) {
+                this.canvasHeight = graphData.canvasHeight;
+            }
+            if (graphData.showNodeInfo !== undefined) {
+                this.showNodeInfo = graphData.showNodeInfo;
+            }
+            if (graphData.backgroundImage) {
+                this.backgroundImage = graphData.backgroundImage;
+            }
+            
+            // 更新画布尺寸
+            this.canvas.width = this.canvasWidth;
+            this.canvas.height = this.canvasHeight;
+            this.canvas.style.width = this.canvasWidth + 'px';
+            this.canvas.style.height = this.canvasHeight + 'px';
+            
             this.showStatus(`已加载 ${nodes.length} 个节点, ${edges.length} 个关系`);
+            this.updateZoomDisplay();
+            this.applyZoom();
             this.render();
         } catch (error) {
             console.error('加载数据失败:', error);
@@ -172,6 +199,134 @@ class GraphEditor {
                     window.location.href = '/login';
                 }
             });
+        }
+    }
+    
+    showSettingsModal() {
+        const modal = document.getElementById('settingsModal');
+        modal.style.display = 'block';
+        
+        // 填充当前设置
+        document.getElementById('canvasWidth').value = this.canvasWidth;
+        document.getElementById('canvasHeight').value = this.canvasHeight;
+        document.getElementById('showNodeInfo').checked = this.showNodeInfo;
+        
+        // 背景图片预览
+        const preview = document.getElementById('backgroundImagePreview');
+        if (this.backgroundImage) {
+            preview.style.backgroundImage = `url(${this.backgroundImage})`;
+            preview.classList.add('has-image');
+            preview.textContent = '';
+        } else {
+            preview.style.backgroundImage = '';
+            preview.classList.remove('has-image');
+            preview.textContent = '预览区域';
+        }
+        
+        // 动态绑定事件（避免重复绑定）
+        const saveSettingsBtn = document.getElementById('saveSettings');
+        saveSettingsBtn.onclick = this.saveSettings.bind(this);
+        
+        const cancelSettingsBtn = document.getElementById('cancelSettings');
+        cancelSettingsBtn.onclick = this.hideSettingsModal.bind(this);
+        
+        const clearBackgroundBtn = document.getElementById('clearBackground');
+        clearBackgroundBtn.onclick = this.clearBackground.bind(this);
+        
+        const backgroundImageInput = document.getElementById('backgroundImage');
+        backgroundImageInput.onchange = this.handleBackgroundImageUpload.bind(this);
+    }
+    
+    async saveSettings() {
+        console.log('saveSettings 被调用');
+        const canvasWidth = parseInt(document.getElementById('canvasWidth').value);
+        const canvasHeight = parseInt(document.getElementById('canvasHeight').value);
+        const showNodeInfo = document.getElementById('showNodeInfo').checked;
+        
+        console.log('保存设置:', { canvasWidth, canvasHeight, showNodeInfo });
+        
+        try {
+            await this.apiPut(`/api/graphs/${this.graphId}`, {
+                canvasWidth,
+                canvasHeight,
+                showNodeInfo
+            });
+            
+            console.log('设置保存成功');
+            
+            this.canvasWidth = canvasWidth;
+            this.canvasHeight = canvasHeight;
+            this.showNodeInfo = showNodeInfo;
+            
+            // 更新画布尺寸
+            this.canvas.width = canvasWidth;
+            this.canvas.height = canvasHeight;
+            this.canvas.style.width = canvasWidth + 'px';
+            this.canvas.style.height = canvasHeight + 'px';
+            
+            this.render();
+            this.hideSettingsModal();
+            this.showStatus('设置已保存');
+        } catch (error) {
+            console.error('保存设置失败:', error);
+            showModal({ title: '保存失败', message: '保存设置失败: ' + error.message, type: 'error' });
+        }
+    }
+    
+    hideSettingsModal() {
+        const modal = document.getElementById('settingsModal');
+        modal.style.display = 'none';
+    }
+    
+    async handleBackgroundImageUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        try {
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const imageData = event.target.result;
+                
+                // 预览
+                const preview = document.getElementById('backgroundImagePreview');
+                preview.style.backgroundImage = `url(${imageData})`;
+                preview.classList.add('has-image');
+                preview.textContent = '';
+                
+                // 保存到数据库
+                await this.apiPut(`/api/graphs/${this.graphId}`, {
+                    backgroundImage: imageData
+                });
+                
+                this.backgroundImage = imageData;
+                this.render();
+            };
+            reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('上传背景图片失败:', error);
+            showModal({ title: '上传失败', message: '上传背景图片失败: ' + error.message, type: 'error' });
+        }
+        
+        e.target.value = '';
+    }
+    
+    async clearBackground() {
+        try {
+            await this.apiPut(`/api/graphs/${this.graphId}`, {
+                backgroundImage: null
+            });
+            
+            this.backgroundImage = null;
+            
+            const preview = document.getElementById('backgroundImagePreview');
+            preview.style.backgroundImage = '';
+            preview.classList.remove('has-image');
+            preview.textContent = '预览区域';
+            
+            this.render();
+        } catch (error) {
+            console.error('清除背景图片失败:', error);
+            showModal({ title: '清除失败', message: '清除背景图片失败: ' + error.message, type: 'error' });
         }
     }
     
@@ -419,8 +574,18 @@ class GraphEditor {
             throw error;
         }
     }
-    
 
+    async saveViewSettings() {
+        try {
+            await this.apiPut(`/api/graphs/${this.graphId}`, {
+                zoomLevel: this.zoomLevel,
+                panOffsetX: this.panOffset.x,
+                panOffsetY: this.panOffset.y
+            });
+        } catch (error) {
+            console.error('保存视图设置失败:', error);
+        }
+    }
     
     async deleteNode(node) {
         try {
@@ -478,6 +643,7 @@ class GraphEditor {
         // 按钮事件
         document.getElementById('addNodeBtn').addEventListener('click', () => this.showNodeModal());
         document.getElementById('clearBtn').addEventListener('click', this.handleClear.bind(this));
+        document.getElementById('settingsBtn').addEventListener('click', () => this.showSettingsModal());
         document.getElementById('helpBtn').addEventListener('click', () => this.showHelpModal());
         
         // 缩放控件事件
@@ -485,11 +651,16 @@ class GraphEditor {
         document.getElementById('zoomOutBtn').addEventListener('click', () => this.zoomOut());
         document.getElementById('zoomResetBtn').addEventListener('click', () => this.zoomReset());
         
-        // 鼠标滚轮缩放
+        // 鼠标滚轮缩放（以鼠标位置为中心）
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
+            
             const delta = e.deltaY > 0 ? -this.zoomStep : this.zoomStep;
-            this.setZoom(this.zoomLevel + delta);
+            const newZoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoomLevel + delta));
+            
+            if (newZoomLevel !== this.zoomLevel) {
+                this.setZoom(newZoomLevel);
+            }
         }, { passive: false });
         
         this.setupModalListeners();
@@ -551,6 +722,10 @@ class GraphEditor {
         
         document.getElementById('nodeForm').addEventListener('submit', this.handleNodeFormSubmit.bind(this));
         document.getElementById('edgeForm').addEventListener('submit', this.handleEdgeFormSubmit.bind(this));
+        
+        // 设置弹窗事件
+        // 这些事件在 showSettingsModal 中动态绑定
+        // 因为设置弹窗在 app.js 加载时还不存在于 DOM 中
         
         document.getElementById('propertiesContent').addEventListener('input', (e) => {
             // 处理 textarea 自动高度调整
@@ -1054,17 +1229,50 @@ class GraphEditor {
             }
         }
 
-        // 开始圈选
-        this.isDraggingSelection = true;
-        this.selectionStart = { x, y };
-        this.selectionEnd = { x, y };
-        // 清除之前的选择
-        this.selectedNodes = [];
-        this.selectedNode = null;
-        this.selectedEdge = null;
-        this.updatePropertiesPanel();
+        // 如果没有点击到任何元素，开始画布平移
+        this.isPanning = true;
+        this.lastPanPosition = { x: e.clientX, y: e.clientY };
+        this.canvas.style.cursor = 'grabbing';
+        this.render();
+        
+        // 在 window 上监听事件，确保鼠标超出画布范围时仍能继续拖拽
+        this.panMouseMoveHandler = this.handlePanMouseMove.bind(this);
+        this.panMouseUpHandler = this.handlePanMouseUp.bind(this);
+        window.addEventListener('mousemove', this.panMouseMoveHandler);
+        window.addEventListener('mouseup', this.panMouseUpHandler);
     }
-    
+
+    handlePanMouseMove(e) {
+        if (!this.isPanning) return;
+        
+        const dx = e.clientX - this.lastPanPosition.x;
+        const dy = e.clientY - this.lastPanPosition.y;
+        
+        this.panOffset.x += dx;
+        this.panOffset.y += dy;
+        
+        this.lastPanPosition = { x: e.clientX, y: e.clientY };
+        this.applyZoom();
+    }
+
+    handlePanMouseUp() {
+        this.isPanning = false;
+        this.canvas.style.cursor = 'crosshair';
+        
+        // 保存视图设置到数据库
+        this.saveViewSettings();
+        
+        // 移除 window 级别的事件监听器
+        if (this.panMouseMoveHandler) {
+            window.removeEventListener('mousemove', this.panMouseMoveHandler);
+            this.panMouseMoveHandler = null;
+        }
+        if (this.panMouseUpHandler) {
+            window.removeEventListener('mouseup', this.panMouseUpHandler);
+            this.panMouseUpHandler = null;
+        }
+    }
+
     handleMouseMove(e) {
         const { x, y } = this.getCanvasCoordinates(e);
 
@@ -1834,12 +2042,8 @@ class GraphEditor {
         // 限制缩放范围
         this.zoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, level));
 
-        // 缓存当前缩放比例到 localStorage，便于刷新后恢复
-        try {
-            window.localStorage.setItem('graphEditor.zoomLevel', String(this.zoomLevel));
-        } catch (err) {
-            console.warn('保存缩放缓存失败:', err);
-        }
+        // 保存视图设置到数据库
+        this.saveViewSettings();
 
         this.updateZoomDisplay();
         this.applyZoom();
@@ -1855,6 +2059,7 @@ class GraphEditor {
     }
     
     zoomReset() {
+        this.panOffset = { x: 0, y: 0 };
         this.setZoom(1.0);
     }
     
@@ -1866,8 +2071,8 @@ class GraphEditor {
     }
     
     applyZoom() {
-        // 使用 CSS transform 来缩放 canvas
-        this.canvas.style.transform = `scale(${this.zoomLevel})`;
+        // 使用 CSS transform 来缩放和平移 canvas
+        this.canvas.style.transform = `translate(${this.panOffset.x}px, ${this.panOffset.y}px) scale(${this.zoomLevel})`;
         this.canvas.style.transformOrigin = 'top left';
     }
     
@@ -1898,8 +2103,8 @@ class GraphEditor {
     // 获取考虑缩放后的鼠标坐标
     getCanvasCoordinates(e) {
         const rect = this.canvas.getBoundingClientRect();
-        // CSS transform scale 会影响 getBoundingClientRect，所以需要除以缩放比例
-        // 但实际测试发现，getBoundingClientRect 返回的是原始尺寸，所以直接除以缩放比例即可
+        // 由于使用了 CSS transform 平移画布，getBoundingClientRect 返回的是平移后的位置
+        // 所以只需要考虑缩放比例，不需要考虑平移偏移
         const x = (e.clientX - rect.left) / this.zoomLevel;
         const y = (e.clientY - rect.top) / this.zoomLevel;
         return { x, y };
@@ -2271,6 +2476,19 @@ class GraphEditor {
         
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
+        // 绘制背景图片
+        if (this.backgroundImage) {
+            const img = new Image();
+            img.src = this.backgroundImage;
+            if (img.complete) {
+                this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+            } else {
+                img.onload = () => {
+                    this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                };
+            }
+        }
+        
         // 按节点对分组边，以便处理多条边的情况
         const edgeGroups = this.groupEdgesByNodePair();
         
@@ -2508,6 +2726,8 @@ class GraphEditor {
     }
 
     drawNodeInfo(node) {
+        if (!this.showNodeInfo) return;
+        
         const tasks = Array.isArray(node.tasks) ? node.tasks : [];
         const hasTasks = tasks.length > 0;
 

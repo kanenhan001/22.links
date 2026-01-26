@@ -227,6 +227,57 @@ async function initDatabase() {
             console.log('设置默认排序值失败（可能已设置）:', e.message);
         }
 
+        // 为 graphs 表添加缩放和平移字段
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN zoomLevel DOUBLE DEFAULT 1.0');
+            console.log('成功为 graphs 表添加 zoomLevel 列');
+        } catch (e) {
+            console.log('graphs 表的 zoomLevel 列可能已存在:', e.message);
+        }
+
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN panOffsetX DOUBLE DEFAULT 0');
+            console.log('成功为 graphs 表添加 panOffsetX 列');
+        } catch (e) {
+            console.log('graphs 表的 panOffsetX 列可能已存在:', e.message);
+        }
+
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN panOffsetY DOUBLE DEFAULT 0');
+            console.log('成功为 graphs 表添加 panOffsetY 列');
+        } catch (e) {
+            console.log('graphs 表的 panOffsetY 列可能已存在:', e.message);
+        }
+
+        // 为 graphs 表添加画布设置字段
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN canvasWidth INT DEFAULT 1600');
+            console.log('成功为 graphs 表添加 canvasWidth 列');
+        } catch (e) {
+            console.log('graphs 表的 canvasWidth 列可能已存在:', e.message);
+        }
+
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN canvasHeight INT DEFAULT 1400');
+            console.log('成功为 graphs 表添加 canvasHeight 列');
+        } catch (e) {
+            console.log('graphs 表的 canvasHeight 列可能已存在:', e.message);
+        }
+
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN showNodeInfo BOOLEAN DEFAULT TRUE');
+            console.log('成功为 graphs 表添加 showNodeInfo 列');
+        } catch (e) {
+            console.log('graphs 表的 showNodeInfo 列可能已存在:', e.message);
+        }
+
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN backgroundImage TEXT');
+            console.log('成功为 graphs 表添加 backgroundImage 列');
+        } catch (e) {
+            console.log('graphs 表的 backgroundImage 列可能已存在:', e.message);
+        }
+
         // 迁移旧数据：如果 nodes/edges 的 graphId 为空，则设为默认关系图 1
         try {
             await pool.execute('UPDATE nodes SET graphId = 1 WHERE graphId IS NULL');
@@ -887,7 +938,7 @@ app.put('/api/graphs/:id', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
         const id = parseInt(req.params.id);
-        const { name, description, thumbnail } = req.body;
+        const { name, description, thumbnail, zoomLevel, panOffsetX, panOffsetY, canvasWidth, canvasHeight, showNodeInfo, backgroundImage } = req.body;
 
         // 检查是否有权限
         const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
@@ -895,11 +946,63 @@ app.put('/api/graphs/:id', async (req, res) => {
             return res.status(403).json({ error: '无权限' });
         }
 
+        // 构建动态更新语句
+        const updates = [];
+        const values = [];
+        
+        if (name !== undefined) {
+            updates.push('name = ?');
+            values.push(name);
+        }
+        if (description !== undefined) {
+            updates.push('description = ?');
+            values.push(description);
+        }
+        if (thumbnail !== undefined) {
+            updates.push('thumbnail = ?');
+            values.push(thumbnail);
+        }
+        if (zoomLevel !== undefined) {
+            updates.push('zoomLevel = ?');
+            values.push(zoomLevel);
+        }
+        if (panOffsetX !== undefined) {
+            updates.push('panOffsetX = ?');
+            values.push(panOffsetX);
+        }
+        if (panOffsetY !== undefined) {
+            updates.push('panOffsetY = ?');
+            values.push(panOffsetY);
+        }
+        if (canvasWidth !== undefined) {
+            updates.push('canvasWidth = ?');
+            values.push(canvasWidth);
+        }
+        if (canvasHeight !== undefined) {
+            updates.push('canvasHeight = ?');
+            values.push(canvasHeight);
+        }
+        if (showNodeInfo !== undefined) {
+            updates.push('showNodeInfo = ?');
+            values.push(showNodeInfo);
+        }
+        if (backgroundImage !== undefined) {
+            updates.push('backgroundImage = ?');
+            values.push(backgroundImage);
+        }
+        
+        if (updates.length === 0) {
+            return res.json(graph);
+        }
+        
+        values.push(id);
+        
         await run(
-            'UPDATE graphs SET name = ?, description = ?, thumbnail = ? WHERE id = ?',
-            [name, description || graph.description, thumbnail || graph.thumbnail, id]
+            `UPDATE graphs SET ${updates.join(', ')} WHERE id = ?`,
+            values
         );
-        const updatedGraph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE id = ?', [id]);
+        
+        const updatedGraph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail, zoomLevel, panOffsetX, panOffsetY FROM graphs WHERE id = ?', [id]);
         res.json(updatedGraph);
     } catch (e) {
         console.error('更新关系图失败:', e);
@@ -994,15 +1097,18 @@ app.get('/api/graphs/:id', async (req, res) => {
         const edges = await queryAll('SELECT * FROM edges WHERE graphId = ?', [id]);
 
         res.json({
-            graph: {
-                id: graph.id,
-                name: graph.name,
-                description: graph.description,
-                createdAt: graph.createdAt,
-                thumbnail: graph.thumbnail
-            },
-            nodes,
-            edges
+            id: graph.id,
+            name: graph.name,
+            description: graph.description,
+            createdAt: graph.createdAt,
+            thumbnail: graph.thumbnail,
+            zoomLevel: graph.zoomLevel,
+            panOffsetX: graph.panOffsetX,
+            panOffsetY: graph.panOffsetY,
+            canvasWidth: graph.canvasWidth,
+            canvasHeight: graph.canvasHeight,
+            showNodeInfo: graph.showNodeInfo,
+            backgroundImage: graph.backgroundImage
         });
     } catch (e) {
         console.error('获取关系图详情失败:', e);

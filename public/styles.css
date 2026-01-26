@@ -111,10 +111,11 @@ body {
     padding: 20px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     flex: 1;
+    min-height: calc(100vh - 130px); /* 最小高度，确保画布容器足够高 */
     display: flex;
     justify-content: flex-start;
     align-items: flex-start;
-    overflow: auto; /* 画布容器可以滚动 */
+    overflow: hidden; /* 隐藏滚动条，避免与 CSS transform 冲突 */
     position: relative; /* 为缩放控件定位 */
 }
 
@@ -123,6 +124,7 @@ body {
     border-radius: 8px;
     background: #fafafa;
     cursor: crosshair;
+    transition: transform 0.1s ease-out; /* 添加过渡效果 */
 }
 
 .properties-panel {
@@ -506,6 +508,10 @@ body {
 
 #helpModal .modal-content {
     max-width: 720px; /* 帮助弹窗稍宽 */
+}
+
+#settingsModal .modal-content {
+    max-width: 500px;
 }
 
 .modal-content > div:first-child { /* 包裹 h2 和 .close 的容器 */
@@ -1150,5 +1156,72 @@ body {
 }
 .modal-btn.secondary:hover {
   background: #eee;
+}
+
+/* 设置弹窗样式 */
+.settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setting-item label {
+    font-size: 14px;
+    color: #555;
+    font-weight: 500;
+}
+
+.setting-item input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.setting-item input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+}
+
+.setting-item label:has(input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.background-preview {
+    width: 100%;
+    height: 120px;
+    border: 2px dashed #ddd;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    color: #999;
+    font-size: 14px;
+}
+
+.background-preview.has-image {
+    border-style: solid;
+}
+
+.setting-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.setting-buttons .modal-btn {
+    flex: 1;
 }
 
