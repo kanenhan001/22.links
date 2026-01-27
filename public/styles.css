@@ -36,6 +36,22 @@ body {
     flex-wrap: wrap;
     align-items: center;
     flex-shrink: 0; /* 工具栏不收缩 */
+    justify-content: space-between;
+}
+
+.toolbar-left,
+.toolbar-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.toolbar-left {
+    flex: 1;
+}
+
+.toolbar-right {
+    flex: 0 0 auto;
 }
 
 .toolbar button {
@@ -70,6 +86,16 @@ body {
 .toolbar button:disabled:hover {
     transform: none;
     box-shadow: none;
+}
+
+.toolbar button svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.toolbar button span {
+    flex-shrink: 0;
 }
 
 .help-content ul {

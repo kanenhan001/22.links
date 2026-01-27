@@ -220,9 +220,7 @@ class GraphEditor {
         }
         
         const nodeCount = this.nodes.length;
-        const padding = 100;
-        const width = this.canvasWidth - padding * 2;
-        const height = this.canvasHeight - padding * 2;
+        const padding = 150;
         
         if (nodeCount === 1) {
             this.nodes[0].x = this.canvasWidth / 2;
@@ -233,17 +231,20 @@ class GraphEditor {
             return;
         }
         
-        const iterations = 300;
-        const repulsionStrength = 5000;
-        const attractionStrength = 0.01;
-        const centerForce = 0.0005;
-        const minDistance = 80;
+        const iterations = 500;
+        const repulsionStrength = 8000;
+        const attractionStrength = 0.02;
+        const centerForce = 0.001;
+        const minDistance = 120;
         
         const positions = this.nodes.map(node => ({ x: node.x, y: node.y }));
         const velocities = this.nodes.map(() => ({ x: 0, y: 0 }));
         
+        const centerX = this.canvasWidth / 2;
+        const centerY = this.canvasHeight / 2;
+        
         for (let iter = 0; iter < iterations; iter++) {
-            const cooling = 1 - iter / iterations;
+            const cooling = Math.pow(1 - iter / iterations, 0.5);
             
             for (let i = 0; i < nodeCount; i++) {
                 let fx = 0, fy = 0;
@@ -266,15 +267,13 @@ class GraphEditor {
                     }
                 }
                 
-                const centerX = this.canvasWidth / 2;
-                const centerY = this.canvasHeight / 2;
                 const dx = positions[i].x - centerX;
                 const dy = positions[i].y - centerY;
                 fx -= dx * centerForce;
                 fy -= dy * centerForce;
                 
-                velocities[i].x = (velocities[i].x + fx) * 0.6;
-                velocities[i].y = (velocities[i].y + fy) * 0.6;
+                velocities[i].x = (velocities[i].x + fx) * 0.7;
+                velocities[i].y = (velocities[i].y + fy) * 0.7;
             }
             
             for (const edge of this.edges) {
@@ -304,7 +303,13 @@ class GraphEditor {
                 positions[i].x = Math.max(padding, Math.min(this.canvasWidth - padding, positions[i].x));
                 positions[i].y = Math.max(padding, Math.min(this.canvasHeight - padding, positions[i].y));
             }
+            
+            if (iter % 10 === 0) {
+                this.resolvePositionsOverlaps(positions, padding);
+            }
         }
+        
+        this.resolvePositionsOverlaps(positions, padding);
         
         for (let i = 0; i < nodeCount; i++) {
             this.nodes[i].x = positions[i].x;
@@ -315,6 +320,51 @@ class GraphEditor {
         this.saveState();
         this.render();
         this.showStatus('美化完成');
+    }
+    
+    resolvePositionsOverlaps(positions, padding) {
+        const maxIterations = 50;
+        const minDistance = 200;
+        
+        for (let iter = 0; iter < maxIterations; iter++) {
+            let hasOverlap = false;
+            let maxOverlap = 0;
+            
+            for (let i = 0; i < positions.length; i++) {
+                for (let j = i + 1; j < positions.length; j++) {
+                    const node1 = this.nodes[i];
+                    const node2 = this.nodes[j];
+                    
+                    const dx = positions[j].x - positions[i].x;
+                    const dy = positions[j].y - positions[i].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const minDist = node1.radius + node2.radius + minDistance;
+                    
+                    if (dist < minDist && dist > 0) {
+                        hasOverlap = true;
+                        const overlap = minDist - dist;
+                        maxOverlap = Math.max(maxOverlap, overlap);
+                        
+                        const moveX = (dx / dist) * overlap * 0.8;
+                        const moveY = (dy / dist) * overlap * 0.8;
+                        
+                        positions[i].x -= moveX;
+                        positions[i].y -= moveY;
+                        positions[j].x += moveX;
+                        positions[j].y += moveY;
+                    }
+                }
+            }
+            
+            for (let i = 0; i < positions.length; i++) {
+                positions[i].x = Math.max(padding, Math.min(this.canvasWidth - padding, positions[i].x));
+                positions[i].y = Math.max(padding, Math.min(this.canvasHeight - padding, positions[i].y));
+            }
+            
+            if (!hasOverlap) break;
+            
+            if (iter > 20 && maxOverlap < 5) break;
+        }
     }
     
     saveState() {
