@@ -1081,6 +1081,78 @@ app.delete('/api/graphs/:id', async (req, res) => {
     }
 });
 
+// 复制关系图
+app.post('/api/graphs/:id/duplicate', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const sourceId = parseInt(req.params.id);
+        const { name } = req.body;
+
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        try {
+            const [sourceGraphs] = await connection.execute(
+                'SELECT * FROM graphs WHERE id = ? AND userId = ?',
+                [sourceId, userId]
+            );
+            if (sourceGraphs.length === 0) {
+                await connection.rollback();
+                connection.release();
+                return res.status(403).json({ error: '无权限' });
+            }
+            const sourceGraph = sourceGraphs[0];
+
+            const [maxSortResult] = await connection.execute(
+                'SELECT MAX(sort_order) as maxSort FROM graphs WHERE userId = ?',
+                [userId]
+            );
+            const maxSort = maxSortResult[0].maxSort || 0;
+            const newSortOrder = maxSort + 1;
+
+            const [graphResult] = await connection.execute(
+                'INSERT INTO graphs (userId, name, description, sort_order, createdAt, thumbnail, zoomLevel, panOffsetX, panOffsetY, canvasWidth, canvasHeight, showNodeInfo, backgroundImage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [userId, name, sourceGraph.description || '', newSortOrder, new Date(), sourceGraph.thumbnail || '', sourceGraph.zoomLevel || 1.0, sourceGraph.panOffsetX || 0, sourceGraph.panOffsetY || 0, sourceGraph.canvasWidth || 2000, sourceGraph.canvasHeight || 2000, sourceGraph.showNodeInfo !== undefined ? sourceGraph.showNodeInfo : 1, sourceGraph.backgroundImage || '']
+            );
+            const newGraphId = graphResult.insertId;
+
+            const [nodes] = await connection.execute('SELECT * FROM nodes WHERE graphId = ?', [sourceId]);
+            const nodeIdMap = {};
+            for (const node of nodes) {
+                const [nodeResult] = await connection.execute(
+                    'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [newGraphId, node.x, node.y, node.radius, node.name, node.type, node.color, node.taskListName, node.tasks, node.image]
+                );
+                nodeIdMap[node.id] = nodeResult.insertId;
+            }
+
+            const [edges] = await connection.execute('SELECT * FROM edges WHERE graphId = ?', [sourceId]);
+            for (const edge of edges) {
+                const newSourceId = nodeIdMap[edge.sourceId];
+                const newTargetId = nodeIdMap[edge.targetId];
+                if (newSourceId && newTargetId) {
+                    await connection.execute(
+                        'INSERT INTO edges (graphId, sourceId, targetId, label, color, bendPoints, tasks) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [newGraphId, newSourceId, newTargetId, edge.label, edge.color, edge.bendPoints, edge.tasks]
+                    );
+                }
+            }
+
+            await connection.commit();
+            const newGraph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE id = ?', [newGraphId]);
+            res.json(newGraph);
+        } catch (e) {
+            await connection.rollback();
+            throw e;
+        } finally {
+            connection.release();
+        }
+    } catch (e) {
+        console.error('复制关系图失败:', e);
+        res.status(500).json({ error: '复制关系图失败: ' + e.message });
+    }
+});
+
 // 获取关系图详情
 app.get('/api/graphs/:id', async (req, res) => {
     try {

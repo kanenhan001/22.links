@@ -1754,7 +1754,6 @@
         Swal.fire({
           title: '复制关系图',
           input: 'text',
-          inputValue: '副本 - ',
           inputPlaceholder: '请输入复制后的名称',
           showCancelButton: true,
           confirmButtonColor: '#667eea',
@@ -1766,10 +1765,17 @@
             title: 'swal2-title-sm',
             confirmButton: 'swal2-btn-sm',
             cancelButton: 'swal2-btn-sm'
+          },
+          didOpen: () => {
+            const card = document.querySelector(`.card[data-graph-id="${graphId}"]`);
+            if (card) {
+              const name = card.querySelector('.name')?.textContent;
+              Swal.getInput().value = name + ' - 副本';
+            }
           }
         }).then((result) => {
           if (result.isConfirmed && result.value && result.value.trim()) {
-            fetchJson('/api/graphs', {
+            fetchJson('/api/graphs/' + graphId + '/duplicate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ name: result.value.trim() })
