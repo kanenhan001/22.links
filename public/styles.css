@@ -62,6 +62,16 @@ body {
     transform: translateY(0);
 }
 
+.toolbar button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.toolbar button:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
 .help-content ul {
     list-style: disc inside;
     margin-left: 20px;

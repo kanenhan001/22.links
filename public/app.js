@@ -61,6 +61,12 @@ class GraphEditor {
 
         // 节点图片缓存
         this.nodeImageCache = new Map();
+
+        // 撤销/重做历史状态
+        this.history = [];
+        this.historyIndex = -1;
+        this.maxHistorySize = 50;
+        this.isRestoring = false;
     }
     
     setupHighDPICanvas() {
@@ -188,6 +194,11 @@ class GraphEditor {
             this.updateZoomDisplay();
             this.applyZoom();
             this.render();
+            
+            this.history = [];
+            this.historyIndex = -1;
+            this.saveState();
+            this.updateUndoRedoButtons();
         } catch (error) {
             console.error('加载数据失败:', error);
             this.showStatus('加载数据失败: ' + error.message);
@@ -199,6 +210,214 @@ class GraphEditor {
                     window.location.href = '/login';
                 }
             });
+        }
+    }
+    
+    beautifyGraph() {
+        if (this.nodes.length === 0) {
+            this.showStatus('没有节点需要美化');
+            return;
+        }
+        
+        const nodeCount = this.nodes.length;
+        const padding = 100;
+        const width = this.canvasWidth - padding * 2;
+        const height = this.canvasHeight - padding * 2;
+        
+        if (nodeCount === 1) {
+            this.nodes[0].x = this.canvasWidth / 2;
+            this.nodes[0].y = this.canvasHeight / 2;
+            this.saveAllNodes();
+            this.render();
+            this.showStatus('美化完成');
+            return;
+        }
+        
+        const iterations = 300;
+        const repulsionStrength = 5000;
+        const attractionStrength = 0.01;
+        const centerForce = 0.0005;
+        const minDistance = 80;
+        
+        const positions = this.nodes.map(node => ({ x: node.x, y: node.y }));
+        const velocities = this.nodes.map(() => ({ x: 0, y: 0 }));
+        
+        for (let iter = 0; iter < iterations; iter++) {
+            const cooling = 1 - iter / iterations;
+            
+            for (let i = 0; i < nodeCount; i++) {
+                let fx = 0, fy = 0;
+                
+                for (let j = 0; j < nodeCount; j++) {
+                    if (i === j) continue;
+                    
+                    const dx = positions[i].x - positions[j].x;
+                    const dy = positions[i].y - positions[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                    
+                    if (dist < minDistance) {
+                        const force = (minDistance - dist) / minDistance * repulsionStrength;
+                        fx += (dx / dist) * force;
+                        fy += (dy / dist) * force;
+                    } else {
+                        const force = repulsionStrength / (dist * dist);
+                        fx += (dx / dist) * force;
+                        fy += (dy / dist) * force;
+                    }
+                }
+                
+                const centerX = this.canvasWidth / 2;
+                const centerY = this.canvasHeight / 2;
+                const dx = positions[i].x - centerX;
+                const dy = positions[i].y - centerY;
+                fx -= dx * centerForce;
+                fy -= dy * centerForce;
+                
+                velocities[i].x = (velocities[i].x + fx) * 0.6;
+                velocities[i].y = (velocities[i].y + fy) * 0.6;
+            }
+            
+            for (const edge of this.edges) {
+                const sourceIndex = this.nodes.findIndex(n => n.id === edge.sourceId);
+                const targetIndex = this.nodes.findIndex(n => n.id === edge.targetId);
+                
+                if (sourceIndex !== -1 && targetIndex !== -1) {
+                    const dx = positions[targetIndex].x - positions[sourceIndex].x;
+                    const dy = positions[targetIndex].y - positions[sourceIndex].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                    
+                    const force = dist * attractionStrength;
+                    const fx = (dx / dist) * force;
+                    const fy = (dy / dist) * force;
+                    
+                    velocities[sourceIndex].x += fx;
+                    velocities[sourceIndex].y += fy;
+                    velocities[targetIndex].x -= fx;
+                    velocities[targetIndex].y -= fy;
+                }
+            }
+            
+            for (let i = 0; i < nodeCount; i++) {
+                positions[i].x += velocities[i].x * cooling;
+                positions[i].y += velocities[i].y * cooling;
+                
+                positions[i].x = Math.max(padding, Math.min(this.canvasWidth - padding, positions[i].x));
+                positions[i].y = Math.max(padding, Math.min(this.canvasHeight - padding, positions[i].y));
+            }
+        }
+        
+        for (let i = 0; i < nodeCount; i++) {
+            this.nodes[i].x = positions[i].x;
+            this.nodes[i].y = positions[i].y;
+        }
+        
+        this.saveAllNodes();
+        this.saveState();
+        this.render();
+        this.showStatus('美化完成');
+    }
+    
+    saveState() {
+        if (this.isRestoring) return;
+        
+        const state = {
+            nodes: JSON.parse(JSON.stringify(this.nodes)),
+            edges: JSON.parse(JSON.stringify(this.edges)),
+            timestamp: Date.now()
+        };
+        
+        if (this.historyIndex < this.history.length - 1) {
+            this.history = this.history.slice(0, this.historyIndex + 1);
+        }
+        
+        this.history.push(state);
+        
+        if (this.history.length > this.maxHistorySize) {
+            this.history.shift();
+        } else {
+            this.historyIndex++;
+        }
+        
+        this.updateUndoRedoButtons();
+    }
+    
+    undo() {
+        if (this.historyIndex <= 0) {
+            this.showStatus('无法后退');
+            return;
+        }
+        
+        this.isRestoring = true;
+        this.historyIndex--;
+        
+        const state = this.history[this.historyIndex];
+        this.nodes = JSON.parse(JSON.stringify(state.nodes));
+        this.edges = JSON.parse(JSON.stringify(state.edges));
+        
+        this.selectedNode = null;
+        this.selectedEdge = null;
+        this.selectedNodes = [];
+        
+        this.render();
+        this.updateUndoRedoButtons();
+        this.showStatus('已后退');
+        
+        setTimeout(() => {
+            this.isRestoring = false;
+        }, 100);
+    }
+    
+    redo() {
+        if (this.historyIndex >= this.history.length - 1) {
+            this.showStatus('无法前进');
+            return;
+        }
+        
+        this.isRestoring = true;
+        this.historyIndex++;
+        
+        const state = this.history[this.historyIndex];
+        this.nodes = JSON.parse(JSON.stringify(state.nodes));
+        this.edges = JSON.parse(JSON.stringify(state.edges));
+        
+        this.selectedNode = null;
+        this.selectedEdge = null;
+        this.selectedNodes = [];
+        
+        this.render();
+        this.updateUndoRedoButtons();
+        this.showStatus('已前进');
+        
+        setTimeout(() => {
+            this.isRestoring = false;
+        }, 100);
+    }
+    
+    updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        
+        if (undoBtn) {
+            undoBtn.disabled = this.historyIndex <= 0;
+            undoBtn.style.opacity = this.historyIndex <= 0 ? '0.5' : '1';
+        }
+        
+        if (redoBtn) {
+            redoBtn.disabled = this.historyIndex >= this.history.length - 1;
+            redoBtn.style.opacity = this.historyIndex >= this.history.length - 1 ? '0.5' : '1';
+        }
+    }
+    
+    async saveAllNodes() {
+        try {
+            for (const node of this.nodes) {
+                await this.apiPut(`/api/nodes/${node.id}`, {
+                    x: node.x,
+                    y: node.y
+                });
+            }
+        } catch (error) {
+            console.error('保存节点位置失败:', error);
         }
     }
     
@@ -592,6 +811,7 @@ class GraphEditor {
             await this.apiDelete(`/api/nodes/${node.id}`);
             this.nodes = this.nodes.filter(n => n.id !== node.id);
             this.edges = this.edges.filter(e => e.sourceId !== node.id && e.targetId !== node.id);
+            this.saveState();
             this.showStatus('节点已删除');
         } catch (error) {
             console.error('删除节点失败:', error);
@@ -605,6 +825,7 @@ class GraphEditor {
             await this.apiDelete(`/api/edges/${edge.id}`);
             this.edges = this.edges.filter(e => e.id !== edge.id);
             console.log('Frontend: Edges after filter:', this.edges.length);
+            this.saveState();
             this.showStatus('关系已删除');
         } catch (error) {
             console.error('删除关系失败:', error);
@@ -641,8 +862,11 @@ class GraphEditor {
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
         
         // 按钮事件
+        document.getElementById('undoBtn').addEventListener('click', () => this.undo());
+        document.getElementById('redoBtn').addEventListener('click', () => this.redo());
         document.getElementById('addNodeBtn').addEventListener('click', () => this.showNodeModal());
         document.getElementById('clearBtn').addEventListener('click', this.handleClear.bind(this));
+        document.getElementById('beautifyBtn').addEventListener('click', () => this.beautifyGraph());
         document.getElementById('settingsBtn').addEventListener('click', () => this.showSettingsModal());
         document.getElementById('helpBtn').addEventListener('click', () => this.showHelpModal());
         
@@ -1368,6 +1592,7 @@ class GraphEditor {
             try {
                 // 保存转折点数据到后端
                 await this.saveEdge(this.bendPointEdge);
+                this.saveState();
                 this.showStatus('转折点已保存');
             } finally {
                 // 无论保存是否成功，都要清理状态，否则会导致无法二次拖拽
@@ -1389,6 +1614,7 @@ class GraphEditor {
 
             // 保存到后端
             await this.saveEdge(edge);
+            this.saveState();
 
             const sourceNode = this.nodes.find(n => n.id === edge.sourceId);
             const newTargetNode = this.nodes.find(n => n.id === newTargetId);
@@ -1418,6 +1644,7 @@ class GraphEditor {
                 for (let node of this.selectedNodes) {
                     await this.saveNode(node);
                 }
+                this.saveState();
             });
             return;
         }
@@ -1429,6 +1656,7 @@ class GraphEditor {
             
             requestAnimationFrame(async () => {
                 await this.saveNode(nodeToSave);
+                this.saveState();
             });
             return;
         }
@@ -1465,6 +1693,20 @@ class GraphEditor {
     }
     
     handleKeyDown(e) {
+        // Ctrl+Z 撤销
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            this.undo();
+            return;
+        }
+        
+        // Ctrl+Y 或 Ctrl+Shift+Z 重做
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+            e.preventDefault();
+            this.redo();
+            return;
+        }
+        
         // 按 ESC 键取消创建关系模式
         if (e.key === 'Escape' && this.creatingEdge) {
             this.cancelCreatingEdge();
@@ -1863,6 +2105,8 @@ class GraphEditor {
             }
         }
         
+        this.saveState();
+        
         form.reset();
         document.getElementById('nodeModal').style.display = 'none';
         this.updatePropertiesPanel();
@@ -1892,6 +2136,8 @@ class GraphEditor {
             this.edges.push(edgeData);
             await this.saveEdge(edgeData);
         }
+        
+        this.saveState();
         
         form.reset();
         document.getElementById('edgeModal').style.display = 'none';
