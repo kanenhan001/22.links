@@ -198,6 +198,13 @@ async function initDatabase() {
         }
 
         try {
+            await pool.execute('ALTER TABLE nodes ADD COLUMN image TEXT');
+            console.log('成功为 nodes 表添加 image 列');
+        } catch (e) {
+            console.log('nodes 表的 image 列可能已存在:', e.message);
+        }
+
+        try {
             await pool.execute('ALTER TABLE edges ADD COLUMN graphId INT');
             console.log('成功为 edges 表添加 graphId 列');
         } catch (e) {
@@ -1236,7 +1243,7 @@ app.post('/api/nodes', async (req, res) => {
         }
 
         const newId = await run(
-            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?)',
             [graphId, x, y, radius, name, type, color, taskListName || '', JSON.stringify(tasks || []), image || '']
         );
         const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [newId]);

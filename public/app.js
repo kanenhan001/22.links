@@ -471,6 +471,11 @@ class GraphEditor {
         }
     }
     
+    async handleManualSave() {
+        await this.saveAllNodes();
+        this.showStatus('保存成功');
+    }
+    
     showSettingsModal() {
         const modal = document.getElementById('settingsModal');
         modal.style.display = 'block';
@@ -996,6 +1001,7 @@ class GraphEditor {
         
         document.getElementById('nodeForm').addEventListener('submit', this.handleNodeFormSubmit.bind(this));
         document.getElementById('edgeForm').addEventListener('submit', this.handleEdgeFormSubmit.bind(this));
+        document.getElementById('saveGraphBtn').addEventListener('click', this.handleManualSave.bind(this));
         
         // 设置弹窗事件
         // 这些事件在 showSettingsModal 中动态绑定
@@ -2113,9 +2119,11 @@ class GraphEditor {
     }
     
     async handleNodeFormSubmit(e) {
-        e.preventDefault();
+        if (e && e.preventDefault) {
+            e.preventDefault();
+        }
         
-        const form = e.target;
+        const form = document.getElementById('nodeForm');
         const nodeId = form.dataset.nodeId;
         console.log('handleNodeFormSubmit, nodeId:', nodeId);
         
@@ -2143,8 +2151,8 @@ class GraphEditor {
             for (let i = 0; i < nodeNames.length; i++) {
                 const name = nodeNames[i];
                 const newNode = {
-                    x: Math.random() * (this.canvas.width - 200) + 100,
-                    y: Math.random() * (this.canvas.height - 200) + 100,
+                    x: Math.random() * 300 + 150,
+                    y: Math.random() * 300 + 150,
                     radius: 40,
                     name: name,
                     type: nodeType,
@@ -2969,9 +2977,11 @@ class GraphEditor {
         this.ctx.shadowOffsetX = 0;
         this.ctx.shadowOffsetY = 0;
         
-        this.ctx.strokeStyle = (this.selectedNode === node || this.selectedNodes.includes(node)) ? '#667eea' : '#333';
-        this.ctx.lineWidth = (this.selectedNode === node || this.selectedNodes.includes(node)) ? 4 : 2.5;
-        this.ctx.stroke();
+        if (this.selectedNode === node || this.selectedNodes.includes(node)) {
+            this.ctx.strokeStyle = '#667eea';
+            this.ctx.lineWidth = 4;
+            this.ctx.stroke();
+        }
         
         if (node.image) {
             let img = this.nodeImageCache.get(node.image);

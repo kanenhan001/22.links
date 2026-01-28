@@ -48,6 +48,13 @@
                 <button id="undoBtn" title="后退 (Ctrl+Z)">↶</button>
                 <button id="redoBtn" title="前进 (Ctrl+Y)">↷</button>
                 <button id="addNodeBtn">+ 新增节点</button>
+                <button id="saveGraphBtn" title="保存关系图">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                    </svg>
+                    <span>保存</span>
+                </button>
                 <button id="clearBtn" style="display: none;">🔄 清空画布</button>
             </div>
             
@@ -152,9 +159,9 @@
             </div>
             <form id="nodeForm">
                 <label for="nodeName">节点名称:</label>
-                <input type="text" id="nodeName" required placeholder="支持批量新增，多个名称用逗号或顿号分隔（如：张三,李四,王五 或 张三、李四、王五）">
+                <textarea id="nodeName" required placeholder="支持批量新增，多个名称用逗号或顿号分隔（如：张三,李四,王五 或 张三、李四、王五）" rows="3"></textarea>
                 <div class="form-row">
-                    <div class="form-group">
+                    <div class="form-group form-group-type">
                         <label for="nodeType">节点类型:</label>
                         <select id="nodeType">
                             <option value="organization">组织</option>
@@ -165,9 +172,11 @@
                             <option value="concept">概念</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group-color">
                         <label for="nodeColor">节点颜色:</label>
-                        <input type="color" id="nodeColor" value="#3498db">
+                        <div class="color-picker-wrapper">
+                            <input type="color" id="nodeColor" value="#3498db">
+                        </div>
                     </div>
                 </div>
 
