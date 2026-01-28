@@ -543,6 +543,20 @@ body {
     flex-shrink: 0;
 }
 
+.node-info-row .inline-text-input {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+}
+
+.node-info-row .inline-text-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
 .node-info-row .inline-color-input::-webkit-color-swatch-wrapper {
     padding: 2px;
 }

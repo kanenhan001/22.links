@@ -2588,6 +2588,7 @@ class GraphEditor {
                                     <option value="event" ${this.selectedNode.type === 'event' ? 'selected' : ''}>事件</option>
                                     <option value="concept" ${this.selectedNode.type === 'concept' ? 'selected' : ''}>概念</option>
                                 </select>
+                                <input type="text" id="propOwner" value="${this.selectedNode.owner || ''}" data-prop="owner" placeholder="负责人" class="inline-text-input">
                                 <input type="color" id="propColor" value="${this.selectedNode.color}" data-prop="color" class="inline-color-input">
                             </div>
                         </div>

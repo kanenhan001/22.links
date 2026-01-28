@@ -212,6 +212,13 @@ async function initDatabase() {
         }
 
         try {
+            await pool.execute('ALTER TABLE nodes ADD COLUMN owner VARCHAR(255)');
+            console.log('成功为 nodes 表添加 owner 列');
+        } catch (e) {
+            console.log('nodes 表的 owner 列可能已存在:', e.message);
+        }
+
+        try {
             await pool.execute('ALTER TABLE edges ADD COLUMN graphId INT');
             console.log('成功为 edges 表添加 graphId 列');
         } catch (e) {
@@ -1242,7 +1249,7 @@ app.get('/api/nodes', async (req, res) => {
 app.post('/api/nodes', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const { graphId, x, y, radius, name, type, color, taskListName, tasks, image, files } = req.body;
+        const { graphId, x, y, radius, name, type, color, taskListName, tasks, image, files, owner } = req.body;
 
         // 检查是否有权限
         const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [graphId, userId]);
@@ -1251,8 +1258,8 @@ app.post('/api/nodes', async (req, res) => {
         }
 
         const newId = await run(
-            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image, files) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [graphId, x, y, radius, name, type, color, taskListName || '', JSON.stringify(tasks || []), image || '', JSON.stringify(files || [])]
+            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image, files, owner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [graphId, x, y, radius, name, type, color, taskListName || '', JSON.stringify(tasks || []), image || '', JSON.stringify(files || []), owner || '']
         );
         const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [newId]);
         res.json(node);
@@ -1267,7 +1274,7 @@ app.put('/api/nodes/:id', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
         const id = parseInt(req.params.id);
-        const { x, y, radius, name, type, color, taskListName, tasks, image, files } = req.body;
+        const { x, y, radius, name, type, color, taskListName, tasks, image, files, owner } = req.body;
 
         // 检查是否有权限
         const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
@@ -1290,10 +1297,11 @@ app.put('/api/nodes/:id', async (req, res) => {
         const tasksValue = tasks !== undefined ? JSON.stringify(tasks) : node.tasks;
         const imageValue = image !== undefined ? image : node.image;
         const filesValue = files !== undefined ? JSON.stringify(files) : node.files;
+        const ownerValue = owner !== undefined ? owner : node.owner;
         
         await run(
-            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, tasks = ?, image = ?, files = ? WHERE id = ?',
-            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, tasksValue, imageValue, filesValue, id]
+            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, tasks = ?, image = ?, files = ?, owner = ? WHERE id = ?',
+            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, tasksValue, imageValue, filesValue, ownerValue, id]
         );
         const updatedNode = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
         res.json(updatedNode);
