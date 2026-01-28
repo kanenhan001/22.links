@@ -2518,6 +2518,13 @@ class GraphEditor {
         const panelContainer = document.querySelector('.properties-panel');
         const panelTitle = document.getElementById('propertiesPanelTitle');
         
+        // 保存当前选中的tab
+        let currentActiveTab = null;
+        const activeTabBtn = panel.querySelector('.tab-btn.active');
+        if (activeTabBtn) {
+            currentActiveTab = activeTabBtn.dataset.tab;
+        }
+        
         // 检查是否选中了多个节点
         if (this.selectedNodes.length > 1) {
             if (panelContainer) {
@@ -2586,71 +2593,88 @@ class GraphEditor {
                         </div>
                     </div>
                 </div>
-                <div class="property-group">
-                    <div class="task-list-header">
-                        ${taskListName ? `
-                            <span class="task-list-title-label">${taskListName}</span>
-                            <button type="button" class="task-list-edit-btn" data-action="edit-task-list-name" title="编辑">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                </svg>
-                            </button>
-                            <button type="button" class="task-list-sort-btn" id="taskListSortBtn" title="排序" style="display: none;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 6h18M6 12h12M9 18h6"></path>
-                                </svg>
-                            </button>
-                        ` : `
-                            <input type="text" class="task-list-name-input" data-prop="taskListName" placeholder="请输入事项清单名称（如：目标、待办等）" value="">
-                        `}
+                <div class="tab-container">
+                    <div class="tab-header">
+                        <button type="button" class="tab-btn active" data-tab="tasks">关键事项</button>
+                        <button type="button" class="tab-btn" data-tab="related">相关方</button>
+                        <button type="button" class="tab-btn" data-tab="files">成员要求</button>
                     </div>
-                    <div class="task-list" id="nodeTaskList">
-                        ${nodeTasks.map((task, index) => `
-                            <div class="task-item ${task.done ? 'done' : ''}" data-node-task-index="${index}" draggable="false">
-                                <span class="task-drag-handle" title="拖拽排序" draggable="true">⋮⋮</span>
-                                <label class="task-checkbox">
-                                    <input type="checkbox" data-node-task-field="done" ${task.done ? 'checked' : ''}>
-                                    <span class="checkmark"></span>
-                                </label>
-                                <textarea class="task-textarea" data-node-task-field="title" placeholder="事项内容">${task.title || ''}</textarea>
-                                <button type="button" class="task-delete-btn" data-node-task-action="delete">删</button>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div class="task-add">
-                        <textarea id="newNodeTaskTitle" class="task-textarea task-add-textarea" placeholder="新增事项..."></textarea>
-                        <button type="button" id="addNodeTaskBtn" class="task-add-btn">添加</button>
-                    </div>
-                </div>
-                <div class="property-group">
-                    <label>相关方 (${outgoingEdges.length}):</label>
-                    ${outgoingEdges.length > 0 ? `
-                        <div class="outgoing-edges-list">
-                            ${outgoingEdges.map(edge => {
-                                const targetNode = this.nodes.find(n => n.id === edge.targetId);
-                                const tasks = Array.isArray(edge.tasks) ? edge.tasks : [];
-                                return `
-                                    <div class="outgoing-edge-item" data-edge-id="${edge.id}">
-                                        <div class="outgoing-edge-header">
-                                            <span class="edge-arrow">→</span>
-                                            <span class="edge-target">${targetNode ? targetNode.name : '未知'}</span>
-                                            <span class="edge-label">${edge.label}</span>
-                                            ${tasks.length > 0 ? `<span class="edge-task-count">(${tasks.length})</span>` : ''}
-                                        </div>
-                                        ${tasks.length > 0 ? `
-                                            <div class="edge-tasks-preview">
-                                                ${tasks.slice(0, 3).map(task => `
-                                                    <span class="task-preview-item ${task.done ? 'done' : ''}">${task.title}</span>
-                                                `).join('')}
-                                                ${tasks.length > 3 ? `<span class="task-more">+${tasks.length - 3}更多</span>` : ''}
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                `;
-                            }).join('')}
+                    <div class="tab-content active" data-tab-content="tasks">
+                        <div class="task-list-header">
+                            ${taskListName ? `
+                                <span class="task-list-title-label">${taskListName}</span>
+                                <button type="button" class="task-list-edit-btn" data-action="edit-task-list-name" title="编辑">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </button>
+                                <button type="button" class="task-list-sort-btn" id="taskListSortBtn" title="排序" style="display: none;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18M6 12h12M9 18h6"></path>
+                                    </svg>
+                                </button>
+                            ` : `
+                                <input type="text" class="task-list-name-input" data-prop="taskListName" placeholder="请输入事项清单名称（如：目标、待办等）" value="">
+                            `}
                         </div>
-                    ` : '<p style="color: #999; font-size: 13px;">暂无发出的关系</p>'}
+                        <div class="task-list" id="nodeTaskList">
+                            ${nodeTasks.map((task, index) => `
+                                <div class="task-item ${task.done ? 'done' : ''}" data-node-task-index="${index}" draggable="false">
+                                    <span class="task-drag-handle" title="拖拽排序" draggable="true">⋮⋮</span>
+                                    <label class="task-checkbox">
+                                        <input type="checkbox" data-node-task-field="done" ${task.done ? 'checked' : ''}>
+                                        <span class="checkmark"></span>
+                                    </label>
+                                    <textarea class="task-textarea" data-node-task-field="title" placeholder="事项内容">${task.title || ''}</textarea>
+                                    <button type="button" class="task-delete-btn" data-node-task-action="delete">删</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="task-add">
+                            <textarea id="newNodeTaskTitle" class="task-textarea task-add-textarea" placeholder="新增事项..."></textarea>
+                            <button type="button" id="addNodeTaskBtn" class="task-add-btn">添加</button>
+                        </div>
+                    </div>
+                    <div class="tab-content" data-tab-content="related">
+                        <label>相关方 (${outgoingEdges.length}):</label>
+                        ${outgoingEdges.length > 0 ? `
+                            <div class="outgoing-edges-list">
+                                ${outgoingEdges.map(edge => {
+                                    const targetNode = this.nodes.find(n => n.id === edge.targetId);
+                                    const tasks = Array.isArray(edge.tasks) ? edge.tasks : [];
+                                    return `
+                                        <div class="outgoing-edge-item" data-edge-id="${edge.id}">
+                                            <div class="outgoing-edge-header">
+                                                <span class="edge-arrow">→</span>
+                                                <span class="edge-target">${targetNode ? targetNode.name : '未知'}</span>
+                                                <span class="edge-label">${edge.label}</span>
+                                                ${tasks.length > 0 ? `<span class="edge-task-count">(${tasks.length})</span>` : ''}
+                                            </div>
+                                            ${tasks.length > 0 ? `
+                                                <div class="edge-tasks-preview">
+                                                    ${tasks.slice(0, 3).map(task => `
+                                                        <span class="task-preview-item ${task.done ? 'done' : ''}">${task.title}</span>
+                                                    `).join('')}
+                                                    ${tasks.length > 3 ? `<span class="task-more">+${tasks.length - 3}更多</span>` : ''}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : '<p style="color: #999; font-size: 13px;">暂无发出的关系</p>'}
+                    </div>
+                    <div class="tab-content" data-tab-content="files">
+                        <div class="file-upload-area" id="fileUploadArea">
+                            <div class="file-upload-icon">📁</div>
+                            <div class="file-upload-text">点击或拖拽文件到此处上传</div>
+                            <input type="file" id="nodeFileInput" multiple style="display: none;">
+                        </div>
+                        <div class="file-list" id="nodeFileList">
+                            ${this.renderNodeFiles()}
+                        </div>
+                    </div>
                 </div>
                 
             `;
@@ -2662,6 +2686,26 @@ class GraphEditor {
 
             // 添加任务拖拽排序功能
             this.setupTaskDragSort(panel);
+
+            // 添加tab切换事件
+            this.setupTabSwitching(panel);
+
+            // 恢复之前选中的tab
+            if (currentActiveTab) {
+                const targetTabBtn = panel.querySelector(`.tab-btn[data-tab="${currentActiveTab}"]`);
+                const targetTabContent = panel.querySelector(`[data-tab-content="${currentActiveTab}"]`);
+                
+                if (targetTabBtn && targetTabContent) {
+                    panel.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    panel.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    
+                    targetTabBtn.classList.add('active');
+                    targetTabContent.classList.add('active');
+                }
+            }
+
+            // 添加文件上传事件
+            this.setupFileUpload(panel);
         } else if (this.selectedEdge) {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
@@ -2738,7 +2782,152 @@ class GraphEditor {
             this.updatePropertiesPanelHeight();
         }, 0);
     }
-    
+
+    setupTabSwitching(panel) {
+        const tabBtns = panel.querySelectorAll('.tab-btn');
+        const tabContents = panel.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tabName = e.target.dataset.tab;
+                
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                
+                e.target.classList.add('active');
+                panel.querySelector(`[data-tab-content="${tabName}"]`).classList.add('active');
+            });
+        });
+    }
+
+    renderNodeFiles() {
+        if (!this.selectedNode || !this.selectedNode.files) {
+            return '<p style="color: #999; font-size: 13px;">暂无文件</p>';
+        }
+
+        const files = Array.isArray(this.selectedNode.files) ? this.selectedNode.files : [];
+        
+        if (files.length === 0) {
+            return '<p style="color: #999; font-size: 13px;">暂无文件</p>';
+        }
+
+        return files.map((file, index) => `
+            <div class="file-item" data-file-index="${index}">
+                <div class="file-info">
+                    <div class="file-icon">📄</div>
+                    <div class="file-details">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-meta">${file.size || ''}</div>
+                    </div>
+                </div>
+                <div class="file-actions">
+                    <button type="button" class="file-action-btn file-download-btn" data-file-action="download">下载</button>
+                    <button type="button" class="file-action-btn file-delete-btn" data-file-action="delete">删除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    setupFileUpload(panel) {
+        const uploadArea = panel.querySelector('#fileUploadArea');
+        const fileInput = panel.querySelector('#nodeFileInput');
+        const fileList = panel.querySelector('#nodeFileList');
+
+        if (!uploadArea || !fileInput || !fileList) return;
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            this.handleFileUpload(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            this.handleFileUpload(files);
+        });
+
+        fileList.addEventListener('click', (e) => {
+            const deleteBtn = e.target.closest('.file-delete-btn');
+            const downloadBtn = e.target.closest('.file-download-btn');
+            
+            if (deleteBtn) {
+                const fileItem = deleteBtn.closest('.file-item');
+                const fileIndex = parseInt(fileItem.dataset.fileIndex, 10);
+                this.handleFileDelete(fileIndex);
+            } else if (downloadBtn) {
+                const fileItem = downloadBtn.closest('.file-item');
+                const fileIndex = parseInt(fileItem.dataset.fileIndex, 10);
+                this.handleFileDownload(fileIndex);
+            }
+        });
+    }
+
+    async handleFileUpload(files) {
+        if (!this.selectedNode || !files || files.length === 0) return;
+
+        if (!Array.isArray(this.selectedNode.files)) {
+            this.selectedNode.files = [];
+        }
+
+        for (const file of files) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const newFile = {
+                    name: file.name,
+                    size: this.formatFileSize(file.size),
+                    data: e.target.result,
+                    uploadDate: new Date().toISOString()
+                };
+                this.selectedNode.files.push(newFile);
+                this.saveNode(this.selectedNode);
+                this.updatePropertiesPanel();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    async handleFileDelete(fileIndex) {
+        if (!this.selectedNode || !Array.isArray(this.selectedNode.files)) return;
+
+        this.selectedNode.files.splice(fileIndex, 1);
+        await this.saveNode(this.selectedNode);
+        this.updatePropertiesPanel();
+    }
+
+    handleFileDownload(fileIndex) {
+        if (!this.selectedNode || !Array.isArray(this.selectedNode.files)) return;
+
+        const file = this.selectedNode.files[fileIndex];
+        if (!file || !file.data) return;
+
+        const link = document.createElement('a');
+        link.href = file.data;
+        link.download = file.name;
+        link.click();
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
     async deleteSelected() {
         if (this.selectedNode) {
             await this.deleteNode(this.selectedNode);
