@@ -923,9 +923,9 @@ app.put('/api/graphs/sort-orders', async (req, res) => {
 
         // 开启事务
         const connection = await pool.getConnection();
-        await connection.beginTransaction();
-
         try {
+            await connection.beginTransaction();
+
             for (const graph of graphs) {
                 console.log('[Sort API] Updating graph', graph.id, 'to sort_order', graph.sort_order, 'for userId', userId);
                 // 更新排序（不检查权限，因为这是用户自己的关系图）
@@ -1110,16 +1110,15 @@ app.post('/api/graphs/:id/duplicate', async (req, res) => {
         const { name } = req.body;
 
         const connection = await pool.getConnection();
-        await connection.beginTransaction();
-
         try {
+            await connection.beginTransaction();
+
             const [sourceGraphs] = await connection.execute(
                 'SELECT * FROM graphs WHERE id = ? AND userId = ?',
                 [sourceId, userId]
             );
             if (sourceGraphs.length === 0) {
                 await connection.rollback();
-                connection.release();
                 return res.status(403).json({ error: '无权限' });
             }
             const sourceGraph = sourceGraphs[0];
@@ -1160,7 +1159,13 @@ app.post('/api/graphs/:id/duplicate', async (req, res) => {
             }
 
             await connection.commit();
-            const newGraph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE id = ?', [newGraphId]);
+            
+            // 使用同一个连接查询新创建的关系图
+            const [newGraphs] = await connection.execute(
+                'SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE id = ?',
+                [newGraphId]
+            );
+            const newGraph = newGraphs[0];
             res.json(newGraph);
         } catch (e) {
             await connection.rollback();
@@ -1517,16 +1522,18 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
 
             // 导入关系图
             for (const graph of importData.graphs) {
-                const newId = await run(
+                // 导入关系图
+                const [graphResult] = await connection.execute(
                     'INSERT INTO graphs (userId, name, createdAt, thumbnail) VALUES (?, ?, ?, ?)',
                     [userId, graph.name, graph.createdAt, graph.thumbnail || '']
                 );
+                const newId = graphResult.insertId;
 
                 // 导入节点
                 const graphNodes = importData.nodes.filter(n => n.graphId === graph.id);
                 for (const node of graphNodes) {
-                    await run(
-                        'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    await connection.execute(
+                        'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                         [newId, node.x, node.y, node.radius, node.name, node.type, node.color, node.taskListName || '', node.tasks || '[]', node.image || '']
                     );
                 }
@@ -1534,7 +1541,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
                 // 导入边
                 const graphEdges = importData.edges.filter(e => e.graphId === graph.id);
                 for (const edge of graphEdges) {
-                    await run(
+                    await connection.execute(
                         'INSERT INTO edges (graphId, sourceId, targetId, label, color, bendPoints, tasks) VALUES (?, ?, ?, ?, ?, ?, ?)',
                         [newId, edge.sourceId, edge.targetId, edge.label, edge.color, edge.bendPoints || '[]', edge.tasks || '[]']
                     );
@@ -1542,7 +1549,6 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
             }
 
             await connection.execute('COMMIT');
-            connection.release();
 
             // 删除上传的临时文件
             fs.unlinkSync(uploadedPath);
@@ -1550,8 +1556,9 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
             res.json({ success: true, message: '导入成功' });
         } catch (error) {
             await connection.execute('ROLLBACK');
-            connection.release();
             throw error;
+        } finally {
+            connection.release();
         }
     } catch (error) {
         console.error('导入失败:', error);

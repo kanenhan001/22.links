@@ -67,6 +67,9 @@ class GraphEditor {
         this.historyIndex = -1;
         this.maxHistorySize = 50;
         this.isRestoring = false;
+        
+        // 节点信息框展开状态
+        this.nodeInfoExpanded = new Map();
     }
     
     setupHighDPICanvas() {
@@ -1374,6 +1377,57 @@ class GraphEditor {
                 this.selectedNode = node; // 只选中，不进入创建模式
                 this.updatePropertiesPanel();
                 this.render();
+                return;
+            }
+        }
+        
+        // 检查是否点击了展开/收起按钮
+        for (let node of this.nodes) {
+            const tasks = Array.isArray(node.tasks) ? node.tasks : [];
+            if (tasks.length === 0) continue;
+            
+            const lineHeight = 18;
+            const padding = 14;
+            const maxWidth = 250;
+            const minWidth = 80;
+            const maxHeight = 200;
+            
+            let title = node.name;
+            if (node.owner) {
+                title += ` (${node.owner})`;
+            }
+            
+            const isExpanded = this.nodeInfoExpanded.get(node.id) || false;
+            const maxVisibleTasks = isExpanded ? tasks.length : 3;
+            const taskItems = tasks.slice(0, maxVisibleTasks).map(t => {
+                const prefix = t.done ? '✓' : '○';
+                return `${prefix} ${t.title || ''}`;
+            });
+            
+            const allLines = [title, ...taskItems];
+            this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+            const lineWidths = allLines.map(line => this.ctx.measureText(line).width);
+            const boxWidth = Math.min(Math.max(Math.max(...lineWidths) + padding * 2, minWidth), maxWidth);
+            let boxHeight = allLines.length * lineHeight + padding * 2;
+            
+            const hasMoreTasks = tasks.length > 3;
+            const needsExpandButton = hasMoreTasks || boxHeight > maxHeight;
+            
+            if (needsExpandButton && !isExpanded) {
+                boxHeight = Math.min(boxHeight, maxHeight);
+            }
+            
+            const boxX = node.x + node.radius + 10;
+            const boxY = node.y - boxHeight / 2;
+            
+            // 检查是否点击了展开/收起按钮
+            const buttonX = boxX + boxWidth - 24;
+            const buttonY = boxY + 6;
+            const buttonSize = 16;
+            
+            if (x >= buttonX - buttonSize/2 && x <= buttonX + buttonSize/2 && 
+                y >= buttonY && y <= buttonY + buttonSize) {
+                this.toggleNodeInfoExpand(node.id);
                 return;
             }
         }
@@ -3231,22 +3285,36 @@ class GraphEditor {
 
         const lineHeight = 18;
         const padding = 14;
-        const maxWidth = 180;
+        const maxWidth = 250;
         const minWidth = 80;
+        const maxHeight = 200;
 
         this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
         this.ctx.textBaseline = 'top';
 
-        const title = node.name;
-        const taskItems = tasks.slice(0, 3).map(t => {
+        let title = node.name;
+        if (node.owner) {
+            title += ` (${node.owner})`;
+        }
+        
+        const isExpanded = this.nodeInfoExpanded.get(node.id) || false;
+        const maxVisibleTasks = isExpanded ? tasks.length : 3;
+        const taskItems = tasks.slice(0, maxVisibleTasks).map(t => {
             const prefix = t.done ? '✓' : '○';
             return `${prefix} ${t.title || ''}`;
         });
 
         const allLines = [title, ...taskItems];
         const lineWidths = allLines.map(line => this.ctx.measureText(line).width);
-        const boxWidth = Math.max(Math.max(...lineWidths) + padding * 2, minWidth);
-        const boxHeight = allLines.length * lineHeight + padding * 2;
+        const boxWidth = Math.min(Math.max(Math.max(...lineWidths) + padding * 2, minWidth), maxWidth);
+        let boxHeight = allLines.length * lineHeight + padding * 2;
+        
+        const hasMoreTasks = tasks.length > 3;
+        const needsExpandButton = hasMoreTasks || boxHeight > maxHeight;
+        
+        if (needsExpandButton && !isExpanded) {
+            boxHeight = Math.min(boxHeight, maxHeight);
+        }
 
         const boxX = node.x + node.radius + 10;// 信息框左边缘
         const boxY = node.y - boxHeight / 2;// 信息框上边缘
@@ -3280,6 +3348,7 @@ class GraphEditor {
         this.ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
         taskItems.forEach((item, index) => {
             const itemY = boxY + padding + lineHeight * (index + 1);
+            if (itemY > boxY + boxHeight - padding) return;
             if (item.startsWith('✓')) {
                 this.ctx.fillStyle = '#27ae60';
             } else {
@@ -3290,6 +3359,26 @@ class GraphEditor {
         });
 
         this.ctx.restore();
+
+        if (needsExpandButton) {
+            const buttonX = boxX + boxWidth - 24;
+            const buttonY = boxY + 6;
+            const buttonSize = 16;
+            
+            this.ctx.save();
+            this.ctx.fillStyle = '#666';
+            this.ctx.font = '10px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(isExpanded ? '收起' : '展开', buttonX, buttonY + buttonSize / 2);
+            this.ctx.restore();
+        }
+    }
+    
+    toggleNodeInfoExpand(nodeId) {
+        const currentState = this.nodeInfoExpanded.get(nodeId) || false;
+        this.nodeInfoExpanded.set(nodeId, !currentState);
+        this.render();
     }
 
     drawEdge(edge, offset = 0, totalEdgesInGroup = 1, unifiedPerpAngle = null) {
