@@ -1407,13 +1407,40 @@ class GraphEditor {
             const allLines = [title, ...taskItems];
             this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
             const lineWidths = allLines.map(line => this.ctx.measureText(line).width);
-            const boxWidth = Math.min(Math.max(Math.max(...lineWidths) + padding * 2, minWidth), maxWidth);
+            // 展开状态下使用更大的最大宽度
+            const expandedMaxWidth = 400;
+            const currentMaxWidth = isExpanded ? expandedMaxWidth : maxWidth;
+            const boxWidth = Math.min(Math.max(Math.max(...lineWidths) + padding * 2, minWidth), currentMaxWidth);
             let boxHeight = allLines.length * lineHeight + padding * 2;
             
             const hasMoreTasks = tasks.length > 3;
-            const needsExpandButton = hasMoreTasks || boxHeight > maxHeight;
             
-            if (needsExpandButton && !isExpanded) {
+            // 检查是否有文本可能会被截断
+            const maxTextWidth = boxWidth - padding * 2;
+            let hasTruncatedText = false;
+            
+            // 检查标题是否可能会被截断
+            const titleWidth = this.ctx.measureText(title).width;
+            if (titleWidth > maxTextWidth) {
+                hasTruncatedText = true;
+            }
+            
+            // 检查任务项是否可能会被截断
+            for (const task of tasks) {
+                const taskText = `${task.done ? '✓' : '○'} ${task.title || ''}`;
+                const taskWidth = this.ctx.measureText(taskText).width;
+                if (taskWidth > maxTextWidth) {
+                    hasTruncatedText = true;
+                    break;
+                }
+            }
+            
+            const needsExpandButton = hasMoreTasks || boxHeight > maxHeight || hasTruncatedText;
+            
+            // 展开状态下，不限制高度
+            if (isExpanded) {
+                boxHeight = allLines.length * lineHeight + padding * 2;
+            } else if (needsExpandButton) {
                 boxHeight = Math.min(boxHeight, maxHeight);
             }
             
@@ -1421,6 +1448,7 @@ class GraphEditor {
             const boxY = node.y - boxHeight / 2;
             
             // 检查是否点击了展开/收起按钮
+            // 无论是否展开，都显示按钮，所以需要检查点击
             const buttonX = boxX + boxWidth - 24;
             const buttonY = boxY + 6;
             const buttonSize = 16;
@@ -3306,14 +3334,43 @@ class GraphEditor {
 
         const allLines = [title, ...taskItems];
         const lineWidths = allLines.map(line => this.ctx.measureText(line).width);
-        const boxWidth = Math.min(Math.max(Math.max(...lineWidths) + padding * 2, minWidth), maxWidth);
+        // 展开状态下使用更大的最大宽度
+        const expandedMaxWidth = 400;
+        const currentMaxWidth = isExpanded ? expandedMaxWidth : maxWidth;
+        const boxWidth = Math.min(Math.max(Math.max(...lineWidths) + padding * 2, minWidth), currentMaxWidth);
         let boxHeight = allLines.length * lineHeight + padding * 2;
         
         const hasMoreTasks = tasks.length > 3;
-        const needsExpandButton = hasMoreTasks || boxHeight > maxHeight;
+        
+        // 检查是否有文本可能会被截断
+        const maxTextWidth = boxWidth - padding * 2;
+        let hasTruncatedText = false;
+        
+        // 检查标题是否可能会被截断
+        const titleWidth = this.ctx.measureText(title).width;
+        if (titleWidth > maxTextWidth) {
+            hasTruncatedText = true;
+        }
+        
+        // 检查任务项是否可能会被截断
+        for (const task of tasks) {
+            const taskText = `${task.done ? '✓' : '○'} ${task.title || ''}`;
+            const taskWidth = this.ctx.measureText(taskText).width;
+            if (taskWidth > maxTextWidth) {
+                hasTruncatedText = true;
+                break;
+            }
+        }
+        
+        const needsExpandButton = hasMoreTasks || boxHeight > maxHeight || hasTruncatedText;
         
         if (needsExpandButton && !isExpanded) {
             boxHeight = Math.min(boxHeight, maxHeight);
+        }
+        
+        // 展开状态下，不限制高度
+        if (isExpanded) {
+            boxHeight = allLines.length * lineHeight + padding * 2;
         }
 
         const boxX = node.x + node.radius + 10;// 信息框左边缘
@@ -3343,24 +3400,86 @@ class GraphEditor {
         this.ctx.fillStyle = '#333';
          this.ctx.textAlign = 'left';  // 左对齐
         this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-        this.ctx.fillText(title, boxX + padding, boxY + padding);// 标题位置
+        
+        // 检查标题是否超出信息框宽度
+        const maxTitleWidth = boxWidth - padding * 2;
+        const displayTitleWidth = this.ctx.measureText(title).width;
+        let displayTitle = title;
+        
+        // 只在收起状态下进行文本截断
+        if (!isExpanded && displayTitleWidth > maxTitleWidth) {
+            // 截断标题并添加省略号
+            let truncatedTitle = title;
+            while (this.ctx.measureText(truncatedTitle + '...').width > maxTitleWidth && truncatedTitle.length > 0) {
+                truncatedTitle = truncatedTitle.substring(0, truncatedTitle.length - 1);
+            }
+            displayTitle = truncatedTitle + '...';
+        }
+        
+        this.ctx.fillText(displayTitle, boxX + padding, boxY + padding);// 标题位置
 
         this.ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-        taskItems.forEach((item, index) => {
+        let hasEllipsis = false;
+        
+        for (let index = 0; index < taskItems.length; index++) {
+            const item = taskItems[index];
             const itemY = boxY + padding + lineHeight * (index + 1);
-            if (itemY > boxY + boxHeight - padding) return;
+            
+            // 检查是否超出信息框高度
+            if (itemY > boxY + boxHeight - padding) {
+                // 显示省略号
+                if (!isExpanded && !hasEllipsis) {
+                    const ellipsisY = itemY - lineHeight;
+                    const ellipsisX = boxX + padding;
+                    this.ctx.fillStyle = '#666';
+                    this.ctx.textAlign = 'left';
+                    this.ctx.fillText('...', ellipsisX, ellipsisY);
+                    hasEllipsis = true;
+                }
+                break;
+            }
+            
+            // 检查文本是否超出信息框宽度
+            const maxTextWidth = boxWidth - padding * 2;
+            const textWidth = this.ctx.measureText(item).width;
+            let displayText = item;
+            
+            // 只在收起状态下进行文本截断
+            if (!isExpanded && textWidth > maxTextWidth) {
+                // 截断文本并添加省略号
+                let truncatedText = item;
+                while (this.ctx.measureText(truncatedText + '...').width > maxTextWidth && truncatedText.length > 0) {
+                    truncatedText = truncatedText.substring(0, truncatedText.length - 1);
+                }
+                displayText = truncatedText + '...';
+            }
+            
             if (item.startsWith('✓')) {
                 this.ctx.fillStyle = '#27ae60';
             } else {
                 this.ctx.fillStyle = '#666';
             }
             this.ctx.textAlign = 'left';  // 左对齐
-            this.ctx.fillText(item, boxX + padding, itemY);// 任务项位置
-        });
+            this.ctx.fillText(displayText, boxX + padding, itemY);// 任务项位置
+        }
+        
+        // 如果还有更多任务没有显示，在最后显示省略号
+        if (!isExpanded && !hasEllipsis && tasks.length > maxVisibleTasks) {
+            const ellipsisY = boxY + padding + lineHeight * (taskItems.length + 1);
+            if (ellipsisY <= boxY + boxHeight - padding) {
+                this.ctx.fillStyle = '#666';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('...', boxX + padding, ellipsisY);
+            }
+        }
 
         this.ctx.restore();
 
-        if (needsExpandButton) {
+        // 检查是否需要显示展开/收起按钮
+        // 收起状态下需要显示展开按钮，或者展开状态下需要显示收起按钮
+        const shouldShowButton = needsExpandButton || isExpanded;
+        
+        if (shouldShowButton) {
             const buttonX = boxX + boxWidth - 24;
             const buttonY = boxY + 6;
             const buttonSize = 16;
