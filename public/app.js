@@ -2680,7 +2680,7 @@ class GraphEditor {
                     <div class="tab-header">
                         <button type="button" class="tab-btn active" data-tab="tasks">关键事项</button>
                         <button type="button" class="tab-btn" data-tab="related">相关方</button>
-                        <button type="button" class="tab-btn" data-tab="files">成员要求</button>
+                        <button type="button" class="tab-btn" data-tab="files">文件</button>
                     </div>
                     <div class="tab-content active" data-tab-content="tasks">
                         <div class="task-list-header">
