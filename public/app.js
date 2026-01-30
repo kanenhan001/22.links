@@ -1003,6 +1003,12 @@ class GraphEditor {
             // 只更新数据，不重新渲染，避免干扰 IME
             this.handlePropertyInput(e);
         });
+        
+        // 初始化全屏切换按钮事件
+        const fullscreenBtn = document.getElementById('propertiesFullscreenBtn');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', this.togglePropertiesFullscreen.bind(this));
+        }
         document.getElementById('propertiesContent').addEventListener('change', this.handlePropertyChange.bind(this));
         document.getElementById('propertiesContent').addEventListener('blur', (e) => {
             // 使用 blur 事件保存数据，避免干扰 IME
@@ -2557,11 +2563,30 @@ class GraphEditor {
     updatePropertiesPanelHeight() {
         const propertiesPanel = document.querySelector('.properties-panel');
         const canvasContainer = document.querySelector('.canvas-container');
-        if (propertiesPanel && canvasContainer && !propertiesPanel.classList.contains('collapsed')) {
+        if (propertiesPanel && canvasContainer && !propertiesPanel.classList.contains('collapsed') && !propertiesPanel.classList.contains('fullscreen')) {
             const canvasRect = canvasContainer.getBoundingClientRect();
             const panelRect = propertiesPanel.getBoundingClientRect();
             // 设置属性面板高度与画布容器高度一致
             propertiesPanel.style.height = canvasRect.height + 'px';
+        }
+    }
+    
+    // 切换属性面板全屏模式
+    togglePropertiesFullscreen() {
+        const panelContainer = document.querySelector('.properties-panel');
+        if (panelContainer) {
+            // 切换全屏状态
+            panelContainer.classList.toggle('fullscreen');
+            
+            // 确保在全屏模式下不处于折叠状态
+            if (panelContainer.classList.contains('fullscreen')) {
+                panelContainer.classList.remove('collapsed');
+                // 全屏模式下设置高度为视口高度
+                panelContainer.style.height = '100vh';
+            } else {
+                // 退出全屏模式后重新计算高度
+                this.updatePropertiesPanelHeight();
+            }
         }
     }
     
@@ -2760,6 +2785,7 @@ class GraphEditor {
                         <button type="button" class="tab-btn active" data-tab="tasks">关键事项</button>
                         <button type="button" class="tab-btn" data-tab="related">相关方</button>
                         <button type="button" class="tab-btn" data-tab="files">文件</button>
+                        <button type="button" class="tab-btn" data-tab="notepad">记事本</button>
                     </div>
                     <div class="tab-content active" data-tab-content="tasks">
                         <div class="task-list-header">
@@ -2837,6 +2863,30 @@ class GraphEditor {
                             ${this.renderNodeFiles()}
                         </div>
                     </div>
+                    <div class="tab-content" data-tab-content="notepad">
+                        <div class="notepad-content">
+                            <div class="notepad-editor" id="nodeNotepadEditor" contenteditable="true">
+                                ${this.selectedNode.notepad || '<p>在此输入记事本内容...</p>'}
+                            </div>
+                            <div class="notepad-toolbar">
+                                <button type="button" class="notepad-btn" data-command="bold" title="加粗">
+                                    <strong>B</strong>
+                                </button>
+                                <button type="button" class="notepad-btn" data-command="italic" title="斜体">
+                                    <em>I</em>
+                                </button>
+                                <button type="button" class="notepad-btn" data-command="underline" title="下划线">
+                                    <u>U</u>
+                                </button>
+                                <button type="button" class="notepad-btn" data-command="insertUnorderedList" title="无序列表">
+                                    • 列表
+                                </button>
+                                <button type="button" class="notepad-btn" data-command="insertOrderedList" title="有序列表">
+                                    1. 列表
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
             `;
@@ -2868,6 +2918,9 @@ class GraphEditor {
 
             // 添加文件上传事件
             this.setupFileUpload(panel);
+            
+            // 添加记事本编辑功能
+            this.setupNotepadEditor(panel);
         } else if (this.selectedEdge) {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
@@ -3036,6 +3089,38 @@ class GraphEditor {
                 this.handleFileDownload(fileIndex);
             }
         });
+    }
+
+    setupNotepadEditor(panel) {
+        const notepadEditor = panel.querySelector('#nodeNotepadEditor');
+        const notepadButtons = panel.querySelectorAll('.notepad-btn');
+
+        if (notepadEditor) {
+            // 设置工具栏按钮点击事件
+            notepadButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const command = button.dataset.command;
+                    document.execCommand(command, false, null);
+                    notepadEditor.focus();
+                });
+            });
+
+            // 监听内容变化，自动保存
+            let saveTimeout;
+            notepadEditor.addEventListener('input', () => {
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(() => {
+                    if (this.selectedNode) {
+                        this.selectedNode.notepad = notepadEditor.innerHTML;
+                        this.saveNode(this.selectedNode);
+                        this.saveState();
+                    }
+                }, 1000); // 1秒后自动保存
+            });
+
+            // 初始化编辑器样式
+            notepadEditor.style.minHeight = '300px';
+        }
     }
 
     async handleFileUpload(files) {
@@ -3880,3 +3965,5 @@ function showModal(options) {
     }
   });
 }
+
+
