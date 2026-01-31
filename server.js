@@ -1270,8 +1270,8 @@ app.post('/api/nodes', async (req, res) => {
         }
 
         const newId = await run(
-            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image, files, owner, notepad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [graphId, x, y, radius, name, type, color, taskListName || '', JSON.stringify(tasks || []), image || '', JSON.stringify(files || []), owner || '', notepad || '']
+            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image, files, owner, notepad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [graphId || null, x || null, y || null, radius || null, name || null, type || null, color || null, taskListName || '', JSON.stringify(tasks || []), image || '', JSON.stringify(files || []), owner || '', notepad || '']
         );
         const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [newId]);
         res.json(node);
@@ -1401,7 +1401,7 @@ app.post('/api/edges', async (req, res) => {
 
         const newId = await run(
             'INSERT INTO edges (graphId, sourceId, targetId, label, color, bendPoints, tasks) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [graphId, sourceId, targetId, label, color, JSON.stringify(bendPoints || []), JSON.stringify(tasks || [])]
+            [graphId || null, sourceId || null, targetId || null, label || null, color || null, JSON.stringify(bendPoints || []), JSON.stringify(tasks || [])]
         );
         const edge = await queryOne('SELECT * FROM edges WHERE id = ?', [newId]);
         res.json(edge);

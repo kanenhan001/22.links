@@ -188,11 +188,8 @@ class GraphEditor {
                 this.backgroundImage = graphData.backgroundImage;
             }
             
-            // 更新画布尺寸
-            this.canvas.width = this.canvasWidth;
-            this.canvas.height = this.canvasHeight;
-            this.canvas.style.width = this.canvasWidth + 'px';
-            this.canvas.style.height = this.canvasHeight + 'px';
+            // 更新画布尺寸 - 保持高DPI设置
+            this.setupHighDPICanvas();
             
             this.showStatus(`已加载 ${nodes.length} 个节点, ${edges.length} 个关系`);
             this.updateZoomDisplay();
@@ -1082,11 +1079,19 @@ class GraphEditor {
         // 处理节点的事项清单字段
         const nodeTaskField = e.target.dataset.nodeTaskField;
         if (nodeTaskField && this.selectedNode) {
+            // 检查事件目标是否属于当前选中的节点
+            const itemEl = e.target.closest('.task-item');
+            if (!itemEl) return;
+            
+            // 检查节点ID是否匹配
+            const taskNodeId = parseInt(itemEl.dataset.nodeId, 10);
+            if (taskNodeId !== this.selectedNode.id) {
+                return;
+            }
+            
             if (!Array.isArray(this.selectedNode.tasks)) {
                 this.selectedNode.tasks = [];
             }
-            const itemEl = e.target.closest('.task-item');
-            if (!itemEl) return;
             const index = parseInt(itemEl.dataset.nodeTaskIndex, 10);
             if (Number.isNaN(index) || !this.selectedNode.tasks[index]) return;
             const task = this.selectedNode.tasks[index];
@@ -1164,11 +1169,19 @@ class GraphEditor {
         // 处理节点的事项清单字段
         const nodeTaskField = e.target.dataset.nodeTaskField;
         if (nodeTaskField && this.selectedNode) {
+            // 检查事件目标是否属于当前选中的节点
+            const itemEl = e.target.closest('.task-item');
+            if (!itemEl) return;
+            
+            // 检查节点ID是否匹配
+            const taskNodeId = parseInt(itemEl.dataset.nodeId, 10);
+            if (taskNodeId !== this.selectedNode.id) {
+                return;
+            }
+            
             if (!Array.isArray(this.selectedNode.tasks)) {
                 this.selectedNode.tasks = [];
             }
-            const itemEl = e.target.closest('.task-item');
-            if (!itemEl) return;
             const index = parseInt(itemEl.dataset.nodeTaskIndex, 10);
             if (Number.isNaN(index) || !this.selectedNode.tasks[index]) return;
             const task = this.selectedNode.tasks[index];
@@ -1396,7 +1409,7 @@ class GraphEditor {
             });
             
             const allLines = [title, ...taskItems];
-            this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+            this.ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
             const lineWidths = allLines.map(line => this.ctx.measureText(line).width);
             // 展开状态下使用更大的最大宽度
             const expandedMaxWidth = 400;
@@ -2700,9 +2713,17 @@ class GraphEditor {
     }
 
     updatePropertiesPanel() {
-        const panel = document.getElementById('propertiesContent');
+        let panel = document.getElementById('propertiesContent');
         const panelContainer = document.querySelector('.properties-panel');
         const panelTitle = document.getElementById('propertiesPanelTitle');
+        
+        // 移除所有子元素的焦点，防止切换节点时内容被覆盖
+        if (document.activeElement && panel.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        
+        // 清空面板内容
+        panel.innerHTML = '';
         
         // 保存当前选中的tab
         let currentActiveTab = null;
@@ -2808,7 +2829,7 @@ class GraphEditor {
                         </div>
                         <div class="task-list" id="nodeTaskList">
                             ${nodeTasks.map((task, index) => `
-                                <div class="task-item ${task.done ? 'done' : ''}" data-node-task-index="${index}" draggable="false">
+                                <div class="task-item ${task.done ? 'done' : ''}" data-node-id="${this.selectedNode.id}" data-node-task-index="${index}" draggable="false">
                                     <span class="task-drag-handle" title="拖拽排序" draggable="true">⋮⋮</span>
                                     <label class="task-checkbox">
                                         <input type="checkbox" data-node-task-field="done" ${task.done ? 'checked' : ''}>
@@ -2921,6 +2942,16 @@ class GraphEditor {
             
             // 添加记事本编辑功能
             this.setupNotepadEditor(panel);
+            
+            // 渲染完成后，再通过 JS 显式把标题填充到输入框里，避免 HTML 解析导致的显示问题
+            const nodeTaskInputs = panel.querySelectorAll('.task-item textarea[data-node-task-field="title"]');
+            nodeTaskInputs.forEach((input, index) => {
+                const task = nodeTasks[index];
+                if (task && typeof task.title === 'string') {
+                    input.value = task.title;
+                }
+                this.autoResizeTextarea(input);
+            });
         } else if (this.selectedEdge) {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
@@ -3451,12 +3482,15 @@ class GraphEditor {
             }
         } else {
             this.ctx.fillStyle = 'white';
-            this.ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+            this.ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
+            this.ctx.textRendering = 'optimizeLegibility';
+            this.ctx.imageSmoothingEnabled = true;
+            this.ctx.imageSmoothingQuality = 'high';
             
-            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            this.ctx.shadowBlur = 3;
+            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            this.ctx.shadowBlur = 1;
             this.ctx.shadowOffsetX = 0;
             this.ctx.shadowOffsetY = 1;
             this.ctx.fillText(node.name, node.x, node.y);
@@ -3492,8 +3526,11 @@ class GraphEditor {
         const minWidth = 80;
         const maxHeight = 200;
 
-        this.ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+        this.ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
         this.ctx.textBaseline = 'top';
+        this.ctx.textRendering = 'optimizeLegibility';
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = 'high';
 
         let title = node.name;
         if (node.owner) {
@@ -3593,7 +3630,7 @@ class GraphEditor {
         
         this.ctx.fillText(displayTitle, boxX + padding, boxY + padding);// 标题位置
 
-        this.ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+        this.ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
         let hasEllipsis = false;
         
         for (let index = 0; index < taskItems.length; index++) {
