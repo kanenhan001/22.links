@@ -139,7 +139,9 @@ async function initDatabase() {
                 type VARCHAR(50),
                 color VARCHAR(50),
                 taskListName VARCHAR(255), -- 事项清单名称（如：目标、待办等）
-                tasks TEXT, -- 事项清单（JSON 字符串）
+                image TEXT,
+                owner VARCHAR(255),
+                notepad TEXT,
                 FOREIGN KEY (graphId) REFERENCES graphs(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         `);
@@ -153,20 +155,37 @@ async function initDatabase() {
                 label VARCHAR(255),
                 color VARCHAR(50),
                 bendPoints TEXT, -- 转折点（JSON 字符串）
-                tasks TEXT, -- 事项清单（JSON 字符串）
                 FOREIGN KEY (sourceId) REFERENCES nodes(id) ON DELETE CASCADE,
                 FOREIGN KEY (targetId) REFERENCES nodes(id) ON DELETE CASCADE,
                 FOREIGN KEY (graphId) REFERENCES graphs(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         `);
 
-        // 对于旧数据库，如果没有 tasks 字段，则尝试添加
-        try {
-            await pool.execute('ALTER TABLE edges ADD COLUMN tasks TEXT');
-            console.log('成功为 edges 表添加 tasks 列');
-        } catch (e) {
-            console.log('edges 表的 tasks 列可能已存在:', e.message);
-        }
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                nodeId INT,
+                edgeId INT,
+                title TEXT,
+                done BOOLEAN DEFAULT FALSE,
+                sortOrder INT DEFAULT 0,
+                FOREIGN KEY (nodeId) REFERENCES nodes(id) ON DELETE CASCADE,
+                FOREIGN KEY (edgeId) REFERENCES edges(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS files (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                nodeId INT,
+                name VARCHAR(255),
+                size VARCHAR(50),
+                type VARCHAR(100),
+                url TEXT,
+                uploadedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (nodeId) REFERENCES nodes(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
 
         // 对于旧数据库，如果没有 bendPoints 字段，则尝试添加
         try {
@@ -189,35 +208,18 @@ async function initDatabase() {
         } catch (e) {
             console.log('nodes 表的 taskListName 列可能已存在:', e.message);
         }
-
-        try {
-            await pool.execute('ALTER TABLE nodes ADD COLUMN tasks TEXT');
-            console.log('成功为 nodes 表添加 tasks 列');
-        } catch (e) {
-            console.log('nodes 表的 tasks 列可能已存在:', e.message);
-        }
-
         try {
             await pool.execute('ALTER TABLE nodes ADD COLUMN image TEXT');
             console.log('成功为 nodes 表添加 image 列');
         } catch (e) {
             console.log('nodes 表的 image 列可能已存在:', e.message);
         }
-
-        try {
-            await pool.execute('ALTER TABLE nodes ADD COLUMN files TEXT');
-            console.log('成功为 nodes 表添加 files 列');
-        } catch (e) {
-            console.log('nodes 表的 files 列可能已存在:', e.message);
-        }
-
         try {
             await pool.execute('ALTER TABLE nodes ADD COLUMN owner VARCHAR(255)');
             console.log('成功为 nodes 表添加 owner 列');
         } catch (e) {
             console.log('nodes 表的 owner 列可能已存在:', e.message);
         }
-
         try {
             await pool.execute('ALTER TABLE nodes ADD COLUMN notepad TEXT');
             console.log('成功为 nodes 表添加 notepad 列');
@@ -1243,11 +1245,11 @@ app.get('/api/nodes', async (req, res) => {
         console.log(`[SQL] ${sql} - params: [${graphId}]`);
         const nodes = await queryAll(sql, [graphId]);
         
-        // 解析 tasks 和 files 字段
+        // 为每个节点添加空的 tasks 和 files 数组，保持向前兼容
         const parsedNodes = nodes.map(node => ({
             ...node,
-            tasks: node.tasks ? JSON.parse(node.tasks) : [],
-            files: node.files ? JSON.parse(node.files) : []
+            tasks: [],
+            files: []
         }));
         
         res.json(parsedNodes);
@@ -1270,8 +1272,8 @@ app.post('/api/nodes', async (req, res) => {
         }
 
         const newId = await run(
-            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image, files, owner, notepad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [graphId || null, x || null, y || null, radius || null, name || null, type || null, color || null, taskListName || '', JSON.stringify(tasks || []), image || '', JSON.stringify(files || []), owner || '', notepad || '']
+            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, image, owner, notepad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [graphId || null, x || null, y || null, radius || null, name || null, type || null, color || null, taskListName || '', image || '', owner || '', notepad || '']
         );
         const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [newId]);
         res.json(node);
@@ -1306,15 +1308,13 @@ app.put('/api/nodes/:id', async (req, res) => {
         const typeValue = type !== undefined ? type : node.type;
         const colorValue = color !== undefined ? color : node.color;
         const taskListNameValue = taskListName !== undefined ? taskListName : node.taskListName;
-        const tasksValue = tasks !== undefined ? JSON.stringify(tasks) : node.tasks;
         const imageValue = image !== undefined ? image : node.image;
-        const filesValue = files !== undefined ? JSON.stringify(files) : node.files;
         const ownerValue = owner !== undefined ? owner : node.owner;
         const notepadValue = notepad !== undefined ? notepad : node.notepad;
         
         await run(
-            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, tasks = ?, image = ?, files = ?, owner = ?, notepad = ? WHERE id = ?',
-            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, tasksValue, imageValue, filesValue, ownerValue, notepadValue, id]
+            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, image = ?, owner = ?, notepad = ? WHERE id = ?',
+            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, imageValue, ownerValue, notepadValue, id]
         );
         const updatedNode = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
         res.json(updatedNode);
@@ -1348,6 +1348,288 @@ app.delete('/api/nodes/:id', async (req, res) => {
     } catch (e) {
         console.error('删除节点失败:', e);
         res.status(500).json({ error: '删除节点失败' });
+    }
+});
+
+// ==================== 任务 API ====================
+
+// 获取节点的所有任务
+app.get('/api/tasks', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const { nodeId } = req.query;
+
+        if (!nodeId) {
+            return res.status(400).json({ error: '缺少 nodeId 参数' });
+        }
+
+        // 检查是否有权限
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        const tasks = await queryAll('SELECT * FROM tasks WHERE nodeId = ? ORDER BY sortOrder', [nodeId]);
+        res.json(tasks);
+    } catch (e) {
+        console.error('获取任务失败:', e);
+        res.status(500).json({ error: '获取任务失败' });
+    }
+});
+
+// 创建任务
+app.post('/api/tasks', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const { nodeId, title, done, sortOrder } = req.body;
+
+        // 检查是否有权限
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        const newId = await run(
+            'INSERT INTO tasks (nodeId, title, done, sortOrder) VALUES (?, ?, ?, ?)',
+            [nodeId, title || '', done || false, sortOrder || 0]
+        );
+        const task = await queryOne('SELECT * FROM tasks WHERE id = ?', [newId]);
+        res.json(task);
+    } catch (e) {
+        console.error('创建任务失败:', e);
+        res.status(500).json({ error: '创建任务失败' });
+    }
+});
+
+// 更新任务
+app.put('/api/tasks/:id', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const id = parseInt(req.params.id);
+        const { title, done, sortOrder } = req.body;
+
+        // 检查是否有权限
+        const task = await queryOne('SELECT * FROM tasks WHERE id = ?', [id]);
+        if (!task) {
+            return res.status(404).json({ error: '任务不存在' });
+        }
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [task.nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        await run(
+            'UPDATE tasks SET title = ?, done = ?, sortOrder = ? WHERE id = ?',
+            [title || task.title, done !== undefined ? done : task.done, sortOrder !== undefined ? sortOrder : task.sortOrder, id]
+        );
+        const updatedTask = await queryOne('SELECT * FROM tasks WHERE id = ?', [id]);
+        res.json(updatedTask);
+    } catch (e) {
+        console.error('更新任务失败:', e);
+        res.status(500).json({ error: '更新任务失败' });
+    }
+});
+
+// 删除任务
+app.delete('/api/tasks/:id', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const id = parseInt(req.params.id);
+
+        // 检查是否有权限
+        const task = await queryOne('SELECT * FROM tasks WHERE id = ?', [id]);
+        if (!task) {
+            return res.status(404).json({ error: '任务不存在' });
+        }
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [task.nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        await run('DELETE FROM tasks WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('删除任务失败:', e);
+        res.status(500).json({ error: '删除任务失败' });
+    }
+});
+
+// ==================== 文件 API ====================
+
+// 获取节点的所有文件
+app.get('/api/files', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const { nodeId } = req.query;
+
+        if (!nodeId) {
+            return res.status(400).json({ error: '缺少 nodeId 参数' });
+        }
+
+        // 检查是否有权限
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        const files = await queryAll('SELECT * FROM files WHERE nodeId = ? ORDER BY uploadedAt DESC', [nodeId]);
+        res.json(files);
+    } catch (e) {
+        console.error('获取文件失败:', e);
+        res.status(500).json({ error: '获取文件失败' });
+    }
+});
+
+// 删除文件
+app.delete('/api/files/:id', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const id = parseInt(req.params.id);
+
+        // 检查是否有权限
+        const file = await queryOne('SELECT * FROM files WHERE id = ?', [id]);
+        if (!file) {
+            return res.status(404).json({ error: '文件不存在' });
+        }
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [file.nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        await run('DELETE FROM files WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('删除文件失败:', e);
+        res.status(500).json({ error: '删除文件失败' });
+    }
+});
+
+const upload = multer({ dest: path.join(__dirname, 'temp') });
+
+// 上传文件
+app.post('/api/files', upload.single('file'), async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const { nodeId, name, size, type } = req.body;
+
+        if (!nodeId) {
+            return res.status(400).json({ error: '缺少 nodeId 参数' });
+        }
+
+        // 检查是否有权限
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        let filePath = '';
+        if (req.file) {
+            filePath = `/uploads/${req.file.filename}`;
+        }
+
+        const newId = await run(
+            'INSERT INTO files (nodeId, name, size, url, type, uploadedAt) VALUES (?, ?, ?, ?, ?, ?)',
+            [nodeId, name || req.file?.originalname || '', size || '', filePath || req.body.url || '', type || req.file?.mimetype || '', new Date().toISOString().slice(0, 19).replace('T', ' ')]
+        );
+        const file = await queryOne('SELECT * FROM files WHERE id = ?', [newId]);
+        res.json(file);
+    } catch (e) {
+        console.error('上传文件失败:', e);
+        res.status(500).json({ error: '上传文件失败' });
+    }
+});
+
+// 下载文件
+app.get('/api/files/:id/download', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const id = parseInt(req.params.id);
+
+        // 检查是否有权限
+        const file = await queryOne('SELECT * FROM files WHERE id = ?', [id]);
+        if (!file) {
+            return res.status(404).json({ error: '文件不存在' });
+        }
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [file.nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        if (file.url) {
+            // 如果文件是本地上传的，返回文件
+            if (file.url.startsWith('/uploads/')) {
+                const filePath = path.join(__dirname, 'public', file.url);
+                if (fs.existsSync(filePath)) {
+                    res.download(filePath, file.name);
+                } else {
+                    res.status(404).json({ error: '文件不存在' });
+                }
+            } else {
+                // 如果文件是外部链接，重定向
+                res.redirect(file.url);
+            }
+        } else {
+            res.status(404).json({ error: '文件不存在' });
+        }
+    } catch (e) {
+        console.error('下载文件失败:', e);
+        res.status(500).json({ error: '下载文件失败' });
     }
 });
 
@@ -1504,7 +1786,6 @@ app.get('/api/export', async (req, res) => {
 });
 
 // 导入数据库
-const upload = multer({ dest: path.join(__dirname, 'temp') });
 app.post('/api/import', upload.single('file'), async (req, res) => {
     try {
         const userId = getAuthedUserId(req);

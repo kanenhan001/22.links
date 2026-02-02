@@ -196,6 +196,13 @@ class GraphEditor {
             this.applyZoom();
             this.render();
             
+            // 等待1秒后自动加载所有节点的任务数据，让信息框自动显示出来
+            setTimeout(() => {
+                this.nodes.forEach(node => {
+                    this.loadNodeTasks(node);
+                });
+            }, 1000);
+            
             this.history = [];
             this.historyIndex = -1;
             this.saveState();
@@ -1075,7 +1082,7 @@ class GraphEditor {
         });
     }
     
-    handlePropertyChange(e) {
+    async handlePropertyChange(e) {
         // 处理节点的事项清单字段
         const nodeTaskField = e.target.dataset.nodeTaskField;
         if (nodeTaskField && this.selectedNode) {
@@ -1089,21 +1096,44 @@ class GraphEditor {
                 return;
             }
             
-            if (!Array.isArray(this.selectedNode.tasks)) {
-                this.selectedNode.tasks = [];
-            }
-            const index = parseInt(itemEl.dataset.nodeTaskIndex, 10);
-            if (Number.isNaN(index) || !this.selectedNode.tasks[index]) return;
-            const task = this.selectedNode.tasks[index];
+            const taskId = parseInt(itemEl.dataset.taskId, 10);
+            if (Number.isNaN(taskId)) return;
 
-            if (nodeTaskField === 'title') {
-                task.title = e.target.value;
-            } else if (nodeTaskField === 'done') {
-                task.done = !!e.target.checked;
+            try {
+                if (nodeTaskField === 'title') {
+                    const response = await fetch(`/api/tasks/${taskId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ title: e.target.value })
+                    });
+                    
+                    if (response.ok) {
+                        // 任务更新成功，更新任务列表
+                        this.updatePropertiesPanel();
+                    } else {
+                        console.error('任务更新失败:', response.statusText);
+                    }
+                } else if (nodeTaskField === 'done') {
+                    const response = await fetch(`/api/tasks/${taskId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ done: !!e.target.checked })
+                    });
+                    
+                    if (response.ok) {
+                        // 任务更新成功，更新任务列表
+                        this.updatePropertiesPanel();
+                    } else {
+                        console.error('任务更新失败:', response.statusText);
+                    }
+                }
+            } catch (error) {
+                console.error('任务更新失败:', error);
             }
-
-            this.saveNode(this.selectedNode);
-            this.render();
             return;
         }
 
@@ -1179,16 +1209,7 @@ class GraphEditor {
                 return;
             }
             
-            if (!Array.isArray(this.selectedNode.tasks)) {
-                this.selectedNode.tasks = [];
-            }
-            const index = parseInt(itemEl.dataset.nodeTaskIndex, 10);
-            if (Number.isNaN(index) || !this.selectedNode.tasks[index]) return;
-            const task = this.selectedNode.tasks[index];
-
-            if (nodeTaskField === 'title') {
-                task.title = e.target.value;
-            }
+            // 这里不需要实时更新，只在blur时更新
             return;
         }
 
@@ -1210,7 +1231,7 @@ class GraphEditor {
         }
     }
 
-    handleTaskClick(e) {
+    async handleTaskClick(e) {
         // 点击发出的关系项，选中该关系
         const outgoingEdgeItem = e.target.closest('.outgoing-edge-item');
         if (outgoingEdgeItem) {
@@ -1262,20 +1283,29 @@ class GraphEditor {
             const title = textarea.value.trim();
             if (!title) return;
 
-            if (!Array.isArray(this.selectedNode.tasks)) {
-                this.selectedNode.tasks = [];
+            try {
+                const response = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        nodeId: this.selectedNode.id,
+                        title: title,
+                        done: false
+                    })
+                });
+                
+                if (response.ok) {
+                    // 任务添加成功，更新任务列表
+                    textarea.value = '';
+                    this.updatePropertiesPanel();
+                } else {
+                    console.error('任务添加失败:', response.statusText);
+                }
+            } catch (error) {
+                console.error('任务添加失败:', error);
             }
-
-            this.selectedNode.tasks.push({
-                id: Date.now(),
-                title,
-                done: false
-            });
-
-            textarea.value = '';
-            this.saveNode(this.selectedNode);
-            this.updatePropertiesPanel();
-            this.render();
             return;
         }
 
@@ -1283,17 +1313,23 @@ class GraphEditor {
         if (e.target.dataset.nodeTaskAction === 'delete') {
             const itemEl = e.target.closest('.task-item');
             if (!itemEl) return;
-            const index = parseInt(itemEl.dataset.nodeTaskIndex, 10);
-            if (Number.isNaN(index)) return;
+            const taskId = parseInt(itemEl.dataset.taskId, 10);
+            if (Number.isNaN(taskId)) return;
 
-            if (!Array.isArray(this.selectedNode.tasks)) {
-                this.selectedNode.tasks = [];
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    // 任务删除成功，更新任务列表
+                    this.updatePropertiesPanel();
+                } else {
+                    console.error('任务删除失败:', response.statusText);
+                }
+            } catch (error) {
+                console.error('任务删除失败:', error);
             }
-
-            this.selectedNode.tasks.splice(index, 1);
-            this.saveNode(this.selectedNode);
-            this.updatePropertiesPanel();
-            this.render();
             return;
         }
 
@@ -2712,7 +2748,7 @@ class GraphEditor {
         }
     }
 
-    updatePropertiesPanel() {
+    async updatePropertiesPanel() {
         let panel = document.getElementById('propertiesContent');
         const panelContainer = document.querySelector('.properties-panel');
         const panelTitle = document.getElementById('propertiesPanelTitle');
@@ -2828,17 +2864,7 @@ class GraphEditor {
                             `}
                         </div>
                         <div class="task-list" id="nodeTaskList">
-                            ${nodeTasks.map((task, index) => `
-                                <div class="task-item ${task.done ? 'done' : ''}" data-node-id="${this.selectedNode.id}" data-node-task-index="${index}" draggable="false">
-                                    <span class="task-drag-handle" title="拖拽排序" draggable="true">⋮⋮</span>
-                                    <label class="task-checkbox">
-                                        <input type="checkbox" data-node-task-field="done" ${task.done ? 'checked' : ''}>
-                                        <span class="checkmark"></span>
-                                    </label>
-                                    <textarea class="task-textarea" data-node-task-field="title" placeholder="事项内容">${task.title || ''}</textarea>
-                                    <button type="button" class="task-delete-btn" data-node-task-action="delete">删</button>
-                                </div>
-                            `).join('')}
+                            <div class="loading-indicator">加载中...</div>
                         </div>
                         <div class="task-add">
                             <textarea id="newNodeTaskTitle" class="task-textarea task-add-textarea" placeholder="新增事项..."></textarea>
@@ -2881,7 +2907,7 @@ class GraphEditor {
                             <input type="file" id="nodeFileInput" multiple style="display: none;">
                         </div>
                         <div class="file-list" id="nodeFileList">
-                            ${this.renderNodeFiles()}
+                            <div class="loading-indicator">加载中...</div>
                         </div>
                     </div>
                     <div class="tab-content" data-tab-content="notepad">
@@ -2943,15 +2969,93 @@ class GraphEditor {
             // 添加记事本编辑功能
             this.setupNotepadEditor(panel);
             
-            // 渲染完成后，再通过 JS 显式把标题填充到输入框里，避免 HTML 解析导致的显示问题
-            const nodeTaskInputs = panel.querySelectorAll('.task-item textarea[data-node-task-field="title"]');
-            nodeTaskInputs.forEach((input, index) => {
-                const task = nodeTasks[index];
-                if (task && typeof task.title === 'string') {
-                    input.value = task.title;
+            // 异步加载任务和文件
+            try {
+                // 加载任务
+                const tasksResponse = await fetch(`/api/tasks?nodeId=${this.selectedNode.id}`);
+                if (!tasksResponse.ok) {
+                    throw new Error(`加载任务失败: ${tasksResponse.statusText}`);
                 }
-                this.autoResizeTextarea(input);
-            });
+                const tasks = await tasksResponse.json();
+                
+                // 将任务数据存储到节点对象中，以便drawNodeInfo方法使用
+                this.selectedNode.tasks = tasks;
+                
+                // 渲染任务列表
+                const taskList = panel.querySelector('#nodeTaskList');
+                if (taskList) {
+                    if (tasks.length === 0) {
+                        taskList.innerHTML = '<p style="color: #999; font-size: 13px;">暂无事项</p>';
+                    } else {
+                        taskList.innerHTML = tasks.map((task) => `
+                            <div class="task-item ${task.done ? 'done' : ''}" data-node-id="${this.selectedNode.id}" data-task-id="${task.id}" draggable="false">
+                                <span class="task-drag-handle" title="拖拽排序" draggable="true">⋮⋮</span>
+                                <label class="task-checkbox">
+                                    <input type="checkbox" data-node-task-field="done" ${task.done ? 'checked' : ''}>
+                                    <span class="checkmark"></span>
+                                </label>
+                                <textarea class="task-textarea" data-node-task-field="title" placeholder="事项内容">${task.title || ''}</textarea>
+                                <button type="button" class="task-delete-btn" data-node-task-action="delete">删</button>
+                            </div>
+                        `).join('');
+                    }
+                }
+                
+                // 加载文件
+                const filesResponse = await fetch(`/api/files?nodeId=${this.selectedNode.id}`);
+                if (!filesResponse.ok) {
+                    throw new Error(`加载文件失败: ${filesResponse.statusText}`);
+                }
+                const files = await filesResponse.json();
+                
+                // 渲染文件列表
+                const fileList = panel.querySelector('#nodeFileList');
+                if (fileList) {
+                    if (files.length === 0) {
+                        fileList.innerHTML = '<p style="color: #999; font-size: 13px;">暂无文件</p>';
+                    } else {
+                        fileList.innerHTML = files.map(file => `
+                            <div class="file-item" data-file-id="${file.id}">
+                                <div class="file-info">
+                                    <div class="file-icon">📄</div>
+                                    <div class="file-details">
+                                        <div class="file-name">${file.name}</div>
+                                        <div class="file-meta">${file.size || ''}</div>
+                                    </div>
+                                </div>
+                                <div class="file-actions">
+                                    <button type="button" class="file-action-btn file-download-btn" data-file-action="download">下载</button>
+                                    <button type="button" class="file-action-btn file-delete-btn" data-file-action="delete">删除</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+                
+                // 重新设置文件上传事件，因为文件列表已更新
+                this.setupFileUpload(panel);
+                
+                // 自动调整所有 textarea 的高度
+                panel.querySelectorAll('.task-textarea').forEach(textarea => {
+                    this.autoResizeTextarea(textarea);
+                });
+                
+                // 添加任务拖拽排序功能
+                this.setupTaskDragSort(panel);
+            } catch (error) {
+                console.error('加载任务或文件失败:', error);
+                
+                // 显示错误信息
+                const taskList = panel.querySelector('#nodeTaskList');
+                if (taskList) {
+                    taskList.innerHTML = '<p style="color: #ff6b6b; font-size: 13px;">加载任务失败</p>';
+                }
+                
+                const fileList = panel.querySelector('#nodeFileList');
+                if (fileList) {
+                    fileList.innerHTML = '<p style="color: #ff6b6b; font-size: 13px;">加载文件失败</p>';
+                }
+            }
         } else if (this.selectedEdge) {
             if (panelContainer) {
                 panelContainer.classList.remove('collapsed');
@@ -3112,12 +3216,12 @@ class GraphEditor {
             
             if (deleteBtn) {
                 const fileItem = deleteBtn.closest('.file-item');
-                const fileIndex = parseInt(fileItem.dataset.fileIndex, 10);
-                this.handleFileDelete(fileIndex);
+                const fileId = parseInt(fileItem.dataset.fileId, 10);
+                this.handleFileDelete(fileId);
             } else if (downloadBtn) {
                 const fileItem = downloadBtn.closest('.file-item');
-                const fileIndex = parseInt(fileItem.dataset.fileIndex, 10);
-                this.handleFileDownload(fileIndex);
+                const fileId = parseInt(fileItem.dataset.fileId, 10);
+                this.handleFileDownload(fileId);
             }
         });
     }
@@ -3157,45 +3261,71 @@ class GraphEditor {
     async handleFileUpload(files) {
         if (!this.selectedNode || !files || files.length === 0) return;
 
-        if (!Array.isArray(this.selectedNode.files)) {
-            this.selectedNode.files = [];
-        }
-
         for (const file of files) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const newFile = {
-                    name: file.name,
-                    size: this.formatFileSize(file.size),
-                    data: e.target.result,
-                    uploadDate: new Date().toISOString()
-                };
-                this.selectedNode.files.push(newFile);
-                this.saveNode(this.selectedNode);
-                this.updatePropertiesPanel();
-            };
-            reader.readAsDataURL(file);
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('nodeId', this.selectedNode.id);
+            formData.append('name', file.name);
+            formData.append('size', this.formatFileSize(file.size));
+            formData.append('type', file.type);
+
+            try {
+                const response = await fetch('/api/files', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    // 文件上传成功，更新文件列表
+                    this.updatePropertiesPanel();
+                } else {
+                    console.error('文件上传失败:', response.statusText);
+                }
+            } catch (error) {
+                console.error('文件上传失败:', error);
+            }
         }
     }
 
-    async handleFileDelete(fileIndex) {
-        if (!this.selectedNode || !Array.isArray(this.selectedNode.files)) return;
+    async handleFileDelete(fileId) {
+        if (!this.selectedNode || !fileId) return;
 
-        this.selectedNode.files.splice(fileIndex, 1);
-        await this.saveNode(this.selectedNode);
-        this.updatePropertiesPanel();
+        try {
+            const response = await fetch(`/api/files/${fileId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                // 文件删除成功，更新文件列表
+                this.updatePropertiesPanel();
+            } else {
+                console.error('文件删除失败:', response.statusText);
+            }
+        } catch (error) {
+            console.error('文件删除失败:', error);
+        }
     }
 
-    handleFileDownload(fileIndex) {
-        if (!this.selectedNode || !Array.isArray(this.selectedNode.files)) return;
+    async handleFileDownload(fileId) {
+        if (!this.selectedNode || !fileId) return;
 
-        const file = this.selectedNode.files[fileIndex];
-        if (!file || !file.data) return;
-
-        const link = document.createElement('a');
-        link.href = file.data;
-        link.download = file.name;
-        link.click();
+        try {
+            const response = await fetch(`/api/files/${fileId}/download`);
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = ''; // 文件名会由服务器响应头指定
+                link.click();
+                URL.revokeObjectURL(url);
+            } else {
+                console.error('文件下载失败:', response.statusText);
+            }
+        } catch (error) {
+            console.error('文件下载失败:', error);
+        }
     }
 
     formatFileSize(bytes) {
@@ -3518,7 +3648,11 @@ class GraphEditor {
         const tasks = Array.isArray(node.tasks) ? node.tasks : [];
         const hasTasks = tasks.length > 0;
 
-        if (!hasTasks) return;
+        if (!hasTasks) {
+            // 如果节点没有任务数据，尝试异步加载
+            this.loadNodeTasks(node);
+            return;
+        }
 
         const lineHeight = 18;
         const padding = 14;
@@ -3706,6 +3840,60 @@ class GraphEditor {
         }
     }
     
+    async loadNodeTasks(node) {
+
+        // 检查节点是否正在加载任务数据，防止重复调用
+        if (node.isLoadingTasks) {
+
+            return;
+        }
+        // 检查节点是否已经加载过任务数据，防止重复调用
+        if (node.hasLoadedTasks) {
+
+            return;
+        }
+        if ((!node.tasks || !Array.isArray(node.tasks) || node.tasks.length === 0) && node.id) {
+            try {
+                // 标记节点正在加载任务数据
+                node.isLoadingTasks = true;
+
+                const response = await fetch(`/api/tasks?nodeId=${node.id}`);
+
+                if (response.ok) {
+                    const tasks = await response.json();
+
+                    node.tasks = tasks;
+
+                    // 标记节点已经加载过任务数据
+                    node.hasLoadedTasks = true;
+                    // 重新渲染，以显示任务数据
+
+                    this.render();
+                } else {
+
+                    // 尝试获取错误响应的详细信息
+                    try {
+                        const errorData = await response.json();
+
+                    } catch (e) {
+
+                    }
+                    // 标记节点已经加载过任务数据，防止重复调用
+                    node.hasLoadedTasks = true;
+                }
+            } catch (error) {
+                console.error('加载节点任务失败:', error);
+                // 标记节点已经加载过任务数据，防止重复调用
+                node.hasLoadedTasks = true;
+            } finally {
+                // 清除加载标记
+                node.isLoadingTasks = false;
+            }
+        } else {
+
+        }
+    }
+
     toggleNodeInfoExpand(nodeId) {
         const currentState = this.nodeInfoExpanded.get(nodeId) || false;
         this.nodeInfoExpanded.set(nodeId, !currentState);
