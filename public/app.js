@@ -1110,8 +1110,7 @@ class GraphEditor {
                     });
                     
                     if (response.ok) {
-                        // 任务更新成功，更新任务列表
-                        this.updatePropertiesPanel();
+                        // 任务更新成功，无需重新渲染面板，数据会在下次加载时自动更新
                     } else {
                         console.error('任务更新失败:', response.statusText);
                     }
@@ -1125,8 +1124,7 @@ class GraphEditor {
                     });
                     
                     if (response.ok) {
-                        // 任务更新成功，更新任务列表
-                        this.updatePropertiesPanel();
+                        // 任务更新成功，无需重新渲染面板，数据会在下次加载时自动更新
                     } else {
                         console.error('任务更新失败:', response.statusText);
                     }
@@ -2753,20 +2751,20 @@ class GraphEditor {
         const panelContainer = document.querySelector('.properties-panel');
         const panelTitle = document.getElementById('propertiesPanelTitle');
         
-        // 移除所有子元素的焦点，防止切换节点时内容被覆盖
-        if (document.activeElement && panel.contains(document.activeElement)) {
-            document.activeElement.blur();
-        }
-        
-        // 清空面板内容
-        panel.innerHTML = '';
-        
         // 保存当前选中的tab
         let currentActiveTab = null;
         const activeTabBtn = panel.querySelector('.tab-btn.active');
         if (activeTabBtn) {
             currentActiveTab = activeTabBtn.dataset.tab;
         }
+        
+        // 移除所有子元素的焦点，防止切换节点时内容被覆盖
+        if (document.activeElement && panel.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        
+        // 显示加载指示器，而不是立即清空面板内容
+        panel.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 300px; color: #999;">加载中...</div>';
         
         // 检查是否选中了多个节点
         if (this.selectedNodes.length > 1) {
@@ -2864,7 +2862,7 @@ class GraphEditor {
                             `}
                         </div>
                         <div class="task-list" id="nodeTaskList">
-                            <div class="loading-indicator">加载中...</div>
+                            <p style="color: #999; font-size: 13px;">加载中...</p>
                         </div>
                         <div class="task-add">
                             <textarea id="newNodeTaskTitle" class="task-textarea task-add-textarea" placeholder="新增事项..."></textarea>
@@ -2907,7 +2905,7 @@ class GraphEditor {
                             <input type="file" id="nodeFileInput" multiple style="display: none;">
                         </div>
                         <div class="file-list" id="nodeFileList">
-                            <div class="loading-indicator">加载中...</div>
+                            <p style="color: #999; font-size: 13px;">加载中...</p>
                         </div>
                     </div>
                     <div class="tab-content" data-tab-content="notepad">
@@ -3015,7 +3013,7 @@ class GraphEditor {
                         fileList.innerHTML = '<p style="color: #999; font-size: 13px;">暂无文件</p>';
                     } else {
                         fileList.innerHTML = files.map(file => `
-                            <div class="file-item" data-file-id="${file.id}">
+                            <div class="file-item" data-file-id="${file.id}" data-file-url="${encodeURIComponent(file.url || '')}">
                                 <div class="file-info">
                                     <div class="file-icon">📄</div>
                                     <div class="file-details">
@@ -3221,7 +3219,8 @@ class GraphEditor {
             } else if (downloadBtn) {
                 const fileItem = downloadBtn.closest('.file-item');
                 const fileId = parseInt(fileItem.dataset.fileId, 10);
-                this.handleFileDownload(fileId);
+                const fileUrl = decodeURIComponent(fileItem.dataset.fileUrl || '');
+                this.handleFileDownload(fileId, fileUrl);
             }
         });
     }
@@ -3306,10 +3305,17 @@ class GraphEditor {
         }
     }
 
-    async handleFileDownload(fileId) {
+    async handleFileDownload(fileId, fileUrl) {
         if (!this.selectedNode || !fileId) return;
 
         try {
+            // 如果文件是外部链接，直接在新窗口打开
+            if (fileUrl && !fileUrl.startsWith('/uploads/')) {
+                window.open(fileUrl, '_blank');
+                return;
+            }
+
+            // 如果是本地上传的文件，通过API下载
             const response = await fetch(`/api/files/${fileId}/download`);
             
             if (response.ok) {

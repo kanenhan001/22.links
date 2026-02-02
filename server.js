@@ -1149,21 +1149,55 @@ app.post('/api/graphs/:id/duplicate', async (req, res) => {
             const nodeIdMap = {};
             for (const node of nodes) {
                 const [nodeResult] = await connection.execute(
-                    'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, tasks, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    [newGraphId, node.x, node.y, node.radius, node.name, node.type, node.color, node.taskListName, node.tasks, node.image]
+                    'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [newGraphId, node.x, node.y, node.radius, node.name, node.type, node.color, node.taskListName, node.image]
                 );
-                nodeIdMap[node.id] = nodeResult.insertId;
+                const newNodeId = nodeResult.insertId;
+                nodeIdMap[node.id] = newNodeId;
+                
+                // 复制节点的tasks
+                const [tasks] = await connection.execute('SELECT * FROM tasks WHERE nodeId = ?', [node.id]);
+                for (const task of tasks) {
+                    await connection.execute(
+                        'INSERT INTO tasks (nodeId, edgeId, title, done, sortOrder) VALUES (?, ?, ?, ?, ?)',
+                        [newNodeId, task.edgeId || null, task.title, task.done, task.sortOrder]
+                    );
+                }
+                
+                // 复制节点的files
+                const [files] = await connection.execute('SELECT * FROM files WHERE nodeId = ?', [node.id]);
+                for (const file of files) {
+                    await connection.execute(
+                        'INSERT INTO files (nodeId, name, url, size, type, uploadedAt) VALUES (?, ?, ?, ?, ?, ?)',
+                        [newNodeId, file.name, file.url, file.size, file.type, file.uploadedAt]
+                    );
+                }
             }
 
             const [edges] = await connection.execute('SELECT * FROM edges WHERE graphId = ?', [sourceId]);
+            const edgeIdMap = {};
             for (const edge of edges) {
                 const newSourceId = nodeIdMap[edge.sourceId];
                 const newTargetId = nodeIdMap[edge.targetId];
                 if (newSourceId && newTargetId) {
-                    await connection.execute(
-                        'INSERT INTO edges (graphId, sourceId, targetId, label, color, bendPoints, tasks) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        [newGraphId, newSourceId, newTargetId, edge.label, edge.color, edge.bendPoints, edge.tasks]
+                    const [edgeResult] = await connection.execute(
+                        'INSERT INTO edges (graphId, sourceId, targetId, label, color, bendPoints) VALUES (?, ?, ?, ?, ?, ?)',
+                        [newGraphId, newSourceId, newTargetId, edge.label, edge.color, edge.bendPoints]
                     );
+                    const newEdgeId = edgeResult.insertId;
+                    edgeIdMap[edge.id] = newEdgeId;
+                    
+                    // 复制边的tasks
+                    const [edgeTasks] = await connection.execute('SELECT * FROM tasks WHERE edgeId = ?', [edge.id]);
+                    for (const task of edgeTasks) {
+                        await connection.execute(
+                            'INSERT INTO tasks (nodeId, edgeId, title, done, sortOrder) VALUES (?, ?, ?, ?, ?)',
+                            [task.nodeId || null, newEdgeId, task.title, task.done, task.sortOrder]
+                        );
+                    }
+                    
+                    // 边的files暂不支持，因为files表没有edgeId字段
+                    // 可以在后续版本中添加这个功能
                 }
             }
 
