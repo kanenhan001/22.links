@@ -908,6 +908,39 @@ class GraphEditor {
         // 键盘事件
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
         
+        // 移除之前的捕获阶段事件监听器
+        document.removeEventListener('wheel', this.handleWheelCapture, { capture: true });
+        
+        // 移除之前的画布事件监听器
+        this.canvas.removeEventListener('wheel', this.handleWheel);
+        
+        // 只在画布上添加鼠标滚轮事件监听器
+        this.handleWheel = (e) => {
+            // 检查鼠标位置是否在画布内
+            const canvasRect = this.canvas.getBoundingClientRect();
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+            
+            const isMouseInCanvas = mouseX >= canvasRect.left && mouseX <= canvasRect.right && mouseY >= canvasRect.top && mouseY <= canvasRect.bottom;
+            
+            if (!isMouseInCanvas) {
+                return;
+            }
+            
+            e.preventDefault();
+            
+            // 确保缩放方向正确：向上滚动放大，向下滚动缩小
+            const delta = e.deltaY < 0 ? this.zoomStep : -this.zoomStep;
+            const newZoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoomLevel + delta));
+            
+            if (newZoomLevel !== this.zoomLevel) {
+                this.setZoom(newZoomLevel);
+            }
+        };
+        
+        // 移除重复的滚轮事件监听器，保留下面功能更完整的匿名函数监听器
+        // this.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
+        
         // 按钮事件
         document.getElementById('undoBtn').addEventListener('click', () => this.undo());
         document.getElementById('redoBtn').addEventListener('click', () => this.redo());
@@ -922,14 +955,65 @@ class GraphEditor {
         document.getElementById('zoomOutBtn').addEventListener('click', () => this.zoomOut());
         document.getElementById('zoomResetBtn').addEventListener('click', () => this.zoomReset());
         
-        // 鼠标滚轮缩放（以鼠标位置为中心）
+        // 移除之前的document级别的事件监听器
+        // document.removeEventListener('wheel', this.handleWheel);
+        
+        // 鼠标滚轮缩放（以鼠标位置为中心）- 直接在画布上添加事件监听器
         this.canvas.addEventListener('wheel', (e) => {
+
+
+            
+            // 检查鼠标位置处的元素是否是属性看板或其内部元素
+            const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+
+            
+            const isElementInPropertiesPanel = elementUnderMouse && elementUnderMouse.closest('.properties-panel') !== null;
+
+            
+            if (isElementInPropertiesPanel) {
+
+                return;
+            }
+            
+            // 检查鼠标位置是否在属性看板内
+            const propertiesPanel = document.querySelector('.properties-panel');
+            let isMouseInPropertiesPanel = false;
+            if (propertiesPanel) {
+                const rect = propertiesPanel.getBoundingClientRect();
+
+                // 检查鼠标是否在属性看板内
+                isMouseInPropertiesPanel = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+
+            }
+            
+            if (isMouseInPropertiesPanel) {
+
+                return;
+            }
+            
+            // 检查鼠标位置是否在画布内
+            const canvasRect = this.canvas.getBoundingClientRect();
+
+            const isMouseInCanvas = e.clientX >= canvasRect.left && e.clientX <= canvasRect.right && e.clientY >= canvasRect.top && e.clientY <= canvasRect.bottom;
+
+            
+            if (!isMouseInCanvas) {
+
+                return;
+            }
+            
+
             e.preventDefault();
             
-            const delta = e.deltaY > 0 ? -this.zoomStep : this.zoomStep;
+            // 确保缩放方向正确：向上滚动放大，向下滚动缩小
+            const delta = e.deltaY < 0 ? this.zoomStep : -this.zoomStep;
             const newZoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoomLevel + delta));
+
+
+
             
             if (newZoomLevel !== this.zoomLevel) {
+
                 this.setZoom(newZoomLevel);
             }
         }, { passive: false });
@@ -937,6 +1021,23 @@ class GraphEditor {
         this.setupModalListeners();
         this.updateZoomDisplay();
         this.applyZoom(); // 初始化时应用缩放
+        
+        // 阻止属性看板上的滚动事件冒泡到画布
+        const propertiesPanel = document.querySelector('.properties-panel');
+        if (propertiesPanel) {
+
+            // 移除之前的事件监听器
+            propertiesPanel.removeEventListener('wheel', this.handlePropertiesPanelWheel);
+            
+            // 添加新的事件监听器
+            this.handlePropertiesPanelWheel = (e) => {
+
+                // 只阻止事件冒泡，不阻止默认行为，这样属性看板的滚动条可以正常滚动
+                e.stopPropagation();
+            };
+            
+            propertiesPanel.addEventListener('wheel', this.handlePropertiesPanelWheel, { passive: true });
+        }
         
         // 更新缩放控件位置和属性面板高度（延迟执行，确保DOM已完全渲染）
         setTimeout(() => {
@@ -2557,6 +2658,33 @@ class GraphEditor {
     // ==================== 缩放功能 ====================
     
     setZoom(level) {
+        // 检查鼠标是否在属性看板内
+        if (window.event) {
+            const mousePosition = { x: window.event.clientX, y: window.event.clientY };
+            const propertiesPanel = document.querySelector('.properties-panel');
+            let isInPropertiesPanel = false;
+            if (propertiesPanel) {
+                const rect = propertiesPanel.getBoundingClientRect();
+                isInPropertiesPanel = mousePosition.x >= rect.left && mousePosition.x <= rect.right && mousePosition.y >= rect.top && mousePosition.y <= rect.bottom;
+
+            }
+            
+            if (isInPropertiesPanel) {
+
+                return;
+            }
+            
+            // 检查鼠标是否在画布内
+            const canvasRect = this.canvas.getBoundingClientRect();
+            const isMouseInCanvas = mousePosition.x >= canvasRect.left && mousePosition.x <= canvasRect.right && mousePosition.y >= canvasRect.top && mousePosition.y <= canvasRect.bottom;
+
+            
+            if (!isMouseInCanvas) {
+
+                return;
+            }
+        }
+        
         // 限制缩放范围
         this.zoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, level));
 
@@ -2703,26 +2831,47 @@ class GraphEditor {
                 item.classList.remove('dragging');
                 draggedItem = null;
             });
+        });
 
-            item.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                if (!draggedItem || draggedItem === item) return;
+        // 将 dragover 和 drop 事件监听器添加到任务列表的容器上
+        taskList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (!draggedItem) return;
 
+            // 找到鼠标位置下方的任务项
+            const taskItems = taskList.querySelectorAll('.task-item');
+            let targetItem = null;
+            let closestDistance = Infinity;
+
+            taskItems.forEach(item => {
+                if (item === draggedItem) return;
+                
                 const rect = item.getBoundingClientRect();
                 const midY = rect.top + rect.height / 2;
+                const distance = Math.abs(e.clientY - midY);
 
-                if (e.clientY < midY) {
-                    taskList.insertBefore(draggedItem, item);
-                } else {
-                    taskList.insertBefore(draggedItem, item.nextSibling);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    targetItem = item;
                 }
             });
 
-            item.addEventListener('drop', (e) => {
-                e.preventDefault();
-                this.saveTaskOrder(taskList);
-            });
+            if (targetItem) {
+                const rect = targetItem.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+
+                if (e.clientY < midY) {
+                    taskList.insertBefore(draggedItem, targetItem);
+                } else {
+                    taskList.insertBefore(draggedItem, targetItem.nextSibling);
+                }
+            }
+        });
+
+        taskList.addEventListener('drop', (e) => {
+            e.preventDefault();
+            this.saveTaskOrder(taskList);
         });
     }
 
@@ -2732,17 +2881,47 @@ class GraphEditor {
         const taskItems = taskList.querySelectorAll('.task-item');
         const newOrder = [];
 
-        taskItems.forEach(item => {
-            const index = parseInt(item.dataset.nodeTaskIndex);
-            if (!isNaN(index) && this.selectedNode.tasks[index]) {
-                newOrder.push(this.selectedNode.tasks[index]);
+        taskItems.forEach((item, index) => {
+            const taskId = parseInt(item.dataset.taskId);
+            if (!isNaN(taskId)) {
+                // 查找对应的任务
+                const task = this.selectedNode.tasks.find(t => t.id === taskId);
+                if (task) {
+                    // 更新任务的顺序
+                    task.order = index;
+                    newOrder.push(task);
+                }
             }
         });
 
         if (newOrder.length === this.selectedNode.tasks.length) {
+            // 更新节点对象中的任务数据
             this.selectedNode.tasks = newOrder;
-            this.saveNode(this.selectedNode);
-            this.updatePropertiesPanel();
+            
+            // 保存每个任务的顺序
+            newOrder.forEach(task => {
+                fetch(`/api/tasks/${task.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(task)
+                })
+                .catch(error => {
+                    console.error('保存任务顺序失败:', error);
+                });
+            });
+
+            // 重新加载任务数据并更新属性面板
+            fetch(`/api/tasks?nodeId=${this.selectedNode.id}`)
+            .then(response => response.json())
+            .then(tasks => {
+                this.selectedNode.tasks = tasks;
+                this.updatePropertiesPanel();
+            })
+            .catch(error => {
+                console.error('加载任务数据失败:', error);
+            });
         }
     }
 
@@ -2941,8 +3120,7 @@ class GraphEditor {
                 this.autoResizeTextarea(textarea);
             });
 
-            // 添加任务拖拽排序功能
-            this.setupTaskDragSort(panel);
+            // 任务拖拽排序功能将在任务列表渲染后添加
 
             // 添加tab切换事件
             this.setupTabSwitching(panel);
@@ -2985,8 +3163,11 @@ class GraphEditor {
                     if (tasks.length === 0) {
                         taskList.innerHTML = '<p style="color: #999; font-size: 13px;">暂无事项</p>';
                     } else {
-                        taskList.innerHTML = tasks.map((task) => `
-                            <div class="task-item ${task.done ? 'done' : ''}" data-node-id="${this.selectedNode.id}" data-task-id="${task.id}" draggable="false">
+                        // 按照 order 属性排序任务
+                        const sortedTasks = [...tasks].sort((a, b) => (a.order || 0) - (b.order || 0));
+                        
+                        taskList.innerHTML = sortedTasks.map((task, index) => `
+                            <div class="task-item ${task.done ? 'done' : ''}" data-node-id="${this.selectedNode.id}" data-task-id="${task.id}" data-node-task-index="${index}" draggable="false">
                                 <span class="task-drag-handle" title="拖拽排序" draggable="true">⋮⋮</span>
                                 <label class="task-checkbox">
                                     <input type="checkbox" data-node-task-field="done" ${task.done ? 'checked' : ''}>
