@@ -2809,18 +2809,22 @@ class GraphEditor {
 
     setupTaskDragSort(panel) {
         const taskList = panel.querySelector('#nodeTaskList');
-        if (!taskList) return;
+        if (!taskList) {
+            return;
+        }
 
         const taskItems = taskList.querySelectorAll('.task-item');
         let draggedItem = null;
 
         taskItems.forEach(item => {
             const dragHandle = item.querySelector('.task-drag-handle');
-            if (!dragHandle) return;
+            if (!dragHandle) {
+                return;
+            }
 
             dragHandle.addEventListener('dragstart', (e) => {
                 draggedItem = item;
-                e.dataTransfer.setData('text/plain', item.dataset.nodeTaskIndex);
+                e.dataTransfer.setData('text/plain', item.dataset.taskId);
                 e.dataTransfer.effectAllowed = 'move';
                 setTimeout(() => {
                     item.classList.add('dragging');
@@ -2876,7 +2880,9 @@ class GraphEditor {
     }
 
     saveTaskOrder(taskList) {
-        if (!this.selectedNode || !Array.isArray(this.selectedNode.tasks)) return;
+        if (!this.selectedNode || !Array.isArray(this.selectedNode.tasks)) {
+            return;
+        }
 
         const taskItems = taskList.querySelectorAll('.task-item');
         const newOrder = [];
@@ -2888,7 +2894,7 @@ class GraphEditor {
                 const task = this.selectedNode.tasks.find(t => t.id === taskId);
                 if (task) {
                     // 更新任务的顺序
-                    task.order = index;
+                    task.sortOrder = index;
                     newOrder.push(task);
                 }
             }
@@ -2900,28 +2906,27 @@ class GraphEditor {
             
             // 保存每个任务的顺序
             newOrder.forEach(task => {
+                // 只发送 sortOrder 字段，简化 API 调用
                 fetch(`/api/tasks/${task.id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(task)
+                    body: JSON.stringify({ sortOrder: task.sortOrder })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        console.error('任务顺序保存失败:', task.id, response.statusText);
+                    }
                 })
                 .catch(error => {
                     console.error('保存任务顺序失败:', error);
                 });
             });
 
-            // 重新加载任务数据并更新属性面板
-            fetch(`/api/tasks?nodeId=${this.selectedNode.id}`)
-            .then(response => response.json())
-            .then(tasks => {
-                this.selectedNode.tasks = tasks;
-                this.updatePropertiesPanel();
-            })
-            .catch(error => {
-                console.error('加载任务数据失败:', error);
-            });
+            // 不需要重新加载任务数据，直接更新属性面板
+            // 这样可以避免服务器返回的任务顺序与我们保存的不一致
+            this.updatePropertiesPanel();
         }
     }
 
@@ -3147,15 +3152,20 @@ class GraphEditor {
             
             // 异步加载任务和文件
             try {
-                // 加载任务
-                const tasksResponse = await fetch(`/api/tasks?nodeId=${this.selectedNode.id}`);
-                if (!tasksResponse.ok) {
-                    throw new Error(`加载任务失败: ${tasksResponse.statusText}`);
-                }
-                const tasks = await tasksResponse.json();
+                // 使用本地已经更新过的任务数据，而不是重新从服务器加载
+                // 这样可以确保拖拽排序后任务顺序立即更新
+                let tasks = this.selectedNode.tasks;
                 
-                // 将任务数据存储到节点对象中，以便drawNodeInfo方法使用
-                this.selectedNode.tasks = tasks;
+                // 如果本地没有任务数据，才从服务器加载
+                if (!Array.isArray(tasks) || tasks.length === 0) {
+                    const tasksResponse = await fetch(`/api/tasks?nodeId=${this.selectedNode.id}`);
+                    if (!tasksResponse.ok) {
+                        throw new Error(`加载任务失败: ${tasksResponse.statusText}`);
+                    }
+                    tasks = await tasksResponse.json();
+                    // 将任务数据存储到节点对象中，以便drawNodeInfo方法使用
+                    this.selectedNode.tasks = tasks;
+                }
                 
                 // 渲染任务列表
                 const taskList = panel.querySelector('#nodeTaskList');
@@ -3163,10 +3173,9 @@ class GraphEditor {
                     if (tasks.length === 0) {
                         taskList.innerHTML = '<p style="color: #999; font-size: 13px;">暂无事项</p>';
                     } else {
-                        // 按照 order 属性排序任务
-                        const sortedTasks = [...tasks].sort((a, b) => (a.order || 0) - (b.order || 0));
-                        
-                        taskList.innerHTML = sortedTasks.map((task, index) => `
+                        // 直接使用本地任务数据，不需要重新排序
+                        // 因为我们已经在 saveTaskOrder 方法中正确更新了任务顺序
+                        taskList.innerHTML = tasks.map((task, index) => `
                             <div class="task-item ${task.done ? 'done' : ''}" data-node-id="${this.selectedNode.id}" data-task-id="${task.id}" data-node-task-index="${index}" draggable="false">
                                 <span class="task-drag-handle" title="拖拽排序" draggable="true">⋮⋮</span>
                                 <label class="task-checkbox">
