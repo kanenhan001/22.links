@@ -196,10 +196,11 @@ class GraphEditor {
             this.applyZoom();
             this.render();
             
-            // 等待1秒后自动加载所有节点的任务数据，让信息框自动显示出来
+            // 等待1秒后自动加载所有节点的任务数据和图片数据，让信息框自动显示出来
             setTimeout(() => {
                 this.nodes.forEach(node => {
                     this.loadNodeTasks(node);
+                    this.loadNodeImage(node);
                 });
             }, 1000);
             
@@ -612,10 +613,14 @@ class GraphEditor {
     async saveNode(node) {
         try {
             node.graphId = this.graphId;
+            // 创建一个不包含 image 字段的节点副本，因为 image 现在存储在单独的表中
+            const nodeWithoutImage = { ...node };
+            delete nodeWithoutImage.image;
+            
             if (node.id) {
-                await this.apiPut(`/api/nodes/${node.id}`, node);
+                await this.apiPut(`/api/nodes/${node.id}`, nodeWithoutImage);
             } else {
-                const result = await this.apiPost('/api/nodes', node);
+                const result = await this.apiPost('/api/nodes', nodeWithoutImage);
                 
                 if (result.id) {
                     node.id = result.id;
@@ -632,7 +637,7 @@ class GraphEditor {
     
     async saveNodePartial(nodeData) {
         try {
-            const { id, graphId, ...updateFields } = nodeData;
+            const { id, graphId, image, ...updateFields } = nodeData;
             if (id) {
                 await this.apiPut(`/api/nodes/${id}`, updateFields);
             }
@@ -1150,16 +1155,30 @@ class GraphEditor {
         });
 
         // 图片上传相关事件（使用事件委托，避免重复绑定）
-        document.getElementById('propertiesContent').addEventListener('click', (e) => {
+        document.getElementById('propertiesContent').addEventListener('click', async (e) => {
             if (e.target.id === 'uploadNodeImageBtn') {
                 e.stopPropagation();
                 document.getElementById('nodeImageInput').click();
             } else if (e.target.id === 'removeNodeImageBtn') {
                 e.stopPropagation();
-                this.selectedNode.image = '';
-                this.saveNode(this.selectedNode);
-                this.updatePropertiesPanel();
-                this.render();
+                try {
+                    // 使用新的API端点删除图片
+                    const response = await fetch(`/api/node-images?nodeId=${this.selectedNode.id}`, {
+                        method: 'DELETE'
+                    });
+                    if (response.ok) {
+                        // 更新本地节点的图片数据
+                        this.selectedNode.image = '';
+                        this.updatePropertiesPanel();
+                        this.render();
+                    } else {
+                        console.error('删除图片失败:', response.statusText);
+                        this.showStatus('删除图片失败');
+                    }
+                } catch (error) {
+                    console.error('删除图片失败:', error);
+                    this.showStatus('删除图片失败');
+                }
             } else if (e.target.closest('#nodeImagePreview') && !this.selectedNode.image) {
                 document.getElementById('nodeImageInput').click();
             }
@@ -1170,12 +1189,33 @@ class GraphEditor {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onload = (event) => {
+                    reader.onload = async (event) => {
                         const imageData = event.target.result;
-                        this.selectedNode.image = imageData;
-                        this.saveNode(this.selectedNode);
-                        this.updatePropertiesPanel();
-                        this.render();
+                        try {
+                            // 使用新的API端点保存图片
+                            const response = await fetch('/api/node-images', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    nodeId: this.selectedNode.id,
+                                    imageData: imageData
+                                })
+                            });
+                            if (response.ok) {
+                                // 更新本地节点的图片数据
+                                this.selectedNode.image = imageData;
+                                this.updatePropertiesPanel();
+                                this.render();
+                            } else {
+                                console.error('保存图片失败:', response.statusText);
+                                this.showStatus('保存图片失败');
+                            }
+                        } catch (error) {
+                            console.error('保存图片失败:', error);
+                            this.showStatus('保存图片失败');
+                        }
                     };
                     reader.readAsDataURL(file);
                 }
@@ -1397,6 +1437,12 @@ class GraphEditor {
                 
                 if (response.ok) {
                     // 任务添加成功，更新任务列表
+                    const newTask = await response.json();
+                    // 将新任务添加到本地任务数组中
+                    if (!Array.isArray(this.selectedNode.tasks)) {
+                        this.selectedNode.tasks = [];
+                    }
+                    this.selectedNode.tasks.push(newTask);
                     textarea.value = '';
                     this.updatePropertiesPanel();
                 } else {
@@ -1422,6 +1468,10 @@ class GraphEditor {
                 
                 if (response.ok) {
                     // 任务删除成功，更新任务列表
+                    // 从本地任务数组中删除该任务
+                    if (Array.isArray(this.selectedNode.tasks)) {
+                        this.selectedNode.tasks = this.selectedNode.tasks.filter(task => task.id !== taskId);
+                    }
                     this.updatePropertiesPanel();
                 } else {
                     console.error('任务删除失败:', response.statusText);
@@ -4087,6 +4137,45 @@ class GraphEditor {
             }
         } else {
 
+        }
+    }
+
+    async loadNodeImage(node) {
+        // 检查节点是否正在加载图片数据，防止重复调用
+        if (node.isLoadingImage) {
+            return;
+        }
+        // 检查节点是否已经加载过图片数据，防止重复调用
+        if (node.hasLoadedImage) {
+            return;
+        }
+        if (node.id) {
+            try {
+                // 标记节点正在加载图片数据
+                node.isLoadingImage = true;
+
+                const response = await fetch(`/api/node-images?nodeId=${node.id}`);
+
+                if (response.ok) {
+                    const imageData = await response.json();
+
+                    if (imageData) {
+                        node.image = imageData;
+                    }
+
+                    // 标记节点已经加载过图片数据
+                    node.hasLoadedImage = true;
+                    // 重新渲染，以显示图片数据
+                    this.render();
+                } else {
+                    console.error('加载节点图片失败:', response.statusText);
+                }
+            } catch (error) {
+                console.error('加载节点图片失败:', error);
+            } finally {
+                // 取消加载标记
+                node.isLoadingImage = false;
+            }
         }
     }
 

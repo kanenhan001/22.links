@@ -1149,8 +1149,8 @@ app.post('/api/graphs/:id/duplicate', async (req, res) => {
             const nodeIdMap = {};
             for (const node of nodes) {
                 const [nodeResult] = await connection.execute(
-                    'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    [newGraphId, node.x, node.y, node.radius, node.name, node.type, node.color, node.taskListName, node.image]
+                    'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [newGraphId, node.x, node.y, node.radius, node.name, node.type, node.color, node.taskListName]
                 );
                 const newNodeId = nodeResult.insertId;
                 nodeIdMap[node.id] = newNodeId;
@@ -1172,6 +1172,15 @@ app.post('/api/graphs/:id/duplicate', async (req, res) => {
                         [newNodeId, file.name, file.url, file.size, file.type, file.uploadedAt]
                     );
                 }
+                
+                // 复制节点的image
+                const [nodeImages] = await connection.execute('SELECT * FROM node_images WHERE nodeId = ?', [node.id]);
+                for (const nodeImage of nodeImages) {
+                    await connection.execute(
+                        'INSERT INTO node_images (nodeId, imageData) VALUES (?, ?)',
+                        [newNodeId, nodeImage.imageData]
+                    );
+                }
             }
 
             const [edges] = await connection.execute('SELECT * FROM edges WHERE graphId = ?', [sourceId]);
@@ -1181,20 +1190,20 @@ app.post('/api/graphs/:id/duplicate', async (req, res) => {
                 const newTargetId = nodeIdMap[edge.targetId];
                 if (newSourceId && newTargetId) {
                     const [edgeResult] = await connection.execute(
-                        'INSERT INTO edges (graphId, sourceId, targetId, label, color, bendPoints) VALUES (?, ?, ?, ?, ?, ?)',
-                        [newGraphId, newSourceId, newTargetId, edge.label, edge.color, edge.bendPoints]
+                        'INSERT INTO edges (graphId, sourceId, targetId, label, color, bendPoints, tasks) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [newGraphId, newSourceId, newTargetId, edge.label, edge.color, edge.bendPoints, edge.tasks]
                     );
                     const newEdgeId = edgeResult.insertId;
                     edgeIdMap[edge.id] = newEdgeId;
                     
                     // 复制边的tasks
-                    const [edgeTasks] = await connection.execute('SELECT * FROM tasks WHERE edgeId = ?', [edge.id]);
-                    for (const task of edgeTasks) {
-                        await connection.execute(
-                            'INSERT INTO tasks (nodeId, edgeId, title, done, sortOrder) VALUES (?, ?, ?, ?, ?)',
-                            [task.nodeId || null, newEdgeId, task.title, task.done, task.sortOrder]
-                        );
-                    }
+                const [edgeTasks] = await connection.execute('SELECT * FROM tasks WHERE edgeId = ?', [edge.id]);
+                for (const task of edgeTasks) {
+                    await connection.execute(
+                        'INSERT INTO tasks (nodeId, edgeId, title, done, sortOrder) VALUES (?, ?, ?, ?, ?)',
+                        [task.nodeId ? nodeIdMap[task.nodeId] || null : null, newEdgeId, task.title, task.done, task.sortOrder]
+                    );
+                }
                     
                     // 边的files暂不支持，因为files表没有edgeId字段
                     // 可以在后续版本中添加这个功能
@@ -1275,7 +1284,7 @@ app.get('/api/nodes', async (req, res) => {
             return res.status(403).json({ error: '无权限' });
         }
 
-        const sql = 'SELECT * FROM nodes WHERE graphId = ?';
+        const sql = 'SELECT id, graphId, x, y, radius, name, type, color, taskListName, tasks, files, owner, notepad FROM nodes WHERE graphId = ?';
         console.log(`[SQL] ${sql} - params: [${graphId}]`);
         const nodes = await queryAll(sql, [graphId]);
         
@@ -1297,7 +1306,7 @@ app.get('/api/nodes', async (req, res) => {
 app.post('/api/nodes', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const { graphId, x, y, radius, name, type, color, taskListName, tasks, image, files, owner, notepad } = req.body;
+        const { graphId, x, y, radius, name, type, color, taskListName, tasks, files, owner, notepad } = req.body;
 
         // 检查是否有权限
         const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [graphId, userId]);
@@ -1306,10 +1315,10 @@ app.post('/api/nodes', async (req, res) => {
         }
 
         const newId = await run(
-            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, image, owner, notepad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [graphId || null, x || null, y || null, radius || null, name || null, type || null, color || null, taskListName || '', image || '', owner || '', notepad || '']
+            'INSERT INTO nodes (graphId, x, y, radius, name, type, color, taskListName, owner, notepad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [graphId || null, x || null, y || null, radius || null, name || null, type || null, color || null, taskListName || '', owner || '', notepad || '']
         );
-        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [newId]);
+        const node = await queryOne('SELECT id, graphId, x, y, radius, name, type, color, taskListName, tasks, files, owner, notepad FROM nodes WHERE id = ?', [newId]);
         res.json(node);
     } catch (e) {
         console.error('创建节点失败:', e);
@@ -1322,7 +1331,7 @@ app.put('/api/nodes/:id', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
         const id = parseInt(req.params.id);
-        const { x, y, radius, name, type, color, taskListName, tasks, image, files, owner, notepad } = req.body;
+        const { x, y, radius, name, type, color, taskListName, tasks, files, owner, notepad } = req.body;
 
         // 检查是否有权限
         const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
@@ -1342,13 +1351,12 @@ app.put('/api/nodes/:id', async (req, res) => {
         const typeValue = type !== undefined ? type : node.type;
         const colorValue = color !== undefined ? color : node.color;
         const taskListNameValue = taskListName !== undefined ? taskListName : node.taskListName;
-        const imageValue = image !== undefined ? image : node.image;
         const ownerValue = owner !== undefined ? owner : node.owner;
         const notepadValue = notepad !== undefined ? notepad : node.notepad;
         
         await run(
-            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, image = ?, owner = ?, notepad = ? WHERE id = ?',
-            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, imageValue, ownerValue, notepadValue, id]
+            'UPDATE nodes SET x = ?, y = ?, radius = ?, name = ?, type = ?, color = ?, taskListName = ?, owner = ?, notepad = ? WHERE id = ?',
+            [xValue, yValue, radiusValue, nameValue, typeValue, colorValue, taskListNameValue, ownerValue, notepadValue, id]
         );
         const updatedNode = await queryOne('SELECT * FROM nodes WHERE id = ?', [id]);
         res.json(updatedNode);
@@ -1664,6 +1672,110 @@ app.get('/api/files/:id/download', async (req, res) => {
     } catch (e) {
         console.error('下载文件失败:', e);
         res.status(500).json({ error: '下载文件失败' });
+    }
+});
+
+// ==================== 图片 API ====================
+
+// 获取节点的图片
+app.get('/api/node-images', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const { nodeId } = req.query;
+
+        if (!nodeId) {
+            return res.status(400).json({ error: '缺少 nodeId 参数' });
+        }
+
+        // 检查是否有权限
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        const image = await queryOne('SELECT * FROM node_images WHERE nodeId = ?', [nodeId]);
+        res.json(image ? image.imageData : null);
+    } catch (e) {
+        console.error('获取图片失败:', e);
+        res.status(500).json({ error: '获取图片失败' });
+    }
+});
+
+// 保存节点的图片
+app.post('/api/node-images', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const { nodeId, imageData } = req.body;
+
+        if (!nodeId) {
+            return res.status(400).json({ error: '缺少 nodeId 参数' });
+        }
+
+        // 检查是否有权限
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        // 检查是否已存在图片
+        const existingImage = await queryOne('SELECT * FROM node_images WHERE nodeId = ?', [nodeId]);
+        if (existingImage) {
+            // 更新现有图片
+            await run('UPDATE node_images SET imageData = ? WHERE nodeId = ?', [imageData, nodeId]);
+        } else {
+            // 创建新图片记录
+            await run('INSERT INTO node_images (nodeId, imageData) VALUES (?, ?)', [nodeId, imageData]);
+        }
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('保存图片失败:', e);
+        res.status(500).json({ error: '保存图片失败' });
+    }
+});
+
+// 删除节点的图片
+app.delete('/api/node-images', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: '用户未登录' });
+        }
+        const { nodeId } = req.query;
+
+        if (!nodeId) {
+            return res.status(400).json({ error: '缺少 nodeId 参数' });
+        }
+
+        // 检查是否有权限
+        const node = await queryOne('SELECT * FROM nodes WHERE id = ?', [nodeId]);
+        if (!node) {
+            return res.status(404).json({ error: '节点不存在' });
+        }
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [node.graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        await run('DELETE FROM node_images WHERE nodeId = ?', [nodeId]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('删除图片失败:', e);
+        res.status(500).json({ error: '删除图片失败' });
     }
 });
 
