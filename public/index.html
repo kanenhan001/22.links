@@ -47,6 +47,15 @@
             <div class="toolbar-left">
                 <button id="undoBtn" title="后退 (Ctrl+Z)">↶</button>
                 <button id="redoBtn" title="前进 (Ctrl+Y)">↷</button>
+                <div class="diagram-type-selector">
+                    <label for="diagramType">图表类型:</label>
+                    <select id="diagramType">
+                        <option value="relationship">关系图</option>
+                        <option value="flow">流程图</option>
+                        <option value="mindmap">思维导图</option>
+                        <option value="swimlane">泳道图</option>
+                    </select>
+                </div>
                 <button id="addNodeBtn">+ 新增节点</button>
                 <button id="saveGraphBtn" title="保存关系图">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

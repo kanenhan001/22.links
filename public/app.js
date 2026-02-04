@@ -60,6 +60,9 @@ class GraphEditor {
         // 当前关系图ID（来自 URL /g/:id）
         this.graphId = this.getGraphIdFromUrl();
 
+        // 图表类型
+        this.diagramType = 'relationship';
+
         // 节点图片缓存
         this.nodeImageCache = new Map();
 
@@ -186,6 +189,16 @@ class GraphEditor {
             }
             if (graphData.backgroundImage) {
                 this.backgroundImage = graphData.backgroundImage;
+            }
+            
+            // 加载图表类型
+            if (graphData.diagramType) {
+                this.diagramType = graphData.diagramType;
+                // 更新图表类型选择器
+                const diagramTypeSelect = document.getElementById('diagramType');
+                if (diagramTypeSelect) {
+                    diagramTypeSelect.value = this.diagramType;
+                }
             }
             
             // 更新画布尺寸 - 保持高DPI设置
@@ -485,6 +498,172 @@ class GraphEditor {
     async handleManualSave() {
         await this.saveAllNodes();
         this.showStatus('保存成功');
+    }
+    
+    // 根据图表类型切换编辑器
+    switchEditorType(type) {
+        const canvasContainer = document.querySelector('.canvas-container');
+        if (!canvasContainer) return;
+        
+        // 清空画布容器
+        canvasContainer.innerHTML = '';
+        
+        switch (type) {
+            case 'relationship':
+                // 重新创建关系图画布
+                this.createRelationshipCanvas(canvasContainer);
+                this.loadData();
+                break;
+            case 'flow':
+            case 'swimlane':
+            case 'mindmap':
+                // 使用Mermaid.js创建相应的图表编辑器
+                this.createMermaidEditor(canvasContainer, type);
+                break;
+            default:
+                // 默认显示关系图
+                this.createRelationshipCanvas(canvasContainer);
+                this.loadData();
+        }
+    }
+    
+    // 创建关系图画布
+    createRelationshipCanvas(container) {
+        // 创建画布元素
+        const canvas = document.createElement('canvas');
+        canvas.id = 'graphCanvas';
+        canvas.width = this.canvasWidth;
+        canvas.height = this.canvasHeight;
+        container.appendChild(canvas);
+        
+        // 重新初始化画布和上下文
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.setupHighDPICanvas();
+        
+        // 添加缩放控件
+        const zoomControls = document.createElement('div');
+        zoomControls.className = 'zoom-controls';
+        zoomControls.innerHTML = `
+            <button id="zoomOutBtn" class="zoom-btn" title="缩小">−</button>
+            <span id="zoomLevel" class="zoom-level">100%</span>
+            <button id="zoomInBtn" class="zoom-btn" title="放大">+</button>
+            <button id="zoomResetBtn" class="zoom-btn zoom-reset" title="重置缩放">⌂</button>
+        `;
+        container.appendChild(zoomControls);
+        
+        // 重新绑定事件监听器
+        this.setupEventListeners();
+    }
+    
+    // 创建Mermaid编辑器
+    createMermaidEditor(container, type) {
+        // 创建Mermaid编辑器容器
+        const editorContainer = document.createElement('div');
+        editorContainer.className = 'mermaid-editor';
+        
+        // 创建工具栏
+        const toolbar = document.createElement('div');
+        toolbar.className = 'toolbar';
+        toolbar.innerHTML = `
+            <button id="mermaidRenderBtn">渲染图表</button>
+            <button id="mermaidSaveBtn">保存图表</button>
+        `;
+        
+        // 创建代码编辑器
+        const textarea = document.createElement('textarea');
+        textarea.id = 'mermaidCode';
+        textarea.placeholder = `请输入Mermaid代码，例如：
+
+${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]' : 
+ type === 'swimlane' ? 'flowchart LR\n    subgraph 泳道1\n        A[开始] --> B[处理]\n    end\n    subgraph 泳道2\n        C[审核] --> D[结束]\n    end\n    B --> C' : 
+ 'graph TD\n    A[中心主题] --> B[子主题1]\n    A --> C[子主题2]\n    B --> D[细节1]\n    B --> E[细节2]'}`;
+        
+        // 创建预览容器
+        const preview = document.createElement('div');
+        preview.className = 'preview';
+        preview.id = 'mermaidPreview';
+        
+        // 组装编辑器
+        editorContainer.appendChild(toolbar);
+        editorContainer.appendChild(textarea);
+        editorContainer.appendChild(preview);
+        container.appendChild(editorContainer);
+        
+        // 加载Mermaid.js
+        this.loadMermaidJS().then(() => {
+            // 绑定事件
+            document.getElementById('mermaidRenderBtn').addEventListener('click', () => {
+                this.renderMermaidChart();
+            });
+            
+            document.getElementById('mermaidSaveBtn').addEventListener('click', () => {
+                this.saveMermaidChart();
+            });
+        });
+    }
+    
+    // 加载Mermaid.js
+    async loadMermaidJS() {
+        return new Promise((resolve) => {
+            // 检查Mermaid.js是否已加载
+            if (window.mermaid) {
+                resolve();
+                return;
+            }
+            
+            // 动态加载Mermaid.js
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.2.4/dist/mermaid.min.js';
+            script.onload = () => {
+                // 初始化Mermaid.js
+                mermaid.initialize({
+                    startOnLoad: true,
+                    theme: 'default'
+                });
+                resolve();
+            };
+            document.head.appendChild(script);
+        });
+    }
+    
+    // 渲染Mermaid图表
+    renderMermaidChart() {
+        const code = document.getElementById('mermaidCode').value;
+        const preview = document.getElementById('mermaidPreview');
+        
+        if (!code) {
+            preview.innerHTML = '<p>请输入Mermaid代码</p>';
+            return;
+        }
+        
+        // 渲染图表
+        preview.innerHTML = `<div class="mermaid">${code}</div>`;
+        
+        // 调用Mermaid.js渲染
+        if (window.mermaid) {
+            mermaid.init(undefined, preview.querySelector('.mermaid'));
+        }
+    }
+    
+    // 保存Mermaid图表
+    async saveMermaidChart() {
+        const code = document.getElementById('mermaidCode').value;
+        if (!code) {
+            this.showStatus('请输入图表代码');
+            return;
+        }
+        
+        try {
+            // 保存图表数据到数据库
+            await this.apiPut(`/api/graphs/${this.graphId}`, {
+                description: code
+            });
+            this.showStatus('图表保存成功');
+        } catch (error) {
+            console.error('保存图表失败:', error);
+            this.showStatus('保存图表失败: ' + error.message);
+        }
     }
     
     showSettingsModal() {
@@ -1050,6 +1229,29 @@ class GraphEditor {
             this.updatePropertiesPanelHeight();
         }, 100);
         
+        // 图表类型选择器事件
+        const diagramTypeSelect = document.getElementById('diagramType');
+        if (diagramTypeSelect) {
+            diagramTypeSelect.addEventListener('change', async (e) => {
+                const newType = e.target.value;
+                if (newType !== this.diagramType) {
+                    // 保存当前图表类型
+                    this.diagramType = newType;
+                    
+                    // 更新数据库中的图表类型
+                    try {
+                        await this.apiPut(`/api/graphs/${this.graphId}`, { diagramType: newType });
+                        
+                        // 根据图表类型切换编辑器
+                        this.switchEditorType(newType);
+                    } catch (error) {
+                        console.error('更新图表类型失败:', error);
+                        this.showStatus('更新图表类型失败: ' + error.message);
+                    }
+                }
+            });
+        }
+
         // 使用防抖优化性能
         let positionUpdateTimer = null;
         const debouncedUpdatePosition = () => {

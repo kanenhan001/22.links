@@ -73,6 +73,74 @@
     .create-btn:hover {
       transform: translateY(-1px);
     }
+    /* 图表类型选择面板 */
+    .chart-type-panel {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 8px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      padding: 16px;
+      z-index: 1000;
+      width: 90%;
+      margin-left: 5%;
+    }
+    .chart-type-panel.hidden {
+      display: none;
+    }
+    .chart-type-section {
+      margin-bottom: 20px;
+    }
+    .chart-type-section:last-child {
+      margin-bottom: 0;
+    }
+    .chart-type-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 12px;
+      padding-left: 4px;
+    }
+    .chart-type-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .chart-type-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #f9fafb;
+    }
+    .chart-type-item:hover {
+      background: #f0f2f5;
+      border-color: #667eea;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102,126,234,0.15);
+    }
+    .chart-type-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .chart-type-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      text-align: center;
+    }
+    /* 确保侧边栏有相对定位，以便面板正确定位 */
+    .sidebar {
+      position: relative;
+    }
     /* 右侧内容区 */
     .main-content {
       flex: 1;
@@ -712,7 +780,31 @@
           <div class="logo-text-en">MindMaple</div>
         </div>
       </div>
-      <button id="btnCreate" class="create-btn">+&nbsp;&nbsp;&nbsp;新建关系图</button>
+      <button id="btnCreate" class="create-btn">+&nbsp;&nbsp;&nbsp;新建图表</button>
+      <!-- 图表类型选择面板 -->
+      <div id="chartTypePanel" class="chart-type-panel hidden">
+        <div class="chart-type-section">
+          <div class="chart-type-section-title">基础图表</div>
+          <div class="chart-type-grid">
+            <div class="chart-type-item" data-type="relationship">
+              <div class="chart-type-icon">⚪</div>
+              <div class="chart-type-name">关系图</div>
+            </div>
+            <div class="chart-type-item" data-type="flow">
+              <div class="chart-type-icon">⬅</div>
+              <div class="chart-type-name">流程图</div>
+            </div>
+            <div class="chart-type-item" data-type="swimlane">
+              <div class="chart-type-icon">📋</div>
+              <div class="chart-type-name">泳道图</div>
+            </div>
+            <div class="chart-type-item" data-type="mindmap">
+              <div class="chart-type-icon">🌳</div>
+              <div class="chart-type-name">思维导图</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 右侧内容区 -->
@@ -744,10 +836,10 @@
       <!-- 右侧内容区 -->
       <div class="content">
         <div class="content-header">
-          <h2 class="content-title">我的关系图</h2>
+          <h2 class="content-title">我的图表</h2>
         </div>
         <div id="grid" class="grid"></div>
-        <div id="empty" class="empty" style="display:none;">还没有关系图，先创建一个吧。</div>
+        <div id="empty" class="empty" style="display:none;">还没有图表，先创建一个吧。</div>
       </div>
     </div>
   </div>
@@ -1077,12 +1169,10 @@
           username: username,
           nickname: nickname
         };
-        
-        if (password) {
+      if (password) {
           userData.password = password;
         }
-        
-        if (userId) {
+      if (userId) {
           await fetchJson('/api/users/' + userId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -1221,9 +1311,146 @@
       });
     }
 
+    // 图表类型选择面板交互
+    function initChartTypePanel() {
+      console.log('initChartTypePanel function called');
+      const btnCreate = document.getElementById('btnCreate');
+      const chartTypePanel = document.getElementById('chartTypePanel');
+      
+      console.log('btnCreate element:', btnCreate);
+      console.log('chartTypePanel element:', chartTypePanel);
+      
+      // 移除现有的点击事件监听器
+      const newBtnCreate = btnCreate.cloneNode(true);
+      btnCreate.parentNode.replaceChild(newBtnCreate, btnCreate);
+      
+      // 点击新建按钮显示/隐藏面板
+      newBtnCreate.addEventListener('click', (e) => {
+        console.log('New chart button clicked!');
+        e.stopPropagation();
+        // 直接调用 openCreateModal 函数进行测试
+        console.log('Directly calling openCreateModal with diagramType: relationship');
+        openCreateModal('relationship');
+      });
+      
+      // 使用事件委托绑定图表类型项的点击事件
+      console.log('Adding click event listener to chartTypePanel');
+      chartTypePanel.addEventListener('click', (e) => {
+        console.log('Click inside chartTypePanel:', e.target);
+        const chartTypeItem = e.target.closest('.chart-type-item');
+        console.log('Closest chart-type-item:', chartTypeItem);
+        if (chartTypeItem) {
+          console.log('Chart type item clicked:', chartTypeItem.dataset.type);
+          e.stopPropagation();
+          const diagramType = chartTypeItem.dataset.type;
+          chartTypePanel.classList.add('hidden');
+          console.log('Calling openCreateModal with diagramType:', diagramType);
+          openCreateModal(diagramType);
+        }
+      });
+      
+      // 点击页面其他地方隐藏面板
+      document.addEventListener('click', (e) => {
+        if (!newBtnCreate.contains(e.target) && !chartTypePanel.contains(e.target)) {
+          chartTypePanel.classList.add('hidden');
+        }
+      });
+    }
+    
+    // 打开创建图表模态框
+    async function openCreateModal(diagramType) {
+      console.log('openCreateModal function called with diagramType:', diagramType);
+      const result = await Swal.fire({
+        title: '新建图表',
+        html: `
+          <div style="width: 100%; max-width: 100%; overflow: hidden;">
+            <div style="margin-bottom: 10px;">
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">图名</label>
+              <input type="text" id="graphName" placeholder="请输入图表名称" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">图表类型</label>
+              <select id="graphType" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
+                <option value="relationship" ${diagramType === 'relationship' ? 'selected' : ''}>关系图</option>
+                <option value="flow" ${diagramType === 'flow' ? 'selected' : ''}>流程图</option>
+                <option value="swimlane" ${diagramType === 'swimlane' ? 'selected' : ''}>泳道图</option>
+                <option value="mindmap" ${diagramType === 'mindmap' ? 'selected' : ''}>思维导图</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">描述</label>
+              <textarea id="graphDescription" placeholder="请输入图表描述（可选）" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; min-height: 60px; resize: vertical; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+            </div>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonColor: '#667eea',
+        cancelButtonColor: '#666',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        customClass: {
+          popup: 'swal2-popup-wide',
+          title: 'swal2-title-sm',
+          confirmButton: 'swal2-btn-sm',
+          cancelButton: 'swal2-btn-sm'
+        },
+        preConfirm: () => {
+          const name = document.getElementById('graphName').value.trim();
+          const diagramType = document.getElementById('graphType').value;
+          const description = document.getElementById('graphDescription').value.trim();
+          if (!name) {
+            Swal.showValidationMessage('请输入图表名称');
+            return false;
+          }
+          return { name, diagramType, description };
+        }
+      });
+
+      const formValues = result.value;
+      if (formValues) {
+        try {
+          const g = await fetchJson('/api/graphs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: formValues.name, diagramType: formValues.diagramType, description: formValues.description })
+          });
+          // 刷新关系图列表
+          loadGraphs();
+          // 显示成功提示
+          Swal.fire({
+            title: '创建成功',
+            text: '图表已创建',
+            icon: 'success',
+            confirmButtonColor: '#667eea',
+            width: '280px',
+            customClass: {
+              title: 'swal2-title-sm',
+              content: 'swal2-content-sm',
+              confirmButton: 'swal2-btn-sm'
+            }
+          });
+        } catch (err) {
+          Swal.fire({
+            title: '创建失败',
+            text: err.message,
+            icon: 'error',
+            confirmButtonColor: '#667eea',
+            width: '280px',
+            customClass: {
+              title: 'swal2-title-sm',
+              content: 'swal2-content-sm',
+              confirmButton: 'swal2-btn-sm'
+            }
+          });
+        }
+      }
+    }
+    
     // 页面加载时检查登录状态
     document.addEventListener('DOMContentLoaded', async () => {
       await ensureLogin();
+      initChartTypePanel();
+      loadGraphs();
     });
 
     // 拖拽排序相关变量
@@ -1920,83 +2147,6 @@
       }
     };
 
-    document.getElementById('btnCreate').addEventListener('click', async () => {
-      // 弹出输入框让用户输入关系图名称和描述
-      const { value: formValues } = await Swal.fire({
-        title: '新建关系图',
-        html: `
-          <div style="width: 100%; max-width: 100%; overflow: hidden;">
-            <div style="margin-bottom: 10px;">
-              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">图名</label>
-              <input type="text" id="graphName" placeholder="请输入关系图名称" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
-            </div>
-            <div>
-              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">描述</label>
-              <textarea id="graphDescription" placeholder="请输入关系图描述（可选）" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; min-height: 60px; resize: vertical; border: 1px solid #ddd; border-radius: 4px;"></textarea>
-            </div>
-          </div>
-        `,
-        showCancelButton: true,
-        confirmButtonColor: '#667eea',
-        cancelButtonColor: '#666',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        customClass: {
-          popup: 'swal2-popup-wide',
-          title: 'swal2-title-sm',
-          confirmButton: 'swal2-btn-sm',
-          cancelButton: 'swal2-btn-sm'
-        },
-        preConfirm: () => {
-          const name = document.getElementById('graphName').value.trim();
-          const description = document.getElementById('graphDescription').value.trim();
-          if (!name) {
-            Swal.showValidationMessage('请输入关系图名称');
-            return false;
-          }
-          return { name, description };
-        }
-      });
-
-      if (formValues) {
-        try {
-          const g = await fetchJson('/api/graphs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: formValues.name, description: formValues.description })
-          });
-          // 刷新关系图列表
-          loadGraphs();
-          // 显示成功提示
-          Swal.fire({
-            title: '创建成功',
-            text: '关系图已创建',
-            icon: 'success',
-            confirmButtonColor: '#667eea',
-            width: '280px',
-            customClass: {
-              title: 'swal2-title-sm',
-              content: 'swal2-content-sm',
-              confirmButton: 'swal2-btn-sm'
-            }
-          });
-        } catch (err) {
-          Swal.fire({
-            title: '创建失败',
-            text: err.message,
-            icon: 'error',
-            confirmButtonColor: '#667eea',
-            width: '280px',
-            customClass: {
-              title: 'swal2-title-sm',
-              content: 'swal2-content-sm',
-              confirmButton: 'swal2-btn-sm'
-            }
-          });
-        }
-      }
-    });
-
     // 处理用户下拉菜单
     const userInfo = document.getElementById('userInfo');
     const userDropdown = document.getElementById('userDropdown');
@@ -2188,6 +2338,132 @@
     ensureLogin().then(u => {
       if (u) loadGraphs();
     });
+    
+    // 图表类型选择面板交互
+    const btnCreate = document.getElementById('btnCreate');
+    const chartTypePanel = document.getElementById('chartTypePanel');
+    
+    // 移除现有的点击事件监听器
+    const newBtnCreate = btnCreate.cloneNode(true);
+    btnCreate.parentNode.replaceChild(newBtnCreate, btnCreate);
+    
+    // 点击新建按钮显示/隐藏面板
+    newBtnCreate.addEventListener('click', (e) => {
+      e.stopPropagation();
+      chartTypePanel.classList.toggle('hidden');
+    });
+    
+    // 点击图表类型项
+    document.querySelectorAll('.chart-type-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const diagramType = item.dataset.type;
+        chartTypePanel.classList.add('hidden');
+        openCreateModal(diagramType);
+      });
+    });
+    
+    // 点击页面其他地方隐藏面板
+    document.addEventListener('click', (e) => {
+      if (!newBtnCreate.contains(e.target) && !chartTypePanel.contains(e.target)) {
+        chartTypePanel.classList.add('hidden');
+      }
+    });
+    
+    // 打开创建图表模态框
+    async function openCreateModal(diagramType) {
+      // 弹出输入框让用户输入图表名称和描述
+      const { value: formValues } = await Swal.fire({
+        title: '新建图表',
+        html: `
+          <div style="width: 100%; max-width: 100%; overflow: hidden;">
+            <div style="margin-bottom: 10px;">
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">图名</label>
+              <input type="text" id="graphName" placeholder="请输入图表名称" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">图表类型</label>
+              <input type="text" id="graphType" value="${getChartTypeName(diagramType)}" disabled style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px; background: #f9fafb;">
+              <input type="hidden" id="graphTypeValue" value="${diagramType}">
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">描述</label>
+              <textarea id="graphDescription" placeholder="请输入图表描述（可选）" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; min-height: 60px; resize: vertical; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+            </div>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonColor: '#667eea',
+        cancelButtonColor: '#666',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        customClass: {
+          popup: 'swal2-popup-wide',
+          title: 'swal2-title-sm',
+          confirmButton: 'swal2-btn-sm',
+          cancelButton: 'swal2-btn-sm'
+        },
+        preConfirm: () => {
+          const name = document.getElementById('graphName').value.trim();
+          const diagramType = document.getElementById('graphTypeValue').value;
+          const description = document.getElementById('graphDescription').value.trim();
+          if (!name) {
+            Swal.showValidationMessage('请输入图表名称');
+            return false;
+          }
+          return { name, diagramType, description };
+        }
+      });
+
+      if (formValues) {
+        try {
+          const g = await fetchJson('/api/graphs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: formValues.name, diagramType: formValues.diagramType, description: formValues.description })
+          });
+          // 刷新图表列表
+          loadGraphs();
+          // 显示成功提示
+          Swal.fire({
+            title: '创建成功',
+            text: '图表已创建',
+            icon: 'success',
+            confirmButtonColor: '#667eea',
+            width: '280px',
+            customClass: {
+              title: 'swal2-title-sm',
+              content: 'swal2-content-sm',
+              confirmButton: 'swal2-btn-sm'
+            }
+          });
+        } catch (err) {
+          Swal.fire({
+            title: '创建失败',
+            text: err.message,
+            icon: 'error',
+            confirmButtonColor: '#667eea',
+            width: '280px',
+            customClass: {
+              title: 'swal2-title-sm',
+              content: 'swal2-content-sm',
+              confirmButton: 'swal2-btn-sm'
+            }
+          });
+        }
+      }
+    }
+    
+    // 获取图表类型名称
+    function getChartTypeName(type) {
+      const typeNames = {
+        'relationship': '关系图',
+        'flow': '流程图',
+        'swimlane': '泳道图',
+        'mindmap': '思维导图'
+      };
+      return typeNames[type] || type;
+    }
   </script>
 </body>
 </html>

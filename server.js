@@ -124,6 +124,7 @@ async function initDatabase() {
                 sort_order INT DEFAULT 0,
                 createdAt DATETIME,
                 thumbnail TEXT,
+                diagramType VARCHAR(50) DEFAULT 'relationship',
                 FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         `);
@@ -247,6 +248,13 @@ async function initDatabase() {
             console.log('成功为 graphs 表添加 sort_order 列');
         } catch (e) {
             console.log('graphs 表的 sort_order 列可能已存在:', e.message);
+        }
+
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN diagramType VARCHAR(50) DEFAULT \'relationship\'');
+            console.log('成功为 graphs 表添加 diagramType 列');
+        } catch (e) {
+            console.log('graphs 表的 diagramType 列可能已存在:', e.message);
         }
 
         // 为现有数据设置默认排序值
@@ -860,7 +868,7 @@ app.post('/api/users/:id/reset-password', async (req, res) => {
 app.get('/api/graphs', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const sql = 'SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE userId = ? ORDER BY sort_order ASC, id DESC';
+        const sql = 'SELECT id, name, description, sort_order, createdAt, thumbnail, diagramType FROM graphs WHERE userId = ? ORDER BY sort_order ASC, id DESC';
         console.log(`[SQL] ${sql} - params: [${userId}]`);
         const [graphs] = await pool.execute(sql, [userId]);
         // console.log('关系图列表:', graphs);
@@ -875,7 +883,7 @@ app.get('/api/graphs', async (req, res) => {
 app.post('/api/graphs', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const { name, description, thumbnail } = req.body;
+        const { name, description, thumbnail, diagramType } = req.body;
         const now = new Date();
         
         // 获取当前用户的最大排序值
@@ -887,11 +895,11 @@ app.post('/api/graphs', async (req, res) => {
         const newSortOrder = maxSort + 1;
         
         const [result] = await pool.execute(
-            'INSERT INTO graphs (userId, name, description, sort_order, createdAt, thumbnail) VALUES (?, ?, ?, ?, ?, ?)',
-            [userId, name, description || '', newSortOrder, now, thumbnail || '']
+            'INSERT INTO graphs (userId, name, description, sort_order, createdAt, thumbnail, diagramType) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [userId, name, description || '', newSortOrder, now, thumbnail || '', diagramType || 'relationship']
         );
         const newId = result.insertId;
-        const graph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail FROM graphs WHERE id = ?', [newId]);
+        const graph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail, diagramType FROM graphs WHERE id = ?', [newId]);
         res.json(graph);
     } catch (e) {
         console.error('创建关系图失败:', e);
@@ -968,7 +976,7 @@ app.put('/api/graphs/:id', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
         const id = parseInt(req.params.id);
-        const { name, description, thumbnail, zoomLevel, panOffsetX, panOffsetY, canvasWidth, canvasHeight, showNodeInfo, backgroundImage } = req.body;
+        const { name, description, thumbnail, zoomLevel, panOffsetX, panOffsetY, canvasWidth, canvasHeight, showNodeInfo, backgroundImage, diagramType } = req.body;
 
         // 检查是否有权限
         const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
@@ -1020,6 +1028,10 @@ app.put('/api/graphs/:id', async (req, res) => {
             updates.push('backgroundImage = ?');
             values.push(backgroundImage);
         }
+        if (diagramType !== undefined) {
+            updates.push('diagramType = ?');
+            values.push(diagramType);
+        }
         
         if (updates.length === 0) {
             return res.json(graph);
@@ -1032,7 +1044,7 @@ app.put('/api/graphs/:id', async (req, res) => {
             values
         );
         
-        const updatedGraph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail, zoomLevel, panOffsetX, panOffsetY FROM graphs WHERE id = ?', [id]);
+        const updatedGraph = await queryOne('SELECT id, name, description, sort_order, createdAt, thumbnail, zoomLevel, panOffsetX, panOffsetY, diagramType FROM graphs WHERE id = ?', [id]);
         res.json(updatedGraph);
     } catch (e) {
         console.error('更新关系图失败:', e);
@@ -1140,8 +1152,8 @@ app.post('/api/graphs/:id/duplicate', async (req, res) => {
             const newSortOrder = maxSort + 1;
 
             const [graphResult] = await connection.execute(
-                'INSERT INTO graphs (userId, name, description, sort_order, createdAt, thumbnail, zoomLevel, panOffsetX, panOffsetY, canvasWidth, canvasHeight, showNodeInfo, backgroundImage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [userId, name, sourceGraph.description || '', newSortOrder, new Date(), sourceGraph.thumbnail || '', sourceGraph.zoomLevel || 1.0, sourceGraph.panOffsetX || 0, sourceGraph.panOffsetY || 0, sourceGraph.canvasWidth || 2000, sourceGraph.canvasHeight || 2000, sourceGraph.showNodeInfo !== undefined ? sourceGraph.showNodeInfo : 1, sourceGraph.backgroundImage || '']
+                'INSERT INTO graphs (userId, name, description, sort_order, createdAt, thumbnail, zoomLevel, panOffsetX, panOffsetY, canvasWidth, canvasHeight, showNodeInfo, backgroundImage, diagramType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [userId, name, sourceGraph.description || '', newSortOrder, new Date(), sourceGraph.thumbnail || '', sourceGraph.zoomLevel || 1.0, sourceGraph.panOffsetX || 0, sourceGraph.panOffsetY || 0, sourceGraph.canvasWidth || 2000, sourceGraph.canvasHeight || 2000, sourceGraph.showNodeInfo !== undefined ? sourceGraph.showNodeInfo : 1, sourceGraph.backgroundImage || '', sourceGraph.diagramType || 'relationship']
             );
             const newGraphId = graphResult.insertId;
 
