@@ -622,10 +622,7 @@ class GraphEditor {
         editorContainer.style.flexDirection = 'column';
         editorContainer.style.height = '100%';
         
-        // 创建工具栏
-        const toolbar = document.createElement('div');
-        toolbar.className = 'toolbar';
-        toolbar.innerHTML = ``;
+        // 不需要工具栏，直接创建代码编辑器
         
         // 创建代码编辑器
         const textarea = document.createElement('textarea');
@@ -672,14 +669,20 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
         
         // 创建预览容器
         const previewContainer = document.createElement('div');
-        previewContainer.style.flex = '1.5';
-        previewContainer.style.minWidth = '400px';
+        previewContainer.style.flex = '4'; // 增加 flex 值，让预览容器更宽
+        previewContainer.style.minWidth = '1000px'; // 增加最小宽度
         previewContainer.style.padding = '10px';
         previewContainer.style.overflow = 'auto';
+        previewContainer.style.display = 'flex';
+        previewContainer.style.justifyContent = 'center'; // 左右居中
+        previewContainer.style.alignItems = 'center'; // 垂直居中
         
         // 设置预览容器样式
         preview.style.width = '100%';
         preview.style.height = '100%';
+        preview.style.display = 'flex';
+        preview.style.justifyContent = 'center'; // 左右居中
+        preview.style.alignItems = 'center'; // 垂直居中
         
         previewContainer.appendChild(preview);
         
@@ -687,7 +690,7 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
         editArea.appendChild(textareaContainer);
         editArea.appendChild(previewContainer);
         
-        editorContainer.appendChild(toolbar);
+        // 不添加工具栏，直接添加编辑区域
         editorContainer.appendChild(editArea);
         container.appendChild(editorContainer);
         
@@ -701,6 +704,20 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
             document.getElementById('mermaidSaveBtn').addEventListener('click', () => {
                 this.saveMermaidChart();
             });
+            
+            // 隐藏不需要的按钮和属性看板
+            console.log('隐藏不需要的按钮和属性看板');
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            const beautifyBtn = document.getElementById('beautifyBtn');
+            const settingsBtn = document.getElementById('settingsBtn');
+            const propertiesPanel = document.querySelector('.properties-panel');
+            
+            if (undoBtn) undoBtn.style.display = 'none';
+            if (redoBtn) redoBtn.style.display = 'none';
+            if (beautifyBtn) beautifyBtn.style.display = 'none';
+            if (settingsBtn) settingsBtn.style.display = 'none';
+            if (propertiesPanel) propertiesPanel.style.display = 'none';
             
             // 自动渲染图表（页面加载后）
             console.log('自动渲染图表（页面加载后）');
@@ -779,9 +796,66 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
                 code: code
             });
             this.showStatus('图表保存成功');
+            
+            // 生成并上传缩略图
+            await this.generateMermaidThumbnail();
         } catch (error) {
             console.error('保存图表失败:', error);
             this.showStatus('保存图表失败: ' + error.message);
+        }
+    }
+    
+    // 生成Mermaid流程图缩略图
+    async generateMermaidThumbnail() {
+        try {
+            const preview = document.getElementById('mermaidPreview');
+            if (!preview) {
+                console.log('找不到预览容器，无法生成缩略图');
+                return;
+            }
+            
+            console.log('开始生成Mermaid流程图缩略图');
+            
+            // 临时保存原始样式并设置为无背景色和边框
+            const originalBgColor = preview.style.backgroundColor;
+            const originalBorder = preview.style.border;
+            preview.style.backgroundColor = '#ffffff';
+            preview.style.border = 'none';
+            
+            // 查找Mermaid生成的图表元素并移除边框
+            const mermaidSvg = preview.querySelector('svg');
+            let originalSvgStyle = '';
+            if (mermaidSvg) {
+                originalSvgStyle = mermaidSvg.getAttribute('style') || '';
+                mermaidSvg.setAttribute('style', (originalSvgStyle + ';border: none;').trim());
+            }
+            
+            // 使用html2canvas生成缩略图
+            const canvas = await html2canvas(preview, {
+                backgroundColor: '#ffffff',
+                scale: 0.5, // 缩小比例，减少文件大小
+                logging: false
+            });
+            
+            // 恢复原始样式
+            preview.style.backgroundColor = originalBgColor;
+            preview.style.border = originalBorder;
+            if (mermaidSvg && originalSvgStyle) {
+                mermaidSvg.setAttribute('style', originalSvgStyle);
+            }
+            
+            // 转换为base64，使用JPEG格式并设置压缩质量
+            const thumbnailData = canvas.toDataURL('image/jpeg', 0.7);
+            
+            console.log('缩略图生成成功，开始上传');
+            
+            // 上传缩略图
+            await this.uploadThumbnail(thumbnailData);
+            
+            console.log('缩略图上传成功');
+        } catch (error) {
+            console.error('生成Mermaid流程图缩略图失败:', error);
+            // 缩略图生成失败不影响主要功能，只记录错误
         }
     }
     
