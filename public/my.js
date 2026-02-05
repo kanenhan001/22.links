@@ -344,9 +344,9 @@ async function fetchJson(url, opts) {
       newBtnCreate.addEventListener('click', (e) => {
         console.log('New chart button clicked!');
         e.stopPropagation();
-        // 直接调用 openCreateModal 函数进行测试
-        console.log('Directly calling openCreateModal with diagramType: relationship');
-        openCreateModal('relationship');
+        // 切换图表类型面板的显示/隐藏
+        chartTypePanel.classList.toggle('hidden');
+        console.log('Chart type panel visibility:', !chartTypePanel.classList.contains('hidden'));
       });
       
       // 使用事件委托绑定图表类型项的点击事件
