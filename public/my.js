@@ -508,7 +508,8 @@ async function fetchJson(url, opts) {
             return;
           }
           if (!e.target.closest('.card-more') && !e.target.closest('.dropdown-menu') && !e.target.closest('.drag-handle')) {
-            window.location.href = '/g/' + g.id;
+            // 直接打开本地的draw.io页面
+            window.open('http://localhost:8080?graphId=' + g.id, '_blank');
           }
         });
         const first = (g.name || 'G').trim().slice(0,1).toUpperCase();

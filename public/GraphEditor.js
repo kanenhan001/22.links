@@ -574,8 +574,8 @@ class GraphEditor {
             case 'flow':
             case 'swimlane':
             case 'mindmap':
-                // 使用Mermaid.js创建相应的图表编辑器
-                this.createMermaidEditor(canvasContainer, type);
+                // 使用Draw.io创建相应的图表编辑器
+                this.createDrawIOEditor(canvasContainer, type);
                 break;
             default:
                 // 默认显示关系图
@@ -611,6 +611,184 @@ class GraphEditor {
         
         // 重新绑定事件监听器
         this.setupEventListeners();
+    }
+    
+    // 创建Draw.io编辑器
+    createDrawIOEditor(container, type) {
+        // 创建Draw.io编辑器容器
+        const editorContainer = document.createElement('div');
+        editorContainer.className = 'drawio-editor';
+        editorContainer.style.display = 'flex';
+        editorContainer.style.flexDirection = 'column';
+        editorContainer.style.height = '100%';
+        
+        // 创建编辑区域容器
+        const editArea = document.createElement('div');
+        editArea.style.display = 'flex';
+        editArea.style.flex = '1';
+        editArea.style.overflow = 'hidden';
+        
+        // 创建iframe容器
+        const iframeContainer = document.createElement('div');
+        iframeContainer.style.flex = '1';
+        iframeContainer.style.minWidth = '800px';
+        iframeContainer.style.height = '100%';
+        
+        // 创建Draw.io iframe
+        const iframe = document.createElement('iframe');
+        iframe.id = 'drawioEditor';
+        iframe.src = 'http://localhost:8080';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.allowFullscreen = true;
+        iframe.onload = () => {
+            console.log('Draw.io iframe 加载完成');
+        };
+        
+        iframeContainer.appendChild(iframe);
+        editArea.appendChild(iframeContainer);
+        editorContainer.appendChild(editArea);
+        container.appendChild(editorContainer);
+        
+        // 绑定事件
+        document.getElementById('mermaidSaveBtn').addEventListener('click', () => {
+            this.saveDrawIOChart();
+        });
+        
+        // 隐藏不需要的按钮和属性看板
+        console.log('隐藏不需要的按钮和属性看板');
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        const beautifyBtn = document.getElementById('beautifyBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const propertiesPanel = document.querySelector('.properties-panel');
+        
+        if (undoBtn) undoBtn.style.display = 'none';
+        if (redoBtn) redoBtn.style.display = 'none';
+        if (beautifyBtn) beautifyBtn.style.display = 'none';
+        if (settingsBtn) settingsBtn.style.display = 'none';
+        if (propertiesPanel) propertiesPanel.style.display = 'none';
+        
+        // 已在iframe创建时添加onload事件处理，加载已保存的图表数据
+    }
+    
+    // 加载Draw.io数据
+    loadDrawIOData(data) {
+        const iframe = document.getElementById('drawioEditor');
+        if (iframe && iframe.contentWindow) {
+            // 向Draw.io发送消息，设置图表数据
+            iframe.contentWindow.postMessage({ 
+                action: 'load', 
+                xml: data 
+            }, 'https://www.diagrams.net');
+        }
+    }
+    
+    // 保存Draw.io图表
+    async saveDrawIOChart() {
+        const iframe = document.getElementById('drawioEditor');
+        if (!iframe || !iframe.contentWindow) {
+            this.showStatus('编辑器未加载完成');
+            return;
+        }
+        
+        // 向Draw.io发送消息，获取图表数据
+        iframe.contentWindow.postMessage({ action: 'getXml' }, 'https://www.diagrams.net');
+        
+        // 监听Draw.io的响应
+        const handleMessage = async (event) => {
+            if (event.origin === 'https://www.diagrams.net' && event.data && event.data.xml) {
+                const xmlData = event.data.xml;
+                
+                try {
+                    // 保存图表数据到数据库
+                    await this.apiPut(`/api/graphs/${this.graphId}`, {
+                        code: xmlData
+                    });
+                    this.showStatus('图表保存成功');
+                    
+                    // 生成并上传缩略图
+                    await this.generateDrawIOThumbnail();
+                } catch (error) {
+                    console.error('保存图表失败:', error);
+                    this.showStatus('保存图表失败: ' + error.message);
+                }
+                
+                // 移除事件监听器
+                window.removeEventListener('message', handleMessage);
+            }
+        };
+        
+        // 添加事件监听器
+        window.addEventListener('message', handleMessage);
+        
+        // 设置超时，防止Draw.io无响应
+        setTimeout(() => {
+            window.removeEventListener('message', handleMessage);
+            this.showStatus('保存超时，请重试');
+        }, 5000);
+    }
+    
+    // 生成Draw.io流程图缩略图
+    async generateDrawIOThumbnail() {
+        try {
+            const iframe = document.getElementById('drawioEditor');
+            if (!iframe || !iframe.contentWindow) {
+                console.log('编辑器未加载完成，无法生成缩略图');
+                return;
+            }
+            
+            // 向Draw.io发送消息，获取图表的SVG
+            iframe.contentWindow.postMessage({ action: 'getSvg' }, 'https://www.diagrams.net');
+            
+            // 监听Draw.io的响应
+            const handleMessage = async (event) => {
+                if (event.origin === 'https://www.diagrams.net' && event.data && event.data.svg) {
+                    const svgData = event.data.svg;
+                    
+                    // 创建临时div来容纳SVG
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = svgData;
+                    document.body.appendChild(tempDiv);
+                    
+                    // 使用html2canvas生成缩略图
+                    const canvas = await html2canvas(tempDiv, {
+                        backgroundColor: '#ffffff',
+                        scale: 0.5, // 缩小比例，减少文件大小
+                        logging: false
+                    });
+                    
+                    // 移除临时div
+                    document.body.removeChild(tempDiv);
+                    
+                    // 转换为base64，使用JPEG格式并设置压缩质量
+                    const thumbnailData = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    console.log('缩略图生成成功，开始上传');
+                    
+                    // 上传缩略图
+                    await this.uploadThumbnail(thumbnailData);
+                    
+                    console.log('缩略图上传成功');
+                    
+                    // 移除事件监听器
+                    window.removeEventListener('message', handleMessage);
+                }
+            };
+            
+            // 添加事件监听器
+            window.addEventListener('message', handleMessage);
+            
+            // 设置超时，防止Draw.io无响应
+            setTimeout(() => {
+                window.removeEventListener('message', handleMessage);
+                console.error('生成缩略图超时');
+            }, 5000);
+        } catch (error) {
+            console.error('生成Draw.io流程图缩略图失败:', error);
+            // 缩略图生成失败不影响主要功能，只记录错误
+        }
     }
     
     // 创建Mermaid编辑器
