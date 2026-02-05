@@ -23,22 +23,16 @@
     white-space: nowrap;
 }
 
-.diagram-type-selector select {
+/* 图表类型显示样式 */
+.diagram-type-display {
     padding: 6px 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 14px;
     color: #333;
     background: white;
-    cursor: pointer;
-    transition: border-color 0.3s ease;
     min-width: 120px;
-}
-
-.diagram-type-selector select:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+    text-align: center;
 }
 
 /* Mermaid图表容器样式 */
@@ -54,9 +48,8 @@
 
 .mermaid-editor {
     display: flex;
-    flex-direction: column;
+    gap: 20px;
     height: 100%;
-    gap: 10px;
 }
 
 .mermaid-editor textarea {
@@ -84,34 +77,6 @@
     border-radius: 5px;
     background: #fafafa;
     overflow: auto;
-}
-
-.mermaid-editor .toolbar {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    padding: 10px;
-    background: #f5f5f5;
-    border-radius: 5px;
-}
-
-.mermaid-editor .toolbar button {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    background: #667eea;
-    color: white;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-}
-
-.mermaid-editor .toolbar button:hover {
-    background: #5568d3;
-}
-
-.mermaid-editor .toolbar button:active {
-    background: #4a5bc7;
 }
 
 html, body {

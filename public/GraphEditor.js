@@ -192,13 +192,28 @@ class GraphEditor {
             }
             
             // 加载图表类型
+            console.log('loadData - 开始加载图表类型:', graphData.diagramType);
             if (graphData.diagramType) {
+                console.log('loadData - 加载到图表类型:', graphData.diagramType);
                 this.diagramType = graphData.diagramType;
-                // 更新图表类型选择器
-                const diagramTypeSelect = document.getElementById('diagramType');
-                if (diagramTypeSelect) {
-                    diagramTypeSelect.value = this.diagramType;
+                // 更新图表类型显示
+                const diagramTypeDisplay = document.getElementById('diagramType');
+                console.log('loadData - 图表类型显示:', diagramTypeDisplay);
+                if (diagramTypeDisplay) {
+                    console.log('loadData - 更新图表类型显示:', this.getDiagramTypeName(this.diagramType));
+                    diagramTypeDisplay.textContent = this.getDiagramTypeName(this.diagramType);
                 }
+                // 根据加载的图表类型切换编辑器
+                console.log('loadData - 调用switchEditorType:', this.diagramType);
+                this.switchEditorType(this.diagramType);
+                
+                // 如果是Mermaid图表类型，直接返回，不执行后续的关系图相关操作
+                if (this.diagramType === 'flow' || this.diagramType === 'swimlane' || this.diagramType === 'mindmap') {
+                    console.log('loadData - 是Mermaid图表类型，直接返回');
+                    return;
+                }
+            } else {
+                console.log('loadData - 没有加载到图表类型');
             }
             
             // 更新画布尺寸 - 保持高DPI设置
@@ -501,9 +516,51 @@ class GraphEditor {
     }
     
     // 根据图表类型切换编辑器
+    // 获取图表类型的中文名称
+    getDiagramTypeName(type) {
+        const typeMap = {
+            'relationship': '关系图',
+            'flow': '流程图',
+            'swimlane': '泳道图',
+            'mindmap': '思维导图'
+        };
+        return typeMap[type] || type;
+    }
+    
     switchEditorType(type) {
         const canvasContainer = document.querySelector('.canvas-container');
         if (!canvasContainer) return;
+        
+        // 更新图表类型显示
+        const diagramTypeDisplay = document.getElementById('diagramType');
+        if (diagramTypeDisplay) {
+            diagramTypeDisplay.textContent = this.getDiagramTypeName(type);
+        }
+        
+        // 控制顶部工具栏按钮的显示/隐藏
+        const mermaidRenderBtn = document.getElementById('mermaidRenderBtn');
+        const mermaidSaveBtn = document.getElementById('mermaidSaveBtn');
+        const addNodeBtn = document.getElementById('addNodeBtn');
+        const saveGraphBtn = document.getElementById('saveGraphBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        if (type === 'flow' || type === 'swimlane' || type === 'mindmap') {
+            // 显示Mermaid相关按钮
+            if (mermaidRenderBtn) mermaidRenderBtn.style.display = 'inline-block';
+            if (mermaidSaveBtn) mermaidSaveBtn.style.display = 'inline-block';
+            // 隐藏关系图相关按钮
+            if (addNodeBtn) addNodeBtn.style.display = 'none';
+            if (saveGraphBtn) saveGraphBtn.style.display = 'none';
+            if (clearBtn) clearBtn.style.display = 'none';
+        } else {
+            // 隐藏Mermaid相关按钮
+            if (mermaidRenderBtn) mermaidRenderBtn.style.display = 'none';
+            if (mermaidSaveBtn) mermaidSaveBtn.style.display = 'none';
+            // 显示关系图相关按钮
+            if (addNodeBtn) addNodeBtn.style.display = 'inline-block';
+            if (saveGraphBtn) saveGraphBtn.style.display = 'inline-block';
+            if (clearBtn) clearBtn.style.display = 'none';
+        }
         
         // 清空画布容器
         canvasContainer.innerHTML = '';
@@ -512,7 +569,7 @@ class GraphEditor {
             case 'relationship':
                 // 重新创建关系图画布
                 this.createRelationshipCanvas(canvasContainer);
-                this.loadData();
+                // 注意：这里不再调用loadData()，避免无限循环
                 break;
             case 'flow':
             case 'swimlane':
@@ -523,7 +580,7 @@ class GraphEditor {
             default:
                 // 默认显示关系图
                 this.createRelationshipCanvas(canvasContainer);
-                this.loadData();
+                // 注意：这里不再调用loadData()，避免无限循环
         }
     }
     
@@ -561,14 +618,14 @@ class GraphEditor {
         // 创建Mermaid编辑器容器
         const editorContainer = document.createElement('div');
         editorContainer.className = 'mermaid-editor';
+        editorContainer.style.display = 'flex';
+        editorContainer.style.flexDirection = 'column';
+        editorContainer.style.height = '100%';
         
         // 创建工具栏
         const toolbar = document.createElement('div');
         toolbar.className = 'toolbar';
-        toolbar.innerHTML = `
-            <button id="mermaidRenderBtn">渲染图表</button>
-            <button id="mermaidSaveBtn">保存图表</button>
-        `;
+        toolbar.innerHTML = ``;
         
         // 创建代码编辑器
         const textarea = document.createElement('textarea');
@@ -579,15 +636,59 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
  type === 'swimlane' ? 'flowchart LR\n    subgraph 泳道1\n        A[开始] --> B[处理]\n    end\n    subgraph 泳道2\n        C[审核] --> D[结束]\n    end\n    B --> C' : 
  'graph TD\n    A[中心主题] --> B[子主题1]\n    A --> C[子主题2]\n    B --> D[细节1]\n    B --> E[细节2]'}`;
         
+        // 加载已保存的代码内容
+        if (this.graphInfo && (this.graphInfo.code || this.graphInfo.description)) {
+            textarea.value = this.graphInfo.code || this.graphInfo.description;
+        }
+        
         // 创建预览容器
         const preview = document.createElement('div');
         preview.className = 'preview';
         preview.id = 'mermaidPreview';
         
+        // 创建编辑区域容器（左右布局）
+        const editArea = document.createElement('div');
+        editArea.style.display = 'flex';
+        editArea.style.flex = '1';
+        editArea.style.overflow = 'hidden';
+        
+        // 创建代码编辑器容器
+        const textareaContainer = document.createElement('div');
+        textareaContainer.style.flex = '1';
+        textareaContainer.style.minWidth = '300px';
+        textareaContainer.style.padding = '10px';
+        textareaContainer.style.borderRight = '1px solid #ddd';
+        
+        // 设置代码编辑器样式
+        textarea.style.width = '100%';
+        textarea.style.height = '100%';
+        textarea.style.resize = 'none';
+        textarea.style.border = 'none';
+        textarea.style.fontFamily = 'monospace';
+        textarea.style.fontSize = '14px';
+        textarea.style.lineHeight = '1.4';
+        
+        textareaContainer.appendChild(textarea);
+        
+        // 创建预览容器
+        const previewContainer = document.createElement('div');
+        previewContainer.style.flex = '1.5';
+        previewContainer.style.minWidth = '400px';
+        previewContainer.style.padding = '10px';
+        previewContainer.style.overflow = 'auto';
+        
+        // 设置预览容器样式
+        preview.style.width = '100%';
+        preview.style.height = '100%';
+        
+        previewContainer.appendChild(preview);
+        
         // 组装编辑器
+        editArea.appendChild(textareaContainer);
+        editArea.appendChild(previewContainer);
+        
         editorContainer.appendChild(toolbar);
-        editorContainer.appendChild(textarea);
-        editorContainer.appendChild(preview);
+        editorContainer.appendChild(editArea);
         container.appendChild(editorContainer);
         
         // 加载Mermaid.js
@@ -600,6 +701,24 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
             document.getElementById('mermaidSaveBtn').addEventListener('click', () => {
                 this.saveMermaidChart();
             });
+            
+            // 自动渲染图表（页面加载后）
+            console.log('自动渲染图表（页面加载后）');
+            this.renderMermaidChart();
+            
+            // 文本数据修改后自动渲染并保存图表
+            const textarea = document.getElementById('mermaidCode');
+            if (textarea) {
+                console.log('添加文本变化事件监听器');
+                textarea.addEventListener('input', () => {
+                    console.log('文本变化，自动渲染图表');
+                    this.renderMermaidChart();
+                    
+                    // 渲染完成后立即保存图表
+                    console.log('自动保存图表');
+                    this.saveMermaidChart();
+                });
+            }
         });
     }
     
@@ -657,7 +776,7 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
         try {
             // 保存图表数据到数据库
             await this.apiPut(`/api/graphs/${this.graphId}`, {
-                description: code
+                code: code
             });
             this.showStatus('图表保存成功');
         } catch (error) {
@@ -1229,27 +1348,11 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
             this.updatePropertiesPanelHeight();
         }, 100);
         
-        // 图表类型选择器事件
-        const diagramTypeSelect = document.getElementById('diagramType');
-        if (diagramTypeSelect) {
-            diagramTypeSelect.addEventListener('change', async (e) => {
-                const newType = e.target.value;
-                if (newType !== this.diagramType) {
-                    // 保存当前图表类型
-                    this.diagramType = newType;
-                    
-                    // 更新数据库中的图表类型
-                    try {
-                        await this.apiPut(`/api/graphs/${this.graphId}`, { diagramType: newType });
-                        
-                        // 根据图表类型切换编辑器
-                        this.switchEditorType(newType);
-                    } catch (error) {
-                        console.error('更新图表类型失败:', error);
-                        this.showStatus('更新图表类型失败: ' + error.message);
-                    }
-                }
-            });
+        // 图表类型显示（不再需要事件监听，因为它只是一个显示元素）
+        const diagramTypeDisplay = document.getElementById('diagramType');
+        if (diagramTypeDisplay) {
+            // 确保图表类型显示正确
+            diagramTypeDisplay.textContent = this.getDiagramTypeName(this.diagramType);
         }
 
         // 使用防抖优化性能
