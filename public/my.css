@@ -1,0 +1,761 @@
+body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+    }
+    .page {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+    /* 左侧边栏 */
+    .sidebar {
+      width: 250px;
+      background: #fff;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px 0;
+    }
+    .logo img {
+      height: 80px;
+      width: auto;
+    }
+    .logo-text-container {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .logo-text-cn {
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+      line-height: 1.2;
+    }
+    .logo-text-en {
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      line-height: 1.2;
+    }
+    .create-btn {
+      width: 90%;
+      padding: 8px;
+      text-align: center;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+      margin: 0 auto;
+    }
+    .create-btn:hover {
+      transform: translateY(-1px);
+    }
+    /* 图表类型选择面板 */
+    .chart-type-panel {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 8px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      padding: 16px;
+      z-index: 1000;
+      width: 90%;
+      margin-left: 5%;
+    }
+    .chart-type-panel.hidden {
+      display: none;
+    }
+    .chart-type-section {
+      margin-bottom: 20px;
+    }
+    .chart-type-section:last-child {
+      margin-bottom: 0;
+    }
+    .chart-type-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 12px;
+      padding-left: 4px;
+    }
+    .chart-type-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .chart-type-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #f9fafb;
+    }
+    .chart-type-item:hover {
+      background: #f0f2f5;
+      border-color: #667eea;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102,126,234,0.15);
+    }
+    .chart-type-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .chart-type-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      text-align: center;
+    }
+    /* 确保侧边栏有相对定位，以便面板正确定位 */
+    .sidebar {
+      position: relative;
+    }
+    /* 右侧内容区 */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    /* 右侧顶部栏 */
+    .header {
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      flex: 1;
+    }
+    .logo-text {
+      font-size: 18px;
+      font-weight: 800;
+      color: #333;
+    }
+    .search-box {
+      flex: 1;
+      max-width: 400px;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      padding: 10px 40px 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 2px rgba(102,126,234,0.18);
+    }
+    .search-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999;
+      cursor: pointer;
+      font-size: 16px;
+      transition: color 0.2s ease;
+      width: 20px;
+      height: 20px;
+    }
+    .search-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .search-icon:hover {
+      color: #667eea;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+    }
+    /* 用户菜单 */
+    .user-menu {
+      position: relative;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: background-color 0.2s ease;
+    }
+    .user-info:hover {
+      background-color: #f5f5f5;
+    }
+    .user-name {
+      font-weight: 600;
+      color: #333;
+    }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #eee;
+      object-fit: cover;
+    }
+    /* 用户下拉菜单 */
+    .user-dropdown {
+      position: fixed;
+      min-width: 180px;
+      z-index: 999999;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      padding: 12px 0;
+      border: 1px solid #e5e7eb;
+      opacity: 1;
+      visibility: visible;
+      transition: all 0.2s ease;
+      min-height: 100px;
+    }
+    
+    .user-dropdown.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(-10px);
+    }
+    
+    /* 确保下拉菜单项可见 */
+    .user-dropdown .dropdown-item {
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #333;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    .user-dropdown .dropdown-item:hover {
+      background-color: #f5f5f5;
+    }
+    
+    .user-dropdown .dropdown-divider {
+      height: 1px;
+      background-color: #e5e7eb;
+      margin: 8px 0;
+    }
+    /* 右侧内容区 */
+    .content {
+      flex: 1;
+      padding: 24px;
+      overflow: auto;
+      background-color: #f5f5f5;
+    }
+    .content-header {
+      margin-bottom: 20px;
+    }
+    .content-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+      margin: 0;
+    }
+    /* 关系图网格 */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    /* 关系图卡片 */
+    .card {
+      border: 1px solid #eee;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(102,126,234,0.6);
+      box-shadow: 0 10px 22px rgba(0,0,0,0.10);
+    }
+    .card.dragging {
+      opacity: 0.5;
+      transform: rotate(2deg);
+      cursor: grabbing;
+    }
+    .card.drag-over {
+      border-color: #667eea;
+      border-width: 2px;
+      background-color: rgba(102,126,234,0.05);
+    }
+    .drag-indicator {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #667eea, #764ba2);
+      border-radius: 2px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 10001;
+    }
+    .drag-indicator.show {
+      opacity: 1;
+    }
+    .drag-indicator-left {
+      left: -2px;
+    }
+    .drag-indicator-right {
+      right: -2px;
+    }
+    .drag-handle {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      cursor: grab;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      color: #999;
+      background: rgba(255,255,255,0.9);
+      border-radius: 4px;
+      padding: 2px;
+    }
+    .card:hover .drag-handle {
+      opacity: 1;
+    }
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+    .thumb {
+      height: 180px;
+      background: linear-gradient(135deg, rgba(102,126,234,0.10), rgba(118,75,162,0.06));
+      display: grid;
+      place-items: center;
+      color: #667eea;
+      font-weight: 900;
+      font-size: 34px;
+      letter-spacing: 1px;
+    }
+    .card-body { padding: 12px 12px; }
+    .name { font-weight: 800; color: #333; margin-bottom: 6px; }
+    .meta { font-size: 12px; color: #888; }
+    .description { font-size: 13px; color: #555; line-height: 1.5; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
+    .empty {
+      color: #666;
+      text-align: center;
+      padding: 60px 0;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    /* 卡片更多按钮样式 */
+    .card { position: relative; }
+    .card-more {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      border: none;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transition: background .15s;
+      z-index: 10;
+    }
+    .card:hover .card-more { display: flex; }
+    .card-more:hover { background: #fff; }
+    .card-more svg { width: 16px; height: 16px; color: #555; }
+    /* 下拉菜单样式 */
+    .dropdown-menu {
+      position: fixed;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+      min-width: 160px;
+      padding: 6px 0 12px 0;
+      display: none;
+      z-index: 1000;
+    }
+    .dropdown-menu.show { display: block; }
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #333;
+      transition: background .1s;
+    }
+    .dropdown-item:hover { background: #f5f5f5; }
+    .dropdown-item svg { width: 16px; height: 16px; color: #666; }
+    .dropdown-item.danger { color: #e53935; }
+    .dropdown-item.danger svg { color: #e53935; }
+    .dropdown-item.admin-only { display: none; }
+    body.admin-user .dropdown-item.admin-only { display: flex; }
+    /* 导出选择样式 */
+    .dropdown-with-select {
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 14px;
+    }
+    .dropdown-select-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    .export-format-select {
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .export-format-select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .export-btn {
+      padding: 4px 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .export-btn:hover {
+      opacity: 0.9;
+    }
+    .dropdown-divider {
+      height: 1px;
+      background: #eee;
+      margin: 6px 0;
+    }
+
+    /* SweetAlert2 自定义样式 */
+    .swal2-title-sm {
+      font-size: 16px !important;
+      font-weight: 700 !important;
+    }
+    .swal2-content-sm {
+      font-size: 14px !important;
+    }
+    .swal2-btn-sm {
+      font-size: 13px !important;
+      padding: 8px 16px !important;
+    }
+
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 240px;
+      }
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .content {
+        padding: 16px;
+      }
+    }
+    
+    /* 模态框样式 */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal.hidden {
+      display: none;
+    }
+    .modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+    }
+    .modal-content {
+      position: relative;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      width: 90%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      z-index: 1001;
+    }
+    .modal-content-large {
+      max-width: 800px;
+    }
+    .user-management-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .user-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .user-list-container {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .user-list-header {
+      display: flex;
+      align-items: center;
+      background: #f9fafb;
+      padding: 14px 20px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #666;
+    }
+    .user-list-header-cell {
+      display: flex;
+      align-items: center;
+    }
+    .user-list-header-avatar {
+      width: 40px;
+    }
+    .user-list-header-info {
+      flex: 1.5;
+    }
+    .user-list-header-username {
+      flex: 1.2;
+    }
+    .user-list-header-time {
+      flex: 1.5;
+    }
+    .user-list-header-status {
+      flex: 0.8;
+    }
+    .user-list-header-actions {
+      flex: 2.5;
+    }
+    .user-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.2s ease;
+    }
+    .user-item:hover {
+      background: #f9fafb;
+    }
+    .user-item-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .user-item-info {
+      flex: 1.5;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-item-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .user-item-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+    .user-item-username {
+      flex: 1.2;
+      font-size: 13px;
+      color: #666;
+    }
+    .user-item-time {
+      flex: 1.5;
+      font-size: 13px;
+      color: #666;
+    }
+    .user-item-status {
+      flex: 0.8;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+      text-align: center;
+    }
+    .user-item-status.active {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .user-item-status.disabled {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .user-item-actions {
+      flex: 2.5;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .user-item-btn {
+      padding: 4px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #fff;
+      color: #666;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .user-item-btn:hover {
+      background: #f5f5f5;
+    }
+    .user-item-btn.danger {
+      color: #e53935;
+      border-color: #fecaca;
+    }
+    .user-item-btn.danger:hover {
+      background: #fef2f2;
+    }
+    .modal-header {
+      padding: 24px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #333;
+      margin: 0;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #999;
+      cursor: pointer;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .modal-close:hover {
+      background: #f3f4f6;
+      color: #333;
+    }
+    .modal-body {
+      padding: 24px;
+    }
+    .modal-footer {
+      padding: 24px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+    .btn {
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(102,126,234,0.4);
+    }
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #666;
+    }
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
