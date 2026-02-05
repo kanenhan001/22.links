@@ -65,6 +65,45 @@ body {
     .create-btn:hover {
       transform: translateY(-1px);
     }
+    /* 功能菜单 */
+    .feature-menu {
+      margin-top: 20px;
+      padding: 0 16px;
+    }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: #333;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 8px;
+    }
+    .feature-item:hover {
+      background: #f5f5f5;
+    }
+    .feature-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+    .feature-text {
+      flex: 1;
+    }
+    .feature-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .feature-badge.hot {
+      background: #fee2e2;
+      color: #dc2626;
+    }
     /* 图表类型选择面板 */
     .chart-type-panel {
       position: absolute;
@@ -293,6 +332,306 @@ body {
       font-weight: 500;
       color: #333;
       margin: 0;
+      margin-bottom: 12px;
+    }
+    /* 分组功能样式 */
+    .group-section {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .group-tabs {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+    .group-tabs::-webkit-scrollbar {
+      height: 4px;
+    }
+    .group-tabs::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    .group-tabs::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+    .group-tab {
+      padding: 8px 16px;
+      border-radius: 20px;
+      background: #666;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .group-tab:hover {
+      background: #555;
+      color: #fff;
+    }
+    .group-tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border-color: rgba(102,126,234,0.6);
+    }
+    .group-manage-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      color: #666;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .group-manage-btn:hover {
+      border-color: #667eea;
+      color: #667eea;
+      background: rgba(102,126,234,0.05);
+    }
+    .group-manage-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+    /* 分组管理模态框 */
+    .group-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .group-modal.hidden {
+      display: none;
+    }
+    .group-modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+    }
+    .group-modal-content {
+      position: relative;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      z-index: 1001;
+    }
+    .group-modal-header {
+      padding: 24px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .group-modal-header h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #333;
+      margin: 0;
+    }
+    .group-modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #999;
+      cursor: pointer;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .group-modal-close:hover {
+      background: #f3f4f6;
+      color: #333;
+    }
+    .group-modal-body {
+      padding: 24px;
+    }
+    .group-modal-footer {
+      padding: 24px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+    .group-list {
+      margin-bottom: 20px;
+    }
+    .group-list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .group-list-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #666;
+      margin: 0;
+    }
+    .group-add-btn {
+      padding: 6px 12px;
+      border: 1px dashed #ddd;
+      border-radius: 6px;
+      background: #f9f9f9;
+      color: #666;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .group-add-btn:hover {
+      border-color: #667eea;
+      color: #667eea;
+      background: rgba(102,126,234,0.05);
+    }
+    .group-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f9f9f9;
+      margin-bottom: 8px;
+      transition: all 0.2s ease;
+    }
+    .group-item:hover {
+      background: #f0f0f0;
+    }
+    .group-item-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .group-item-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .group-item-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      flex: 1;
+    }
+    .group-item-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .group-item-btn {
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fff;
+      color: #666;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .group-item-btn:hover {
+      background: #f5f5f5;
+    }
+    .group-item-btn.danger {
+      color: #e53935;
+      border-color: #fecaca;
+    }
+    .group-item-btn.danger:hover {
+      background: #fef2f2;
+    }
+    /* 分组编辑表单 */
+    .group-form {
+      margin-bottom: 20px;
+    }
+    .group-form-group {
+      margin-bottom: 16px;
+    }
+    .group-form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .group-form-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 13px;
+      transition: all 0.3s ease;
+    }
+    .group-form-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+    /* 图表卡片添加分组菜单 */
+    .group-assign-menu {
+      position: fixed;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+      min-width: 180px;
+      padding: 6px 0;
+      display: none;
+      z-index: 1000;
+    }
+    .group-assign-menu.show {
+      display: block;
+    }
+    .group-assign-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      transition: background-color 0.2s ease;
+    }
+    .group-assign-item:hover {
+      background-color: #f5f5f5;
+    }
+    .group-assign-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .group-assign-divider {
+      height: 1px;
+      background: #eee;
+      margin: 6px 0;
     }
     /* 关系图网格 */
     .grid {

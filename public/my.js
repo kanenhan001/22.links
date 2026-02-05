@@ -467,6 +467,12 @@ async function fetchJson(url, opts) {
       await ensureLogin();
       initChartTypePanel();
       loadGraphs();
+      
+      // 为管理分组按钮添加事件监听器
+      const btnManageGroups = document.getElementById('btnManageGroups');
+      if (btnManageGroups) {
+        btnManageGroups.addEventListener('click', openGroupManagementModal);
+      }
     });
 
     // 拖拽排序相关变量
@@ -748,9 +754,618 @@ async function fetchJson(url, opts) {
       }
     }
 
+    // ==================== 分组功能 ====================
+
+    // 分组数据管理
+    let groups = [];
+    let graphGroups = {};
+    let currentGroupId = 'all';
+
+    // 初始化分组数据
+    function initGroups() {
+      try {
+        const savedGroups = localStorage.getItem('graphGroups');
+        if (savedGroups) {
+          const data = JSON.parse(savedGroups);
+          groups = data.groups || [];
+          graphGroups = data.graphGroups || {};
+        } else {
+          groups = [];
+          graphGroups = {};
+        }
+      } catch (error) {
+        console.error('加载分组数据失败:', error);
+        groups = [];
+        graphGroups = {};
+      }
+    }
+
+    // 保存分组数据
+    function saveGroups() {
+      try {
+        localStorage.setItem('graphGroups', JSON.stringify({
+          groups: groups,
+          graphGroups: graphGroups
+        }));
+      } catch (error) {
+        console.error('保存分组数据失败:', error);
+      }
+    }
+
+    // 添加分组
+    function addGroup(name) {
+      if (!name || name.trim() === '') return null;
+      
+      const existingGroup = groups.find(g => g.name === name.trim());
+      if (existingGroup) return existingGroup;
+      
+      const newGroup = {
+        id: Date.now().toString(),
+        name: name.trim(),
+        color: getRandomColor()
+      };
+      
+      groups.push(newGroup);
+      saveGroups();
+      return newGroup;
+    }
+
+    // 更新分组
+    function updateGroup(id, name) {
+      if (!name || name.trim() === '') return false;
+      
+      const group = groups.find(g => g.id === id);
+      if (!group) return false;
+      
+      group.name = name.trim();
+      saveGroups();
+      return true;
+    }
+
+    // 删除分组
+    function deleteGroup(id) {
+      const index = groups.findIndex(g => g.id === id);
+      if (index === -1) return false;
+      
+      groups.splice(index, 1);
+      
+      // 移除所有图表与该分组的关联
+      Object.keys(graphGroups).forEach(graphId => {
+        const graphGroupIds = graphGroups[graphId];
+        if (graphGroupIds.includes(id)) {
+          graphGroups[graphId] = graphGroupIds.filter(gid => gid !== id);
+        }
+      });
+      
+      saveGroups();
+      return true;
+    }
+
+    // 获取随机颜色
+    function getRandomColor() {
+      const colors = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+        'linear-gradient(135deg, #d9a7c7 0%, #fef9d7 100%)'
+      ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // 获取图表的分组
+    function getGraphGroups(graphId) {
+      return graphGroups[graphId] || [];
+    }
+
+    // 设置图表的分组
+    function setGraphGroups(graphId, groupIds) {
+      graphGroups[graphId] = groupIds;
+      saveGroups();
+    }
+
+    // 添加图表到分组
+    function addGraphToGroup(graphId, groupId) {
+      if (!graphGroups[graphId]) {
+        graphGroups[graphId] = [];
+      }
+      if (!graphGroups[graphId].includes(groupId)) {
+        graphGroups[graphId].push(groupId);
+        saveGroups();
+      }
+    }
+
+    // 从分组中移除图表
+    function removeGraphFromGroup(graphId, groupId) {
+      if (graphGroups[graphId]) {
+        graphGroups[graphId] = graphGroups[graphId].filter(gid => gid !== groupId);
+        saveGroups();
+      }
+    }
+
+    // 渲染分组标签
+    function renderGroupTabs() {
+      const groupTabs = document.getElementById('groupTabs');
+      if (!groupTabs) return;
+      
+      // 清空现有标签
+      groupTabs.innerHTML = '';
+      
+      // 添加"全部"标签
+      const allTab = document.createElement('div');
+      allTab.className = `group-tab ${currentGroupId === 'all' ? 'active' : ''}`;
+      allTab.dataset.groupId = 'all';
+      allTab.textContent = '全部';
+      allTab.addEventListener('click', () => switchGroup('all'));
+      groupTabs.appendChild(allTab);
+      
+      // 添加用户分组
+      groups.forEach(group => {
+        const tab = document.createElement('div');
+        tab.className = `group-tab ${currentGroupId === group.id ? 'active' : ''}`;
+        tab.dataset.groupId = group.id;
+        tab.textContent = group.name;
+        tab.style.background = group.color;
+        tab.addEventListener('click', () => switchGroup(group.id));
+        groupTabs.appendChild(tab);
+      });
+    }
+
+    // 切换分组
+    function switchGroup(groupId) {
+      currentGroupId = groupId;
+      renderGroupTabs();
+      filterGraphsByGroup();
+    }
+
+    // 根据分组筛选图表
+    function filterGraphsByGroup() {
+      const allCards = Array.from(document.querySelectorAll('.card'));
+      
+      allCards.forEach(card => {
+        const graphId = card.dataset.graphId;
+        
+        if (currentGroupId === 'all') {
+          card.style.display = 'block';
+        } else {
+          const graphGroupIds = getGraphGroups(graphId);
+          if (graphGroupIds.includes(currentGroupId)) {
+            card.style.display = 'block';
+          } else {
+            card.style.display = 'none';
+          }
+        }
+      });
+      
+      // 检查是否有显示的卡片
+      const visibleCards = allCards.filter(card => card.style.display === 'block');
+      const empty = document.getElementById('empty');
+      if (visibleCards.length === 0) {
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+      }
+    }
+
+    // 渲染分组管理界面
+    function renderGroupManagement() {
+      const modal = document.getElementById('groupManagementModal');
+      if (!modal) return;
+      
+      const groupList = modal.querySelector('.group-list-body');
+      if (!groupList) return;
+      
+      // 清空现有分组
+      groupList.innerHTML = '';
+      
+      if (groups.length === 0) {
+        groupList.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 13px;">还没有分组，点击"添加分组"创建一个吧。</div>';
+        return;
+      }
+      
+      // 渲染分组列表
+      groups.forEach(group => {
+        const groupItem = document.createElement('div');
+        groupItem.className = 'group-item';
+        groupItem.innerHTML = `
+          <div class="group-item-info">
+            <div class="group-item-color" style="background: ${group.color}"></div>
+            <div class="group-item-name">${group.name}</div>
+          </div>
+          <div class="group-item-actions">
+            <button class="group-item-btn" onclick="editGroup('${group.id}')">编辑</button>
+            <button class="group-item-btn danger" onclick="deleteGroupConfirm('${group.id}')">删除</button>
+          </div>
+        `;
+        groupList.appendChild(groupItem);
+      });
+    }
+
+    // 打开分组管理模态框
+    function openGroupManagementModal() {
+      const modal = document.getElementById('groupManagementModal');
+      if (modal) {
+        renderGroupManagement();
+        modal.classList.remove('hidden');
+      }
+    }
+
+    // 关闭分组管理模态框
+    function closeGroupManagementModal() {
+      const modal = document.getElementById('groupManagementModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    // 打开添加分组模态框
+    function openAddGroupModal() {
+      Swal.fire({
+        title: '添加分组',
+        html: `
+          <div style="width: 100%; max-width: 100%;">
+            <div style="margin-bottom: 10px;">
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">分组名称</label>
+              <input type="text" id="groupName" placeholder="请输入分组名称" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonColor: '#667eea',
+        cancelButtonColor: '#666',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        customClass: {
+          popup: 'swal2-popup-wide',
+          title: 'swal2-title-sm',
+          confirmButton: 'swal2-btn-sm',
+          cancelButton: 'swal2-btn-sm'
+        },
+        preConfirm: () => {
+          const name = document.getElementById('groupName').value.trim();
+          if (!name) {
+            Swal.showValidationMessage('请输入分组名称');
+            return false;
+          }
+          return { name };
+        }
+      }).then((result) => {
+        if (result.isConfirmed && result.value) {
+          const newGroup = addGroup(result.value.name);
+          if (newGroup) {
+            renderGroupTabs();
+            renderGroupManagement();
+            Swal.fire({
+              title: '添加成功',
+              text: '分组已创建',
+              icon: 'success',
+              confirmButtonColor: '#667eea',
+              width: '280px',
+              customClass: {
+                title: 'swal2-title-sm',
+                content: 'swal2-content-sm',
+                confirmButton: 'swal2-btn-sm'
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // 编辑分组
+    function editGroup(groupId) {
+      const group = groups.find(g => g.id === groupId);
+      if (!group) return;
+      
+      Swal.fire({
+        title: '编辑分组',
+        html: `
+          <div style="width: 100%; max-width: 100%;">
+            <div style="margin-bottom: 10px;">
+              <label style="font-size: 13px; font-weight: 500; color: #333; display: block; margin-bottom: 5px; text-align: left;">分组名称</label>
+              <input type="text" id="editGroupName" placeholder="请输入分组名称" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;" value="${group.name}">
+            </div>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonColor: '#667eea',
+        cancelButtonColor: '#666',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        customClass: {
+          popup: 'swal2-popup-wide',
+          title: 'swal2-title-sm',
+          confirmButton: 'swal2-btn-sm',
+          cancelButton: 'swal2-btn-sm'
+        },
+        preConfirm: () => {
+          const name = document.getElementById('editGroupName').value.trim();
+          if (!name) {
+            Swal.showValidationMessage('请输入分组名称');
+            return false;
+          }
+          return { name };
+        }
+      }).then((result) => {
+        if (result.isConfirmed && result.value) {
+          const success = updateGroup(groupId, result.value.name);
+          if (success) {
+            renderGroupTabs();
+            renderGroupManagement();
+            Swal.fire({
+              title: '编辑成功',
+              text: '分组已更新',
+              icon: 'success',
+              confirmButtonColor: '#667eea',
+              width: '280px',
+              customClass: {
+                title: 'swal2-title-sm',
+                content: 'swal2-content-sm',
+                confirmButton: 'swal2-btn-sm'
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // 删除分组确认
+    function deleteGroupConfirm(groupId) {
+      const group = groups.find(g => g.id === groupId);
+      if (!group) return;
+      
+      Swal.fire({
+        title: '确认删除',
+        text: `确定要删除分组"${group.name}"吗？此操作不可恢复。`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        confirmButtonColor: '#e53935',
+        cancelButtonColor: '#666',
+        width: '320px',
+        customClass: {
+          title: 'swal2-title-sm',
+          content: 'swal2-content-sm',
+          confirmButton: 'swal2-btn-sm',
+          cancelButton: 'swal2-btn-sm'
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          const success = deleteGroup(groupId);
+          if (success) {
+            renderGroupTabs();
+            renderGroupManagement();
+            filterGraphsByGroup();
+            Swal.fire({
+              title: '删除成功',
+              text: '分组已删除',
+              icon: 'success',
+              confirmButtonColor: '#667eea',
+              width: '280px',
+              customClass: {
+                title: 'swal2-title-sm',
+                content: 'swal2-content-sm',
+                confirmButton: 'swal2-btn-sm'
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // 打开图表分组分配菜单
+    function openGroupAssignMenu(graphId, button) {
+      closeMenu();
+      
+      const btn = button || document.querySelector('.card-more[data-graph-id="' + graphId + '"]');
+      if (!btn) return;
+      
+      // 创建菜单
+      const container = document.getElementById('dropdownMenuContainer');
+      container.innerHTML = `
+        <div class="dropdown-menu show" id="menu-${graphId}">
+          <div class="dropdown-item" onclick="event.stopPropagation(); handleMenuAction('rename', ${graphId})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            编辑
+          </div>
+          <div class="dropdown-item" onclick="event.stopPropagation(); handleMenuAction('copy', ${graphId})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            复制
+          </div>
+          <div class="dropdown-item dropdown-with-select" onclick="event.stopPropagation();">
+            <div class="dropdown-select-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>导出图片</span>
+            </div>
+            <select class="export-format-select" id="format-${graphId}" onchange="event.stopPropagation();">
+              <option value="jpg">JPG</option>
+              <option value="png">PNG</option>
+            </select>
+            <button class="export-btn" onclick="event.stopPropagation(); handleExport(${graphId})">导出</button>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item" onclick="event.stopPropagation(); showGraphGroupsMenu(${graphId}, this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M3 12h18M3 18h18"/>
+            </svg>
+            分组管理
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item danger" onclick="event.stopPropagation(); handleMenuAction('delete', ${graphId})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            删除
+          </div>
+        </div>
+      `;
+
+      // 计算菜单位置
+        const menu = document.getElementById('menu-' + graphId);
+        const rect = btn.getBoundingClientRect();
+        
+        // 获取屏幕宽度
+        const screenWidth = window.innerWidth;
+        
+        // 估算菜单的宽度（约200px）
+        const estimatedMenuWidth = 200;
+        
+        // 检查右侧是否有足够空间
+        let left;
+        if (rect.right + estimatedMenuWidth < screenWidth) {
+          // 如果有足够空间，在按钮右侧显示菜单
+          left = rect.right - estimatedMenuWidth + 'px';
+        } else {
+          // 如果右侧空间不足，在按钮左侧显示菜单
+          left = rect.left - estimatedMenuWidth + 'px';
+        }
+        
+        menu.style.left = left;
+        menu.style.top = rect.bottom + 5 + 'px';
+        activeMenuId = graphId;
+        activeMenuButton = btn;
+    }
+
+    // 显示图表分组管理菜单
+    function showGraphGroupsMenu(graphId, button) {
+      const btn = button;
+      if (!btn) return;
+      
+      // 计算当前菜单的位置
+      const rect = btn.getBoundingClientRect();
+      
+      // 获取屏幕宽度
+      const screenWidth = window.innerWidth;
+      
+      // 找到当前打开的主菜单
+      const currentMenu = document.querySelector('.dropdown-menu.show');
+      let left, top;
+      
+      if (currentMenu) {
+        // 如果有主菜单，计算菜单位置
+        const menuRect = currentMenu.getBoundingClientRect();
+        
+        // 估算二级菜单的宽度（约180px，比主菜单小）
+        const estimatedMenuWidth = 180;
+        
+        // 检查右侧是否有足够空间
+        if (menuRect.right + estimatedMenuWidth + 5 < screenWidth) {
+          // 如果有足够空间，在主菜单的右侧显示二级菜单
+          left = menuRect.right + 5;
+        } else {
+          // 如果右侧空间不足，在主菜单的左侧显示二级菜单
+          left = menuRect.left - estimatedMenuWidth + 12 ;
+        }
+        top = menuRect.top;
+      } else {
+        // 如果没有主菜单，在按钮下方显示
+        left = rect.left;
+        top = rect.bottom + 5;
+      }
+      
+      // 创建分组管理菜单
+      const container = document.getElementById('dropdownMenuContainer');
+      
+      // 先移除现有的分组菜单
+      const existingGroupMenu = document.getElementById('group-menu-' + graphId);
+      if (existingGroupMenu) {
+        existingGroupMenu.remove();
+      }
+      
+      let menuHtml = `
+        <div class="dropdown-menu show" id="group-menu-${graphId}">
+          <div class="dropdown-item" onclick="event.stopPropagation(); openAddGroupModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            创建新分组
+          </div>
+          <div class="dropdown-divider"></div>
+      `;
+      
+      // 添加分组选项
+      if (groups.length === 0) {
+        menuHtml += `
+          <div class="dropdown-item" style="color: #999; cursor: default;">
+            暂无分组
+          </div>
+        `;
+      } else {
+        const graphGroupIds = getGraphGroups(graphId);
+        
+        groups.forEach(group => {
+          const isInGroup = graphGroupIds.includes(group.id);
+          menuHtml += `
+            <div class="dropdown-item" onclick="event.stopPropagation(); toggleGraphGroup(${graphId}, '${group.id}')">
+              <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                <div style="width: 12px; height: 12px; border-radius: 50%; background: ${group.color};"></div>
+                <span style="flex: 1;">${group.name}</span>
+                <span style="color: ${isInGroup ? '#667eea' : '#999'};">
+                  ${isInGroup ? '✓' : ''}
+                </span>
+              </div>
+            </div>
+          `;
+        });
+      }
+      
+      menuHtml += `
+        </div>
+      `;
+      
+      // 添加到容器
+      container.insertAdjacentHTML('beforeend', menuHtml);
+      
+      // 设置菜单位置
+      const menu = document.getElementById('group-menu-' + graphId);
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+      // 保持activeMenuId为主菜单的ID，不要修改它
+      // activeMenuId = 'group-' + graphId;
+      activeMenuButton = btn;
+    }
+
+    // 切换图表分组
+    function toggleGraphGroup(graphId, groupId) {
+      const graphGroupIds = getGraphGroups(graphId);
+      if (graphGroupIds.includes(groupId)) {
+        removeGraphFromGroup(graphId, groupId);
+      } else {
+        addGraphToGroup(graphId, groupId);
+      }
+      
+      // 关闭所有菜单
+      closeMenu();
+      
+      // 如果当前在该分组视图，重新筛选
+      if (currentGroupId !== 'all') {
+        filterGraphsByGroup();
+      }
+    }
+
+    // ==================== 图表加载 ====================
+
     async function loadGraphs() {
       const list = await fetchJson('/api/graphs');
       renderCards(list);
+      // 初始化分组功能
+      initGroups();
+      renderGroupTabs();
+      filterGraphsByGroup();
     }
 
     // 菜单相关逻辑
@@ -814,7 +1429,24 @@ async function fetchJson(url, opts) {
         // 计算菜单位置
         const menu = document.getElementById('menu-' + graphId);
         const rect = btn.getBoundingClientRect();
-        menu.style.left = rect.right - 150 + 'px';
+        
+        // 获取屏幕宽度
+        const screenWidth = window.innerWidth;
+        
+        // 估算菜单的宽度（约200px）
+        const estimatedMenuWidth = 200;
+        
+        // 检查右侧是否有足够空间
+        let left;
+        if (rect.right + estimatedMenuWidth < screenWidth) {
+          // 如果有足够空间，在按钮右侧显示菜单
+          left = rect.right - estimatedMenuWidth + 'px';
+        } else {
+          // 如果右侧空间不足，在按钮左侧显示菜单
+          left = rect.left - estimatedMenuWidth + 'px';
+        }
+        
+        menu.style.left = left;
         menu.style.top = rect.bottom + 5 + 'px';
         activeMenuId = graphId;
         activeMenuButton = btn;
@@ -828,15 +1460,24 @@ async function fetchJson(url, opts) {
       if (moreBtn) {
         e.stopPropagation();
         const graphId = moreBtn.dataset.graphId;
-        showMenu(graphId, moreBtn);
+        openGroupAssignMenu(graphId, moreBtn);
         return;
       }
 
       // 处理菜单内的点击
       if (activeMenuId) {
-        const menu = document.getElementById('menu-' + activeMenuId);
-        // 如果点击不在菜单内，关闭菜单
-        if (menu && !menu.contains(e.target)) {
+        // 检查是否点击了任何打开的菜单
+        const allMenus = document.querySelectorAll('.dropdown-menu.show');
+        let isClickInMenu = false;
+        
+        allMenus.forEach(menu => {
+          if (menu.contains(e.target)) {
+            isClickInMenu = true;
+          }
+        });
+        
+        // 如果点击不在任何菜单内，关闭所有菜单
+        if (!isClickInMenu) {
           closeMenu();
         }
       }
@@ -848,6 +1489,21 @@ async function fetchJson(url, opts) {
         closeMenu();
       }
     });
+
+    // 显示功能开发中提示
+    window.showComingSoon = function() {
+      Swal.fire({
+        title: '功能开发中',
+        text: '敬请期待。',
+        icon: 'info',
+        confirmButtonColor: '#667eea',
+        width: '320px',
+        customClass: {
+          title: 'swal2-title-sm',
+          confirmButton: 'swal2-btn-sm'
+        }
+      });
+    };
 
 
 

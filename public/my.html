@@ -19,6 +19,18 @@
         </div>
       </div>
       <button id="btnCreate" class="create-btn">+&nbsp;&nbsp;&nbsp;新建图表</button>
+      <!-- 功能菜单 -->
+      <div class="feature-menu">
+        <div class="feature-item" onclick="showComingSoon()">
+          <div class="feature-icon">📋</div>
+          <div class="feature-text">模版广场</div>
+          <div class="feature-badge hot">HOT</div>
+        </div>
+        <div class="feature-item" onclick="showComingSoon()">
+          <div class="feature-icon">👥</div>
+          <div class="feature-text">协作</div>
+        </div>
+      </div>
       <!-- 图表类型选择面板 -->
       <div id="chartTypePanel" class="chart-type-panel hidden">
         <div class="chart-type-section">
@@ -74,7 +86,19 @@
       <!-- 右侧内容区 -->
       <div class="content">
         <div class="content-header">
-          <h2 class="content-title">我的图表</h2>
+          <!-- 分组切换和管理功能 -->
+          <div class="group-section">
+            <div id="groupTabs" class="group-tabs">
+              <div class="group-tab active" data-group-id="all">全部</div>
+            </div>
+            <button id="btnManageGroups" class="group-manage-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              管理分组
+            </button>
+          </div>
         </div>
         <div id="grid" class="grid"></div>
         <div id="empty" class="empty" style="display:none;">还没有图表，先创建一个吧。</div>
@@ -121,6 +145,27 @@
         <line x1="21" y1="12" x2="9" y2="12"/>
       </svg>
       退出登录
+    </div>
+  </div>
+
+  <!-- 分组管理模态框 -->
+  <div class="group-modal hidden" id="groupManagementModal">
+    <div class="group-modal-overlay" onclick="closeGroupManagementModal()"></div>
+    <div class="group-modal-content">
+      <div class="group-modal-header">
+        <h3>管理分组</h3>
+        <button class="group-modal-close" onclick="closeGroupManagementModal()">&times;</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="group-list-header">
+          <h4 class="group-list-title">我的分组</h4>
+          <button class="group-add-btn" onclick="openAddGroupModal()">+ 添加分组</button>
+        </div>
+        <div class="group-list-body" id="groupListBody"></div>
+      </div>
+      <div class="group-modal-footer">
+        <button class="btn btn-secondary" onclick="closeGroupManagementModal()">关闭</button>
+      </div>
     </div>
   </div>
 
