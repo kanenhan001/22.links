@@ -51,7 +51,6 @@ function showModal(options) {
     swalOptions.cancelButtonColor = '#666';
     swalOptions.customClass.cancelButton = 'swal2-btn-sm';
   }
-
   Swal.fire(swalOptions).then((result) => {
     if (result.isConfirmed && onConfirm) {
       onConfirm();
