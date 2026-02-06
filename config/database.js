@@ -8,7 +8,8 @@ const config = {
     port: parseInt(process.env.DB_PORT) || 3306,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    drawioUrl: process.env.DRAWIO_URL || 'http://localhost:8080'
 };
 
 module.exports = config;

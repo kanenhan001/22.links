@@ -264,6 +264,20 @@
     </div>
   </div>
 
+  <script>
+    // 从服务器获取配置信息
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(config => {
+        window.APP_CONFIG = config;
+      })
+      .catch(err => {
+        console.error('获取配置失败，使用默认配置:', err);
+        window.APP_CONFIG = {
+          drawioUrl: 'http://localhost:8080'
+        };
+      });
+  </script>
   <script src="/my.js"></script>
 </body>
 </html>

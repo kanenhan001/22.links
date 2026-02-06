@@ -508,8 +508,14 @@ async function fetchJson(url, opts) {
             return;
           }
           if (!e.target.closest('.card-more') && !e.target.closest('.dropdown-menu') && !e.target.closest('.drag-handle')) {
-            // 直接打开本地的draw.io页面，使用中文界面
-            window.open('http://localhost:8080?graphId=' + g.id + '&lang=zh', '_blank');
+            // 根据图表类型选择编辑器
+            if (g.diagramType === 'relationship') {
+              // 关系图打开本地的关系图编辑器
+              window.open('/g/' + g.id, '_blank');
+            } else {
+              // 流程图、泳道图、思维导图打开draw.io编辑器
+              window.open('http://localhost:8080?graphId=' + g.id + '&lang=zh', '_blank');
+            }
           }
         });
         const first = (g.name || 'G').trim().slice(0,1).toUpperCase();

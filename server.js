@@ -2044,6 +2044,12 @@ app.get('/api/info', async (req, res) => {
     }
 });
 
+app.get('/api/config', (req, res) => {
+    res.json({
+        drawioUrl: DB_CONFIG.drawioUrl || 'http://localhost:8080'
+    });
+});
+
 // ==================== SPA Fallback (必须放在所有 API 路由之后) ====================
 // 对于所有其他请求，返回 index.html 以支持前端路由
 app.get('*', (req, res) => {
