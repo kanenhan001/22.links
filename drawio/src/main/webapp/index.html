@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>图表编辑器</title>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="Description" content="draw.io is free online diagram software for making flowcharts, process diagrams, org charts, UML, ER and network diagrams">
+    <meta name="Keywords" content="drawio, diagram, online, flow chart, flowchart maker, uml, erd">
+    <meta itemprop="name" content="draw.io - free flowchart maker and diagrams online">
+	<meta itemprop="description" content="draw.io is a free online diagramming application and flowchart maker . You can use it to create UML, entity relationship,
+		org charts, BPMN and BPM, database schema and networks. Also possible are telecommunication network, workflow, flowcharts, maps overlays and GIS, electronic 
+		circuit and social network diagrams.">
+	<meta itemprop="image" content="https://lh4.googleusercontent.com/-cLKEldMbT_E/Tx8qXDuw6eI/AAAAAAAAAAs/Ke0pnlk8Gpg/w500-h344-k/BPMN%2Bdiagram%2Brc2f.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<meta name="msapplication-config" content="images/browserconfig.xml">
+    <meta name="mobile-web-app-capable" content="yes">
+	<meta name="theme-color" content="#d89000">
+    <link rel="canonical" href="https://app.diagrams.net">
+	<link rel="manifest" href="images/manifest.json">
+	<link rel="icon" href="favicon.ico" sizes="any">
+	<link rel="shortcut icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+    <link rel="stylesheet" type="text/css" href="styles/grapheditor.css">
+	<link rel="stylesheet" media="(forced-colors: active)" href="styles/high-contrast.css" id="high-contrast-stylesheet">
+	<script src="js/bootstrap.js"></script>
+	<style type="text/css">
+		.geBlock {
+			z-index:-3;
+			margin:100px;
+			margin-top:40px;
+			margin-bottom:30px;
+			padding:20px;
+			text-align:center;
+			min-width:50%;
+		}
+		.geBlock h1, .geBlock h2 {
+			margin-top:0px;
+			padding-top:0px;
+		}
+		
+		/* 加载动画样式 */
+		.loading-container {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			min-height: 400px;
+			padding: 40px;
+		}
+		
+		.loading-logo {
+			font-size: 36px;
+			font-weight: bold;
+			color: #4CAF50;
+			margin-bottom: 30px;
+			animation: pulse 2s infinite;
+		}
+		
+		.loading-spinner {
+			width: 80px;
+			height: 80px;
+			border: 8px solid #f3f3f3;
+			border-top: 8px solid #4CAF50;
+			border-radius: 50%;
+			animation: spin 1.5s linear infinite;
+			margin-bottom: 30px;
+		}
+		
+		.loading-text {
+			font-size: 18px;
+			color: #666;
+			margin-bottom: 10px;
+		}
+		
+		.loading-subtext {
+			font-size: 14px;
+			color: #999;
+		}
+		
+		@keyframes spin {
+			0% { transform: rotate(0deg); }
+			100% { transform: rotate(360deg); }
+		}
+		
+		@keyframes pulse {
+			0% { transform: scale(1); }
+			50% { transform: scale(1.05); }
+			100% { transform: scale(1); }
+		}
+	</style>
+</head>
+<body class="geEditor geClassic">
+<div id="geInfo">
+	<div class="geBlock">
+		<div class="loading-container">
+			<div class="loading-spinner"></div>
+			<div class="loading-text">正在加载流程图编辑器...</div>
+			<div class="loading-subtext">请稍候，编辑器正在准备中</div>
+		</div>
+	</div>
+</div>
+<script src="js/main.js"></script>
+</body>
+</html>
