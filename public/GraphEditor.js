@@ -551,8 +551,17 @@ class GraphEditor {
             this.drawIOAutoSaveHandler = null;
         }
         
+        // 清理Draw.io全局消息监听器
+        if (this.drawIOMessageHandler) {
+            window.removeEventListener('message', this.drawIOMessageHandler);
+            this.drawIOMessageHandler = null;
+        }
+        
         // 停止自动检查定时器
         this.stopDrawIOAutoCheck();
+        
+        // 停止隐藏未保存提示的定时器
+        this.stopHidingUnsavedIndicator();
         
         // 更新图表类型显示
         const diagramTypeDisplay = document.getElementById('diagramType');
@@ -660,19 +669,58 @@ class GraphEditor {
         // 创建Draw.io iframe
         const iframe = document.createElement('iframe');
         iframe.id = 'drawioEditor';
-        iframe.src = window.APP_CONFIG?.drawioUrl || 'http://localhost:8080';
+        
+        // 构建URL，添加配置参数禁用默认保存和未保存提示
+        const drawioUrl = window.APP_CONFIG?.drawioUrl || 'http://localhost:8080';
+        const url = new URL(drawioUrl);
+        url.searchParams.append('saveAndExit', 'false');
+        url.searchParams.append('noSaveBtn', 'true');
+        url.searchParams.append('noSaveBtnMobile', 'true');
+        url.searchParams.append('disableAutoSave', 'true');
+        url.searchParams.append('local', 'false');
+        url.searchParams.append('modified', 'false');
+        url.searchParams.append('autosave', '0');
+        url.searchParams.append('sync', '0');
+        url.searchParams.append('readOnly', 'false');
+        url.searchParams.append('skipSave', 'true');
+        url.searchParams.append('forceSave', 'false');
+        
+        iframe.src = url.toString();
         iframe.style.width = '100%';
         iframe.style.height = '100%';
         iframe.style.border = 'none';
         iframe.allowFullscreen = true;
+        
         iframe.onload = () => {
             console.log('Draw.io iframe 加载完成');
+            
+            // 加载已保存的图表数据
+            if (this.graphInfo && this.graphInfo.code) {
+                this.loadDrawIOData(this.graphInfo.code);
+            }
+            
+            // 设置保存回调，拦截Draw.io的保存操作
+            const iframeWindow = iframe.contentWindow;
+            if (iframeWindow) {
+                iframeWindow.postMessage({
+                    action: 'configure',
+                    config: {
+                        saveCallback: true,
+                        exitCallback: true,
+                        autosave: 0,
+                        modified: false
+                    }
+                }, this.drawioOrigin);
+            }
         };
         
         iframeContainer.appendChild(iframe);
         editArea.appendChild(iframeContainer);
         editorContainer.appendChild(editArea);
         container.appendChild(editorContainer);
+        
+        // 设置Draw.io全局消息监听器
+        this.setupDrawIOMessageListener();
         
         // 设置Draw.io自动保存监听器
         this.setupDrawIOAutoSave();
@@ -734,15 +782,21 @@ class GraphEditor {
                     });
                     this.showStatus('图表保存成功');
                     
+                    // 通知Draw.io文档已保存，清除未保存提示
+                    iframe.contentWindow.postMessage({ 
+                        action: 'saved',
+                        xml: xmlData
+                    }, this.drawioOrigin);
+                    
                     // 生成并上传缩略图
                     await this.generateDrawIOThumbnail();
                 } catch (error) {
                     console.error('保存图表失败:', error);
                     this.showStatus('保存图表失败: ' + error.message);
+                } finally {
+                    // 移除事件监听器
+                    window.removeEventListener('message', handleMessage);
                 }
-                
-                // 移除事件监听器
-                window.removeEventListener('message', handleMessage);
             }
         };
         
@@ -822,11 +876,11 @@ class GraphEditor {
         let autoSaveTimeout;
         let isSaving = false;
         let lastSavedData = '';
+        const iframe = document.getElementById('drawioEditor');
         
         // 初始化时获取初始数据
         setTimeout(async () => {
             try {
-                const iframe = document.getElementById('drawioEditor');
                 if (iframe && iframe.contentWindow) {
                     // 获取初始数据作为基准
                     iframe.contentWindow.postMessage({ action: 'getXml' }, this.drawioOrigin);
@@ -839,6 +893,13 @@ class GraphEditor {
         // 监听Draw.io的数据响应
         const handleDrawIOData = (event) => {
             if (event.origin !== this.drawioOrigin || !event.data) {
+                return;
+            }
+            
+            // 处理Draw.io的保存请求
+            if (event.data.action === 'save') {
+                console.log('Draw.io请求保存，拦截并使用我们的保存逻辑');
+                this.saveDrawIOChart();
                 return;
             }
             
@@ -867,12 +928,20 @@ class GraphEditor {
                             console.log('自动保存成功');
                             // 更新最后保存的数据
                             lastSavedData = currentData;
+                            
+                            // 通知Draw.io文档已保存
+                            if (iframe && iframe.contentWindow) {
+                                iframe.contentWindow.postMessage({ 
+                                    action: 'saved',
+                                    xml: currentData
+                                }, this.drawioOrigin);
+                            }
                         } catch (error) {
                             console.error('自动保存失败:', error);
                         } finally {
                             isSaving = false;
                         }
-                    }, 3000); // 3秒后执行保存
+                    }, 2000);
                 }
             }
         };
@@ -907,6 +976,97 @@ class GraphEditor {
         if (this.autoCheckInterval) {
             clearInterval(this.autoCheckInterval);
             this.autoCheckInterval = null;
+        }
+    }
+    
+    // 设置Draw.io全局消息监听器
+    setupDrawIOMessageListener() {
+        const iframe = document.getElementById('drawioEditor');
+        
+        // 监听所有来自Draw.io的消息
+        const handleDrawIOMessage = (event) => {
+            if (event.origin !== this.drawioOrigin || !event.data) {
+                return;
+            }
+            
+            console.log('收到Draw.io消息:', event.data);
+            
+            // 处理Draw.io的修改事件
+            if (event.data.action === 'modified' && event.data.modified) {
+                console.log('Draw.io文档被修改，清除未保存提示');
+                
+                // 立即通知Draw.io文档已保存，清除未保存提示
+                if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage({ 
+                        action: 'saved',
+                        xml: event.data.xml || ''
+                    }, this.drawioOrigin);
+                }
+            }
+            
+            // 处理Draw.io的保存请求
+            if (event.data.action === 'save') {
+                console.log('Draw.io请求保存，拦截并使用我们的保存逻辑');
+                this.saveDrawIOChart();
+                return;
+            }
+            
+            // 处理Draw.io的退出请求
+            if (event.data.action === 'exit') {
+                console.log('Draw.io请求退出');
+                return;
+            }
+        };
+        
+        // 添加消息监听器
+        window.addEventListener('message', handleDrawIOMessage);
+        
+        // 存储监听器引用以便后续清理
+        this.drawIOMessageHandler = handleDrawIOMessage;
+        
+        // 定期检查并隐藏未保存提示
+        this.startHidingUnsavedIndicator();
+    }
+    
+    // 开始定期检查并隐藏未保存提示
+    startHidingUnsavedIndicator() {
+        this.hidingInterval = setInterval(() => {
+            const iframe = document.getElementById('drawioEditor');
+            if (iframe && iframe.contentDocument) {
+                try {
+                    // 尝试访问Draw.io的DOM
+                    const doc = iframe.contentDocument;
+                    
+                    // 查找未保存提示元素
+                    const unsavedIndicators = doc.querySelectorAll('[title*="未保存"], [title*="unsaved"], .ge-btn-save, #unsavedChanges');
+                    
+                    unsavedIndicators.forEach(element => {
+                        // 隐藏未保存提示
+                        element.style.display = 'none';
+                        element.style.visibility = 'hidden';
+                        element.style.opacity = '0';
+                        console.log('隐藏未保存提示元素:', element);
+                    });
+                    
+                    // 同时尝试通过JavaScript API设置保存状态
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ 
+                            action: 'setModified',
+                            modified: false
+                        }, this.drawioOrigin);
+                    }
+                } catch (error) {
+                    console.error('隐藏未保存提示失败:', error);
+                }
+            }
+        }, 1000); // 每秒检查一次
+    }
+    
+    // 停止定期检查并隐藏未保存提示
+    stopHidingUnsavedIndicator() {
+        if (this.hidingInterval) {
+            clearInterval(this.hidingInterval);
+            this.hidingInterval = null;
         }
     }
     

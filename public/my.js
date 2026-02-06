@@ -514,7 +514,7 @@ async function fetchJson(url, opts) {
               window.open('/g/' + g.id, '_blank');
             } else {
               // 流程图、泳道图、思维导图打开draw.io编辑器
-              window.open('http://localhost:8080?graphId=' + g.id + '&lang=zh', '_blank');
+              window.open('http://localhost:8080?graphId=' + g.id + '&lang=zh&dev=1', '_blank');
             }
           }
         });
