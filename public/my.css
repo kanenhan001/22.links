@@ -159,6 +159,22 @@ body {
       transform: translateY(-2px);
       box-shadow: 0 6px 16px rgba(102,126,234,0.15);
     }
+    .chart-type-item.disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .chart-type-item.disabled .chart-type-icon {
+      background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    }
+    .chart-type-item.disabled .chart-type-name {
+      color: #9ca3af;
+    }
+    .chart-type-item.disabled:hover {
+      background: #f9fafb;
+      border-color: #d1d5db;
+      transform: none;
+      box-shadow: none;
+    }
     .chart-type-icon {
       font-size: 32px;
       margin-bottom: 12px;

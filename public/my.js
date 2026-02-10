@@ -389,8 +389,7 @@ async function fetchJson(url, opts) {
               <select id="graphType" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
                 <option value="relationship" ${diagramType === 'relationship' ? 'selected' : ''}>关系图</option>
                 <option value="flow" ${diagramType === 'flow' ? 'selected' : ''}>流程图</option>
-                <option value="swimlane" ${diagramType === 'swimlane' ? 'selected' : ''}>泳道图</option>
-                <option value="mindmap" ${diagramType === 'mindmap' ? 'selected' : ''}>思维导图</option>
+                <option value="mindmap" ${diagramType === 'mindmap' ? 'selected' : ''} disabled>思维导图</option>
               </select>
             </div>
             <div>
@@ -2138,7 +2137,7 @@ async function fetchJson(url, opts) {
       const typeNames = {
         'relationship': '关系图',
         'flow': '流程图',
-        'swimlane': '泳道图',
+
         'mindmap': '思维导图'
       };
       return typeNames[type] || type;

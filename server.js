@@ -269,9 +269,9 @@ async function initDatabase() {
             console.log('graphs 表的 code 列可能已存在:', e.message);
         }
 
-        // 为现有数据设置默认排序值
+        // 为现有数据设置默认排序值（只在sort_order为NULL时设置）
         try {
-            await pool.execute('UPDATE graphs SET sort_order = id WHERE sort_order IS NULL OR sort_order = 0');
+            await pool.execute('UPDATE graphs SET sort_order = id WHERE sort_order IS NULL');
             console.log('成功为现有关系图设置默认排序值');
         } catch (e) {
             console.log('设置默认排序值失败（可能已设置）:', e.message);
