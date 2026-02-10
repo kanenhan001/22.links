@@ -513,7 +513,9 @@ async function fetchJson(url, opts) {
               window.open('/g/' + g.id, '_blank');
             } else {
               // 流程图、泳道图、思维导图打开draw.io编辑器
-              window.open('http://localhost:8080?graphId=' + g.id + '&lang=zh&dev=1', '_blank');
+              const drawioUrl = window.APP_CONFIG?.drawioUrl || 'http://localhost:8080';
+              const apiBaseUrl = window.APP_CONFIG?.apiBaseUrl || 'http://localhost:3000';
+              window.open(drawioUrl + '?graphId=' + g.id + '&lang=zh&dev=1&apiBaseUrl=' + apiBaseUrl, '_blank');
             }
           }
         });

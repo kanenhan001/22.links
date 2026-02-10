@@ -9,7 +9,8 @@ const config = {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    drawioUrl: process.env.DRAWIO_URL || 'http://localhost:8080'
+    drawioUrl: process.env.DRAWIO_URL || 'http://localhost:8080',
+    apiBaseUrl: process.env.APIBASE_URL || 'http://localhost:3000'
 };
 
 module.exports = config;

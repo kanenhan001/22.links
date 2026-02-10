@@ -2,6 +2,9 @@
  * Copyright (c) 2006-2017, JGraph Holdings Ltd
  * Copyright (c) 2006-2017, draw.io AG
  */
+// API base URL configuration
+DrawioFile.API_BASE_URL = urlParams['apiBaseUrl'] || 'http://localhost:3000';
+
 DrawioFile = function(ui, data)
 {
 	mxEventSource.call(this);
@@ -16,7 +19,7 @@ DrawioFile = function(ui, data)
 	if (graphId != null && graphId != '')
 	{
 		var xhr = new XMLHttpRequest();
-		xhr.open('GET', 'http://localhost:3000/api/graphs/' + graphId, true);
+		xhr.open('GET', DrawioFile.API_BASE_URL + '/api/graphs/' + graphId, true);
 		xhr.withCredentials = true;
 		xhr.setRequestHeader('Content-Type', 'application/json');
 
@@ -1067,10 +1070,10 @@ DrawioFile.prototype.save = function(revision, success, error, unloading, overwr
 			var thumbnail = this.generateThumbnail();
 			
 			// 发送PUT请求到保存API
-			var xhr = new XMLHttpRequest();
-			xhr.open('PUT', 'http://localhost:3000/api/graphs/' + graphId, true);
-			xhr.withCredentials = true;
-			xhr.setRequestHeader('Content-Type', 'application/json');
+		var xhr = new XMLHttpRequest();
+		xhr.open('PUT', DrawioFile.API_BASE_URL + '/api/graphs/' + graphId, true);
+		xhr.withCredentials = true;
+		xhr.setRequestHeader('Content-Type', 'application/json');
 			
 			xhr.onload = mxUtils.bind(this, function() {
 				if (xhr.status >= 200 && xhr.status < 300)
@@ -2133,7 +2136,7 @@ DrawioFile.prototype.saveDraft = function(data)
 		var thumbnail = this.generateThumbnail();
 		
 		var xhr = new XMLHttpRequest();
-			xhr.open('PUT', 'http://localhost:3000/api/graphs/' + graphId, true);
+			xhr.open('PUT', DrawioFile.API_BASE_URL + '/api/graphs/' + graphId, true);
 			xhr.withCredentials = true;
 			xhr.setRequestHeader('Content-Type', 'application/json');
 		

@@ -13,7 +13,8 @@ if (!mxIsElectron)
 		var hashes = 'default-src \'self\'; ' +
 			'script-src %script-src% \'self\' https://viewer.diagrams.net https://apis.google.com https://*.pusher.com; ';
 
-		var directives = 'connect-src %connect-src% \'self\' https://*.draw.io https://*.diagrams.net http://localhost:3000 ' +
+		var apiBaseUrl = urlParams['apiBaseUrl'] || 'http://localhost:3000';
+		var directives = 'connect-src %connect-src% \'self\' https://*.draw.io https://*.diagrams.net ' + apiBaseUrl + ' ' +
 			'https://*.googleapis.com wss://app.diagrams.net wss://*.pusher.com https://*.pusher.com ' +
 			'https://api.github.com https://raw.githubusercontent.com https://gitlab.com ' +
 			'https://graph.microsoft.com https://my.microsoftpersonalcontent.com https://*.sharepoint.com https://*.sharepoint.de  ' +

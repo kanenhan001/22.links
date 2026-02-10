@@ -2049,7 +2049,8 @@ app.get('/api/info', async (req, res) => {
 
 app.get('/api/config', (req, res) => {
     res.json({
-        drawioUrl: DB_CONFIG.drawioUrl || 'http://localhost:8080'
+        drawioUrl: DB_CONFIG.drawioUrl || 'http://localhost:8080',
+        apiBaseUrl: DB_CONFIG.apiBaseUrl || 'http://localhost:3000'
     });
 });
 
