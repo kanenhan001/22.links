@@ -1063,6 +1063,9 @@ DrawioFile.prototype.save = function(revision, success, error, unloading, overwr
 			var fileData = this.getData();
 			var graphId = this.getId();
 			
+			// 生成缩略图
+			var thumbnail = this.generateThumbnail();
+			
 			// 发送PUT请求到保存API
 			var xhr = new XMLHttpRequest();
 			xhr.open('PUT', 'http://localhost:3000/api/graphs/' + graphId, true);
@@ -1104,7 +1107,7 @@ DrawioFile.prototype.save = function(revision, success, error, unloading, overwr
 			});
 			
 			this.savingFile = true;
-			xhr.send(JSON.stringify({code: fileData}));
+			xhr.send(JSON.stringify({code: fileData, thumbnail: thumbnail}));
 		}
 	}
 	catch (e)
@@ -1514,6 +1517,161 @@ DrawioFile.prototype.setData = function(data)
 DrawioFile.prototype.getData = function()
 {
 	return this.data;
+};
+
+/**
+ * Generates a thumbnail for the current diagram.
+ * @returns {string} Base64 encoded thumbnail image
+ */
+DrawioFile.prototype.generateThumbnail = function()
+{
+	try
+	{
+		// 创建临时 Canvas 元素
+		var canvas = document.createElement('canvas');
+		var ctx = canvas.getContext('2d');
+		
+		// 设置缩略图大小
+		var thumbnailWidth = 200;
+		var thumbnailHeight = 150;
+		canvas.width = thumbnailWidth;
+		canvas.height = thumbnailHeight;
+		
+		// 获取当前编辑器的图形
+		var graph = this.ui.editor.graph;
+		if (!graph) return '';
+		
+		// 获取图形边界
+		var bounds = graph.getGraphBounds();
+		if (!bounds || bounds.width === 0 || bounds.height === 0)
+		{
+			// 如果没有图形，返回空字符串
+			return '';
+		}
+		
+		// 计算缩放比例
+		var scaleX = thumbnailWidth / bounds.width;
+		var scaleY = thumbnailHeight / bounds.height;
+		var scale = Math.min(scaleX, scaleY);
+		
+		// 计算偏移量，使图形居中
+		var offsetX = (thumbnailWidth - bounds.width * scale) / 2;
+		var offsetY = (thumbnailHeight - bounds.height * scale) / 2;
+		
+		// 绘制背景
+		ctx.fillStyle = '#ffffff';
+		ctx.fillRect(0, 0, thumbnailWidth, thumbnailHeight);
+		
+		// 移动到起始位置并缩放
+		ctx.translate(offsetX, offsetY);
+		ctx.scale(scale, scale);
+		ctx.translate(-bounds.x, -bounds.y);
+		
+		// 直接绘制所有单元格
+		var model = graph.getModel();
+		var root = model.getRoot();
+		
+		// 遍历所有子元素
+		this.drawAllCells(ctx, graph, root);
+		
+		// 重置变换
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		
+		// 将 Canvas 转换为 base64 编码的图片
+		return canvas.toDataURL('image/png');
+	}
+	catch (e)
+	{
+		// 如果生成缩略图失败，返回空字符串
+		console.error('生成缩略图失败:', e);
+		return '';
+	}
+};
+
+/**
+ * Draws all cells recursively.
+ */
+DrawioFile.prototype.drawAllCells = function(ctx, graph, parent)
+{
+	var model = graph.getModel();
+	var childCount = model.getChildCount(parent);
+	
+	for (var i = 0; i < childCount; i++) {
+		var child = model.getChildAt(parent, i);
+		
+		var state = graph.getView().getState(child);
+		if (state) {
+			this.drawState(ctx, state, graph);
+		}
+		
+		// 递归绘制所有子元素，不管类型是什么
+		// 因为在drawio中，根节点下通常有页面节点，页面节点下才是实际图形
+		this.drawAllCells(ctx, graph, child);
+	}
+};
+
+/**
+ * Recursively draws the given state and its children on the canvas.
+ */
+DrawioFile.prototype.drawState = function(ctx, state, graph)
+{
+	if (!state) return;
+	
+	// 保存当前状态
+	ctx.save();
+	
+	// 绘制顶点（矩形、椭圆等）
+	if (state.cell && state.cell.isVertex() && state.width > 0 && state.height > 0) {
+		var x = state.x;
+		var y = state.y;
+		var w = state.width;
+		var h = state.height;
+		
+		// 绘制基本形状
+		ctx.strokeStyle = '#333333';
+		ctx.fillStyle = '#f0f0f0';
+		ctx.lineWidth = 1;
+		
+		// 绘制矩形
+		ctx.beginPath();
+		ctx.rect(x, y, w, h);
+		ctx.fill();
+		ctx.stroke();
+		
+		// 绘制文本
+		if (state.text && state.text.value) {
+			ctx.fillStyle = '#000000';
+			ctx.font = '10px Arial';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText(state.text.value.substring(0, 20), x + w/2, y + h/2);
+		}
+	}
+	// 绘制边（线条）
+	else if (state.cell && state.cell.isEdge()) {
+		ctx.strokeStyle = '#333333';
+		ctx.lineWidth = 1;
+		
+		// 绘制线条
+		if (state.absolutePoints && state.absolutePoints.length > 0) {
+			ctx.beginPath();
+			ctx.moveTo(state.absolutePoints[0].x, state.absolutePoints[0].y);
+			for (var i = 1; i < state.absolutePoints.length; i++) {
+				ctx.lineTo(state.absolutePoints[i].x, state.absolutePoints[i].y);
+			}
+			ctx.stroke();
+		}
+	}
+	
+	// 恢复状态
+	ctx.restore();
+	
+	// 递归绘制子元素
+	if (state.children) {
+		for (var i = 0; i < state.children.length; i++) {
+			this.drawState(ctx, state.children[i], graph);
+		}
+	}
 };
 
 /**
@@ -1970,8 +2128,9 @@ DrawioFile.prototype.saveDraft = function(data)
 		this.ui.setDatabaseItem('.draft_' + this.draftId,
 			JSON.stringify(draft));
 		
-		// 同时调用用户的API保存到graphs表的code字段
+		// 同时调用用户的API保存到graphs表的code字段和thumbnail字段
 		var graphId = this.getId();
+		var thumbnail = this.generateThumbnail();
 		
 		var xhr = new XMLHttpRequest();
 			xhr.open('PUT', 'http://localhost:3000/api/graphs/' + graphId, true);
@@ -1996,7 +2155,7 @@ DrawioFile.prototype.saveDraft = function(data)
 			EditorUi.debug('DrawioFile.saveDraft', '网络错误，API保存失败');
 		};
 		
-		xhr.send(JSON.stringify({code: draftData}));
+		xhr.send(JSON.stringify({code: draftData, thumbnail: thumbnail}));
 		
 		EditorUi.debug('DrawioFile.saveDraft', [this],
 			'draftId', this.draftId, [draft]);
