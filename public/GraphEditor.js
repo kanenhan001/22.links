@@ -65,6 +65,9 @@ class GraphEditor {
 
         // 节点图片缓存
         this.nodeImageCache = new Map();
+        
+        // 事件监听器绑定标志，确保事件只被绑定一次
+        this.eventListenersBound = false;
 
         // 撤销/重做历史状态
         this.history = [];
@@ -1933,9 +1936,13 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
             }
         });
         
-        document.getElementById('nodeForm').addEventListener('submit', this.handleNodeFormSubmit.bind(this));
-        document.getElementById('edgeForm').addEventListener('submit', this.handleEdgeFormSubmit.bind(this));
-        document.getElementById('saveGraphBtn').addEventListener('click', this.handleManualSave.bind(this));
+        // 确保事件监听器只被绑定一次
+        if (!this.eventListenersBound) {
+            document.getElementById('nodeForm').addEventListener('submit', this.handleNodeFormSubmit.bind(this));
+            document.getElementById('edgeForm').addEventListener('submit', this.handleEdgeFormSubmit.bind(this));
+            document.getElementById('saveGraphBtn').addEventListener('click', this.handleManualSave.bind(this));
+            this.eventListenersBound = true;
+        }
         
         // 设置弹窗事件
         // 这些事件在 showSettingsModal 中动态绑定
