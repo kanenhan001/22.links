@@ -18,7 +18,7 @@ const PORT = 3000;
 // 中间件
 // 日志中间件，用于记录请求体大小和内容
 app.use(cors({
-    origin: 'http://localhost:8080',
+    origin: DB_CONFIG.drawioUrl,
     credentials: true
 }));
 // 增加请求体大小限制，解决PayloadTooLargeError
