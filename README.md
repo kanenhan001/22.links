@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-脉图是一个基于 Node.js 的多功能可视化图表编辑器，支持关系图、流程图和思维导图的创建、编辑和管理。系统提供直观的可视化界面，让用户能够轻松绘制和管理各种复杂的图表结构，同时支持数据的持久化存储和多设备访问。
+脉图是一个基于 Node.js 的多功能可视化图表编辑器，支持关系图谱、流程图和思维导图的创建、编辑和管理。系统提供直观的可视化界面，让用户能够轻松绘制和管理各种复杂的图表结构，同时支持数据的持久化存储和多设备访问。
 
 ## 核心价值
 
@@ -27,7 +27,7 @@
 
 ### 1. 多种图表类型
 
-- **关系图**: 支持节点和边的可视化编辑，适用于人物关系、组织架构等场景
+- **关系图谱**: 支持节点和边的可视化编辑，适用于人物关系、组织架构、知识图谱等场景
 - **流程图**: 支持流程步骤的可视化编排，适用于业务流程、工作流等场景
 - **思维导图**: 支持层级结构的可视化展示，适用于头脑风暴、知识管理等场景
 
@@ -66,7 +66,7 @@
 
 ![思维导图编辑器](./public/images/screenshot/3.png)
 
-### 4. 流程图图编辑器
+### 4. 流程图编辑器
 
 ![关系图编辑器](./public/images/screenshot/4.png)
 
@@ -97,25 +97,6 @@ npm install
 3. **配置 MySQL 数据库**
    - 使用数据库备份还原即可
 
-4. **配置环境变量** (可选)
-```bash
-# Windows (PowerShell)
-$env:DB_HOST = 'localhost'
-$env:DB_USER = 'root'
-$env:DB_PASSWORD = 'your_password'
-$env:DB_NAME = 'graph_editor'
-$env:DB_PORT = 3306
-$env:SESSION_SECRET = 'your_secret_key'
-
-# Linux/Mac
-export DB_HOST=localhost
-export DB_USER=root
-export DB_PASSWORD=your_password
-export DB_NAME=graph_editor
-export DB_PORT=3306
-export SESSION_SECRET=your_secret_key
-```
-
 5. **启动服务**
 ```bash
 npm start
@@ -143,36 +124,10 @@ const DB_CONFIG = {
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    drawioUrl: process.env.DRAWIO_URL || 'http://localhost:8080',
+    apiBaseUrl: process.env.APIBASE_URL || 'http://localhost:3000'
 };
-```
-
-### 使用环境变量配置
-
-推荐使用环境变量来配置数据库连接，这样可以避免在代码中硬编码敏感信息。
-
-**Windows (PowerShell)**:
-```powershell
-$env:DB_HOST = 'localhost'
-$env:DB_USER = 'graph_user'
-$env:DB_PASSWORD = 'your_secure_password'
-$env:DB_NAME = 'graph_editor'
-$env:DB_PORT = 3306
-$env:SESSION_SECRET = 'your-session-secret-key-keep-it-safe'
-
-npm start
-```
-
-**Linux/Mac**:
-```bash
-export DB_HOST=localhost
-export DB_USER=graph_user
-export DB_PASSWORD=your_secure_password
-export DB_NAME=graph_editor
-export DB_PORT=3306
-export SESSION_SECRET=your-session-secret-key-keep-it-safe
-
-npm start
 ```
 
 ## 贡献指南
