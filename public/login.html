@@ -488,6 +488,10 @@
                 <label class="form-label" for="register-password">密码</label>
                 <input type="password" id="register-password" class="form-input" placeholder="请设置密码">
               </div>
+              <div class="form-group">
+                <label class="form-label" for="register-password-confirm">确认密码</label>
+                <input type="password" id="register-password-confirm" class="form-input" placeholder="请再次输入密码">
+              </div>
               <div class="form-actions" style="margin-top: 24px;">
                 <button class="login-button" onclick="handleRegister()">注册</button>
               </div>
@@ -673,11 +677,23 @@
       const username = document.getElementById('register-username').value.trim();
       const nickname = document.getElementById('register-nickname').value.trim();
       const password = document.getElementById('register-password').value.trim();
+      const passwordConfirm = document.getElementById('register-password-confirm').value.trim();
       
-      if (!username || !nickname || !password) {
+      if (!username || !nickname || !password || !passwordConfirm) {
         Sweetalert2.fire({
           title: '注册失败',
           text: '账号、昵称和密码不能为空',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
+      if (!/^[a-zA-Z]/.test(username)) {
+        Sweetalert2.fire({
+          title: '注册失败',
+          text: '账号必须以英文字母开头',
           icon: 'error',
           confirmButtonColor: '#667eea',
           width: '320px'
@@ -718,6 +734,17 @@
         return;
       }
       
+      if (password !== passwordConfirm) {
+        Sweetalert2.fire({
+          title: '注册失败',
+          text: '两次输入的密码不一致',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
       try {
         await fetchJson('/api/auth/register', {
           method: 'POST',
@@ -736,6 +763,7 @@
           document.getElementById('register-username').value = '';
           document.getElementById('register-nickname').value = '';
           document.getElementById('register-password').value = '';
+          document.getElementById('register-password-confirm').value = '';
           closeRegisterModal();
         });
       } catch (err) {

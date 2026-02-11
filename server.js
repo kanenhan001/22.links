@@ -464,6 +464,61 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+// 用户注册
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { username, nickname, password } = req.body;
+        
+        if (!username || !nickname || !password) {
+            return res.status(400).json({ error: '账号、昵称和密码不能为空' });
+        }
+        
+        // 验证账号是否以英文字母开头
+        if (!/^[a-zA-Z]/.test(username)) {
+            return res.status(400).json({ error: '账号必须以英文字母开头' });
+        }
+        
+        // 检查账号长度
+        if (username.length < 3 || username.length > 20) {
+            return res.status(400).json({ error: '账号长度应在3-20个字符之间' });
+        }
+        
+        // 检查昵称长度
+        if (nickname.length < 2 || nickname.length > 15) {
+            return res.status(400).json({ error: '昵称长度应在2-15个字符之间' });
+        }
+        
+        // 检查密码长度
+        if (password.length < 6) {
+            return res.status(400).json({ error: '密码长度至少为6个字符' });
+        }
+        
+        // 检查账号是否已存在
+        const existingUser = await queryOne('SELECT * FROM users WHERE username = ?', [username]);
+        if (existingUser) {
+            return res.status(400).json({ error: '账号已存在' });
+        }
+        
+        // 对密码进行加密
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        
+        // 创建新用户
+        const now = new Date();
+        const newId = await run(
+            'INSERT INTO users (provider, providerUserId, username, password, nickname, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+            ['local', username, username, hashedPassword, nickname, now]
+        );
+        
+        // 获取新创建的用户信息
+        const newUser = await queryOne('SELECT * FROM users WHERE id = ?', [newId]);
+        
+        res.json({ success: true, user: { id: newUser.id, username: newUser.username, nickname: newUser.nickname } });
+    } catch (error) {
+        console.error('注册失败:', error);
+        res.status(500).json({ error: '注册失败' });
+    }
+});
+
 // 修改密码
 app.post('/api/auth/change-password', async (req, res) => {
     try {
