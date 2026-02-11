@@ -4723,11 +4723,12 @@
 				editorUi.menus.addSubmenu('openRecent', menu, parent);
 				editorUi.menus.addMenuItems(menu,
 					['-', 'synchronize', 'properties', '-',
-					'save', 'saveAs', '-'], parent);
+					'saveAs', '-'], parent);
 			}
 			else if (editorUi.mode == App.MODE_ATLAS)
 			{
-				if (urlParams['noSaveBtn'] != '1' &&
+				// 隐藏保存按钮
+				/*if (urlParams['noSaveBtn'] != '1' &&
 					urlParams['embedInline'] != '1')
 				{
 					editorUi.menus.addMenuItems(menu, ['-', 'save'], parent);
@@ -4743,13 +4744,13 @@
 					{
 						editorUi.menus.addMenuItems(menu, ['revisionHistory'], parent);
 					}
-				}
+				}*/
 				
 				menu.addSeparator(parent);
 			}
 			else if (editorUi.mode == App.MODE_ATLAS)
 			{
-				editorUi.menus.addMenuItems(menu, ['save', 'synchronize', '-'], parent);
+				editorUi.menus.addMenuItems(menu, ['synchronize', '-'], parent);
 			}
 			else if (urlParams['noFileMenu'] != '1')
 			{
@@ -4875,11 +4876,15 @@
 			
 			if (file != null && (file.constructor == DriveFile || file.constructor == OneDriveFile))
 			{
-				editorUi.menus.addMenuItems(menu, ['save', 'makeCopy', '-', 'rename', 'moveToFolder'], parent);
+				// 隐藏保存按钮
+				// editorUi.menus.addMenuItems(menu, ['save', 'makeCopy', '-', 'rename', 'moveToFolder'], parent);
+				editorUi.menus.addMenuItems(menu, ['makeCopy', '-', 'rename', 'moveToFolder'], parent);
 			}
 			else
 			{
-				editorUi.menus.addMenuItems(menu, ['save', 'saveAs', '-', 'rename'], parent);
+				// 隐藏保存按钮，保留另存为按钮
+				// editorUi.menus.addMenuItems(menu, ['save', 'saveAs', '-', 'rename'], parent);
+				editorUi.menus.addMenuItems(menu, ['saveAs', '-', 'rename'], parent);
 				this.addMenuItems(menu, [(editorUi.isOfflineApp()) ? 'upload' : 'makeCopy'], parent);
 			}
 			
@@ -4955,7 +4960,8 @@
 				}
 				
 				menu.addSeparator(parent);
-				editorUi.menus.addMenuItems(menu, ['-', 'save'], parent);
+				// 隐藏保存按钮
+				// editorUi.menus.addMenuItems(menu, ['-', 'save'], parent);
 
 				if (file == null || file.constructor != DriveFile)
 				{
@@ -5068,7 +5074,9 @@
 						this.addMenuItems(menu, ['exportOptionsDisabled'], parent);
 					}
 					
-					this.addMenuItems(menu, ['save', '-', 'share'], parent);
+					// 隐藏保存按钮
+					// this.addMenuItems(menu, ['save', '-', 'share'], parent);
+					this.addMenuItems(menu, ['-', 'share'], parent);
 					
 					var item = this.addMenuItem(menu, 'synchronize', parent);
 					
@@ -5111,7 +5119,9 @@
 						}
 					}
 					
-					this.addMenuItems(menu, ['-', 'save', 'saveAs', '-'], parent);
+					// 隐藏保存按钮
+// this.addMenuItems(menu, ['-', 'save', 'saveAs', '-'], parent);
+this.addMenuItems(menu, ['-', 'saveAs', '-'], parent);
 					
 					if (!mxClient.IS_CHROMEAPP && !EditorUi.isElectronApp &&
 						editorUi.getServiceName() == 'draw.io' &&
