@@ -544,9 +544,9 @@ async function fetchJson(url, opts) {
             </svg>
           </button>
           <div class="card-body">
-            <div class="name">${g.name || '未命名关系图'}</div>
+            <div class="name" title="${g.name || '未命名关系图'}">${g.name || '未命名关系图'}</div>
             <div class="meta">创建时间：${fmtTime(g.createdAt)}</div>
-            ${g.description && g.description !== 'None' ? `<div class="description">${g.description}</div>` : ''}
+            ${g.description && g.description !== 'None' ? `<div class="description" title="${g.description}">${g.description}</div>` : ''}
           </div>
         `;
 
@@ -1022,7 +1022,7 @@ async function fetchJson(url, opts) {
             <div class="group-item-name">${group.name}</div>
           </div>
           <div class="group-item-actions">
-            <button class="group-item-btn" onclick="editGroup('${group.id}')">编辑</button>
+            
             <button class="group-item-btn danger" onclick="deleteGroupConfirm('${group.id}')">删除</button>
           </div>
         `;
