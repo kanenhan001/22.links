@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>思维导图编辑器</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f5f7fa;
+      overflow: hidden;
+    }
+    .editor-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .editor-header {
+      background-color: white;
+      padding: 12px 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .back-btn {
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .back-btn:hover {
+      background-color: #f0f0f0;
+    }
+    .graph-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: #333;
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: white;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+    .btn-primary {
+      background-color: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+    .btn-primary:hover {
+      background-color: #5a6fd8;
+      border-color: #5a6fd8;
+      color: white;
+    }
+    .editor-content {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    #mindmap-container {
+      width: 100%;
+      height: 100%;
+      background-color: white;
+    }
+    .status-bar {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background-color: rgba(255, 255, 255, 0.9);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #666;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="editor-container">
+    <!-- 顶部工具栏 -->
+    <div class="editor-header">
+      <div class="header-left">
+        <button class="back-btn" onclick="goBack()">←</button>
+        <div class="graph-title" id="graphTitle">思维导图</div>
+      </div>
+      <div class="header-right">
+        <button class="btn" onclick="exportMindmap()">导出</button>
+        <button class="btn btn-primary" onclick="saveMindmap()">保存</button>
+      </div>
+    </div>
+    
+    <!-- 编辑器内容区 -->
+    <div class="editor-content">
+      <div id="mindmap-container"></div>
+      <div class="status-bar" id="statusBar">就绪</div>
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入 MindElixir 及其依赖 -->
+  <link rel="stylesheet" href="/vendor/mind-elixir/MindElixir.css">
+  <script src="/vendor/mind-elixir/MindElixir.iife.js"></script>
+  
+  <script>
+    let mindElixirInstance = null;
+    let graphId = null;
+    let isSaving = false;
+    let autoSaveTimer = null;
+    
+    // 获取 URL 中的图表 ID
+    function getGraphIdFromUrl() {
+      const path = window.location.pathname;
+      const match = path.match(/\/m\/(\d+)/);
+      return match ? match[1] : null;
+    }
+    
+    // 初始化 MindElixir
+    function initMindmap() {
+      graphId = getGraphIdFromUrl();
+      if (!graphId) {
+        alert('无效的图表 ID');
+        return;
+      }
+      
+      // 加载图表数据
+      fetchJson(`/api/graphs/${graphId}`)
+        .then(function(graphData) {
+          document.getElementById('graphTitle').textContent = graphData.name || '思维导图';
+          
+          // 确保 MindElixir 已加载
+          if (typeof MindElixir === 'undefined') {
+            console.error('MindElixir 未加载');
+            updateStatus('初始化失败：MindElixir 未加载');
+            document.getElementById('loadingOverlay').style.display = 'none';
+            return;
+          }
+          
+          // 调试信息
+          console.log('MindElixir 对象:', MindElixir);
+          console.log('MindElixir 类型:', typeof MindElixir);
+          
+          // 检查 MindElixir 的实际导出方式
+          const MindElixirConstructor = MindElixir.default || MindElixir;
+          console.log('使用的构造函数:', MindElixirConstructor);
+          
+          if (typeof MindElixirConstructor !== 'function') {
+            console.error('MindElixir 不是一个构造函数');
+            updateStatus('初始化失败：MindElixir 不是一个构造函数');
+            document.getElementById('loadingOverlay').style.display = 'none';
+            return;
+          }
+          
+          // 创建 MindElixir 实例
+          // 处理 data 选项，确保格式正确
+          let mindmapData;
+          if (graphData.code && graphData.code !== 'undefined' && graphData.code.trim() !== '') {
+            try {
+              mindmapData = JSON.parse(graphData.code);
+              console.log('解析的思维导图数据:', mindmapData);
+            } catch (parseError) {
+              console.error('解析思维导图数据失败，使用默认数据:', parseError);
+              // 使用默认数据结构
+              mindmapData = {
+                nodeData: {
+                  id: 'root',
+                  topic: '中心主题'
+                }
+              };
+            }
+          } else {
+            // 使用默认数据结构
+            mindmapData = {
+              nodeData: {
+                id: 'root',
+                topic: '中心主题'
+              }
+            };
+            console.log('使用默认思维导图数据:', mindmapData);
+          }
+          
+          const options = {
+            el: '#mindmap-container',
+            direction: 2,
+            locale: 'zh_CN', // 使用中文界面
+            newTopicName: '新节点', // 新节点名称
+            draggable: true, // 启用拖拽功能
+            dragMode: 2,     // 拖拽模式：1-拖拽画布，2-拖拽节点
+            contextMenu: true,
+            toolBar: true,
+            nodeMenu: true,
+            keypress: true,
+            // 启用节点拖拽插件
+            plugins: [
+              {
+                name: 'nodeDraggable',
+                enable: true
+              }
+            ]
+          };
+          
+          console.log('创建 MindElixir 实例，选项:', options);
+          
+          try {
+            mindElixirInstance = new MindElixirConstructor(options);
+            console.log('MindElixir 实例创建成功:', mindElixirInstance);
+            
+            // 初始化实例，使用加载的数据或默认数据
+            if (typeof mindElixirInstance.init === 'function') {
+              try {
+                mindElixirInstance.init(mindmapData);
+                console.log('MindElixir 实例初始化成功（带数据）');
+              } catch (initError) {
+                console.error('带数据初始化失败，尝试使用默认数据:', initError);
+                // 尝试使用默认数据结构
+                try {
+                  mindElixirInstance.init({
+                    nodeData: {
+                      id: 'root',
+                      topic: '中心主题'
+                    }
+                  });
+                  console.log('MindElixir 实例初始化成功（带默认数据）');
+                } catch (initError2) {
+                  console.error('带默认数据初始化失败:', initError2);
+                  // 放弃初始化，显示错误信息
+                  throw initError2;
+                }
+              }
+            } else {
+              console.error('MindElixir 实例没有 init 方法');
+              updateStatus('初始化失败：MindElixir 实例没有 init 方法');
+              document.getElementById('loadingOverlay').style.display = 'none';
+              return;
+            }
+          } catch (error) {
+            console.error('创建或初始化 MindElixir 实例失败:', error);
+            updateStatus('初始化失败：' + error.message);
+            document.getElementById('loadingOverlay').style.display = 'none';
+            return;
+          }
+          
+          // 启用自动保存
+          enableAutoSave();
+          
+          // 隐藏加载覆盖层
+          document.getElementById('loadingOverlay').style.display = 'none';
+          updateStatus('就绪');
+        })
+        .catch(function(error) {
+          console.error('初始化思维导图失败:', error);
+          updateStatus('初始化失败');
+          document.getElementById('loadingOverlay').style.display = 'none';
+        });
+    }
+    
+    // 启用自动保存
+    function enableAutoSave() {
+      console.log('启用自动保存功能');
+      
+      // 清除任何现有的定时器
+      if (autoSaveTimer) {
+        console.log('清除现有自动保存定时器');
+        clearInterval(autoSaveTimer);
+        autoSaveTimer = null;
+      }
+      
+      // 检查 MindElixir 实例
+      console.log('检查 MindElixir 实例:', !!mindElixirInstance);
+      
+      if (mindElixirInstance) {
+        console.log('MindElixir 实例属性:', Object.keys(mindElixirInstance));
+        console.log('MindElixir 原型:', Object.getPrototypeOf(mindElixirInstance));
+        
+        // 直接在编辑器上添加事件监听
+        const container = document.getElementById('mindmap-container');
+        if (container) {
+          console.log('添加容器事件监听器');
+          
+          // 监听键盘事件
+          container.addEventListener('keyup', (e) => {
+            console.log('键盘释放事件:', e.key, e.target);
+            updateStatus('未保存');
+            // 键盘释放时触发保存
+            setTimeout(() => {
+              if (!isSaving) {
+                console.log('键盘释放触发自动保存');
+                saveMindmap(true);
+              }
+            }, 500);
+          });
+          
+          // 监听输入事件
+          container.addEventListener('input', (e) => {
+            console.log('输入事件:', e.target);
+            updateStatus('未保存');
+            setTimeout(() => {
+              if (!isSaving) {
+                console.log('输入事件触发自动保存');
+                saveMindmap(true);
+              }
+            }, 500);
+          });
+          
+          // 监听鼠标事件
+          container.addEventListener('click', (e) => {
+            console.log('点击事件:', e.target);
+            // 点击事件不直接触发保存，只用于调试
+          });
+          
+          container.addEventListener('dblclick', (e) => {
+            console.log('双击事件:', e.target);
+            updateStatus('未保存');
+            setTimeout(() => {
+              if (!isSaving) {
+                console.log('双击事件触发自动保存');
+                saveMindmap(true);
+              }
+            }, 500);
+          });
+          
+          // 监听鼠标按下和释放事件
+          container.addEventListener('mousedown', (e) => {
+            console.log('鼠标按下事件:', e.target);
+          });
+          
+          container.addEventListener('mouseup', (e) => {
+            console.log('鼠标释放事件:', e.target);
+            updateStatus('未保存');
+            setTimeout(() => {
+              if (!isSaving) {
+                console.log('鼠标释放触发自动保存');
+                saveMindmap(true);
+              }
+            }, 500);
+          });
+          
+          // 使用 MutationObserver 监听 DOM 变化
+          const observer = new MutationObserver((mutations) => {
+            console.log('DOM 变化:', mutations.length, '个变化');
+            updateStatus('未保存');
+            
+            // 延迟保存，避免频繁操作
+            setTimeout(() => {
+              if (!isSaving) {
+                console.log('DOM 变化触发自动保存');
+                saveMindmap(true);
+              }
+            }, 1000);
+          });
+          
+          // 配置观察器
+          const config = {
+            attributes: true,
+            childList: true,
+            characterData: true,
+            subtree: true
+          };
+          
+          // 开始观察
+          observer.observe(container, config);
+          console.log('已添加 DOM 变化观察器');
+        }
+      } else {
+        console.log('MindElixir 实例不存在');
+      }
+      
+      console.log('自动保存功能已启用，仅在编辑操作时触发');
+    }
+    
+    // 保存思维导图
+    function saveMindmap(isAutoSave) {
+      console.log('开始保存思维导图，自动保存:', isAutoSave);
+      
+      if (!mindElixirInstance) {
+        console.log('保存失败: MindElixir 实例不存在');
+        return;
+      }
+      
+      if (!graphId) {
+        console.log('保存失败: 图表 ID 不存在');
+        return;
+      }
+      
+      console.log('开始保存过程，当前 isSaving:', isSaving);
+      
+      isSaving = true;
+      updateStatus('保存中...');
+      
+      try {
+        console.log('获取思维导图数据');
+        const mindmapData = mindElixirInstance.getData();
+        console.log('获取到的思维导图数据:', mindmapData);
+        
+        const code = JSON.stringify(mindmapData);
+        console.log('序列化后的思维导图数据长度:', code.length);
+        
+        // 生成缩略图
+        console.log('生成缩略图');
+        const thumbnail = generateThumbnail();
+        console.log('缩略图生成成功，长度:', thumbnail.length);
+        
+        // 保存到服务器
+        console.log('保存到服务器，图表 ID:', graphId);
+        
+        fetchJson(`/api/graphs/${graphId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, thumbnail })
+        })
+        .then(function(response) {
+          console.log('保存成功，响应:', response);
+          updateStatus(isAutoSave ? '自动保存成功' : '保存成功');
+          
+          // 3 秒后恢复状态
+          setTimeout(() => {
+            updateStatus('就绪');
+          }, 3000);
+        })
+        .catch(function(error) {
+          console.error('保存失败:', error);
+          updateStatus('保存失败');
+        })
+        .finally(function() {
+          console.log('保存过程完成，设置 isSaving 为 false');
+          isSaving = false;
+        });
+      } catch (error) {
+        console.error('保存过程异常:', error);
+        updateStatus('保存失败');
+        isSaving = false;
+      }
+    }
+    
+    // 生成缩略图
+    function generateThumbnail() {
+      try {
+        // 创建临时画布
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 300;
+        const ctx = canvas.getContext('2d');
+        
+        // 绘制白色背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 获取思维导图数据
+        let rootTopic = '中心主题';
+        let actualData = null;
+        
+        if (mindElixirInstance) {
+          try {
+            actualData = mindElixirInstance.getData();
+            console.log('实际思维导图数据:', actualData);
+          } catch (e) {
+            console.error('获取思维导图数据失败:', e);
+          }
+        }
+        
+        // 如果有实际数据，使用实际数据生成缩略图
+        if (actualData && actualData.nodeData) {
+          rootTopic = actualData.nodeData.topic || '中心主题';
+          
+          // 为根节点设置 level 属性
+          const rootNode = JSON.parse(JSON.stringify(actualData.nodeData));
+          rootNode.level = 0;
+          
+          // 直接使用实际数据结构绘制
+          drawMindmapFromData(ctx, rootNode, 200, 150, 150);
+        } else {
+          // 使用默认数据
+          const defaultData = {
+            topic: rootTopic,
+            level: 0, // 设置根节点 level
+            children: [
+              {
+                topic: '分支1',
+                children: [
+                  { topic: '子节点1' },
+                  { topic: '子节点2' }
+                ]
+              },
+              {
+                topic: '分支2',
+                children: [
+                  { topic: '子节点3' }
+                ]
+              },
+              {
+                topic: '分支3'
+              }
+            ]
+          };
+          drawMindmapFromData(ctx, defaultData, 200, 150, 150);
+        }
+        
+        // 转换为 base64
+        return canvas.toDataURL('image/png');
+      } catch (error) {
+        console.error('生成缩略图失败:', error);
+        return '';
+      }
+    }
+    
+    // 根据实际数据绘制思维导图
+    function drawMindmapFromData(ctx, node, x, y, maxWidth) {
+      // 定义配置
+      const config = {
+        rootRadius: 25,
+        childRadius: 18,
+        levelSpacing: 80,
+        siblingSpacing: 40,
+        colors: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a']
+      };
+      
+      // 绘制当前节点
+      const radius = node.level === 0 ? config.rootRadius : Math.max(12, config.childRadius - node.level * 3);
+      const color = config.colors[node.level % config.colors.length];
+      
+      // 绘制节点阴影
+      ctx.shadowColor = color + '40';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      // 绘制节点背景
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 重置阴影
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
+      // 绘制节点文本
+      ctx.fillStyle = 'white';
+      ctx.font = `${Math.max(10, 14 - node.level * 2)}px Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // 截断过长的文本
+      let displayText = node.topic || '节点';
+      const maxTextWidth = radius * 2;
+      while (ctx.measureText(displayText).width > maxTextWidth && displayText.length > 1) {
+        displayText = displayText.slice(0, -1);
+      }
+      if (displayText.length < node.topic.length) {
+        displayText += '...';
+      }
+      
+      ctx.fillText(displayText, x, y);
+      
+      // 绘制子节点
+      if (node.children && node.children.length > 0) {
+        // 计算子节点的总宽度
+        const childCount = node.children.length;
+        const totalChildWidth = (childCount - 1) * config.siblingSpacing;
+        const startX = x + config.levelSpacing - totalChildWidth / 2;
+        
+        // 为每个子节点设置层级
+        node.children.forEach((child, index) => {
+          child.level = (node.level || 0) + 1;
+          
+          // 计算子节点位置 - 模拟 MindElixir 的布局
+          const angle = (index - (childCount - 1) / 2) * (Math.PI / 4);
+          const distance = config.levelSpacing + child.level * 20;
+          
+          const childX = x + Math.cos(angle) * distance;
+          const childY = y + Math.sin(angle) * distance;
+          
+          // 确保子节点在画布范围内
+          const clampedChildX = Math.max(50, Math.min(350, childX));
+          const clampedChildY = Math.max(50, Math.min(250, childY));
+          
+          // 绘制连接线
+          ctx.strokeStyle = color + '80';
+          ctx.lineWidth = 1.5;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          
+          // 使用直线连接，更接近 MindElixir 的实际连接方式
+          ctx.moveTo(x, y);
+          ctx.lineTo(clampedChildX, clampedChildY);
+          ctx.stroke();
+          
+          // 递归绘制子节点
+          drawMindmapFromData(ctx, child, clampedChildX, clampedChildY, maxWidth - config.levelSpacing);
+        });
+      }
+    }
+    
+    // 导出思维导图
+    function exportMindmap() {
+      if (!mindElixirInstance) return;
+      
+      const mindmapData = mindElixirInstance.getData();
+      const dataStr = JSON.stringify(mindmapData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${document.getElementById('graphTitle').textContent}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    // 返回我的图表页面
+    function goBack() {
+      window.location.href = '/my';
+    }
+    
+    // 更新状态
+    function updateStatus(text) {
+      document.getElementById('statusBar').textContent = text;
+    }
+    
+    // 通用 fetch 函数
+    function fetchJson(url, opts) {
+      return fetch(url, opts)
+        .then(function(res) {
+          return res.json().catch(function() { return {}; });
+        })
+        .then(function(data) {
+          if (!data) {
+            throw new Error('无效的响应数据');
+          }
+          return data;
+        });
+    }
+    
+    // 页面加载完成后初始化
+    window.addEventListener('DOMContentLoaded', function() {
+      initMindmap();
+    });
+    
+    // 页面关闭前提示保存
+    window.addEventListener('beforeunload', function(e) {
+      if (document.getElementById('statusBar').textContent === '未保存') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  </script>
+</body>
+</html>

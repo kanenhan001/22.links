@@ -39,6 +39,11 @@ app.get('/my', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'my.html'));
 });
 
+// 思维导图编辑页面路由
+app.get('/m/:id', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'mindmap.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({

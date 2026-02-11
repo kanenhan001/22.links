@@ -389,7 +389,7 @@ async function fetchJson(url, opts) {
               <select id="graphType" style="width: 100%; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 4px;">
                 <option value="relationship" ${diagramType === 'relationship' ? 'selected' : ''}>关系图</option>
                 <option value="flow" ${diagramType === 'flow' ? 'selected' : ''}>流程图</option>
-                <option value="mindmap" ${diagramType === 'mindmap' ? 'selected' : ''} disabled>思维导图</option>
+                <option value="mindmap" ${diagramType === 'mindmap' ? 'selected' : ''}>思维导图</option>
               </select>
             </div>
             <div>
@@ -512,8 +512,11 @@ async function fetchJson(url, opts) {
             if (g.diagramType === 'relationship') {
               // 关系图打开本地的关系图编辑器
               window.open('/g/' + g.id, '_blank');
+            } else if (g.diagramType === 'mindmap') {
+              // 思维导图打开本地的思维导图编辑器
+              window.open('/m/' + g.id, '_blank');
             } else {
-              // 流程图、泳道图、思维导图打开draw.io编辑器
+              // 流程图、泳道图打开draw.io编辑器
               const drawioUrl = window.APP_CONFIG?.drawioUrl || 'http://localhost:8080';
               const apiBaseUrl = window.APP_CONFIG?.apiBaseUrl || 'http://localhost:3000';
               window.open(drawioUrl + '?graphId=' + g.id + '&lang=zh&dev=1&apiBaseUrl=' + apiBaseUrl, '_blank');
