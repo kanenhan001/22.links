@@ -54,21 +54,25 @@
 
 ## 系统截图
 
-### 1. 主界面
+### 1. 登录界面
 
-![主界面](https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=modern%20dashboard%20interface%20for%20diagram%20editor%20showing%20grid%20of%20chart%20cards%20with%20thumbnails%2C%20clean%20white%20design%20with%20blue%20accents&image_size=landscape_16_9)
+![登录界面](./public/images/screenshot/1.png)
 
-### 2. 思维导图编辑器
+### 2. 主界面
 
-![思维导图编辑器](https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mind%20map%20editor%20interface%20with%20nodes%20and%20connections%2C%20root%20node%20in%20center%20with%20branches%20radiating%20out%2C%20clean%20modern%20design&image_size=landscape_16_9)
+![主界面](./public/images/screenshot/2.png)
 
 ### 3. 关系图编辑器
 
-![关系图编辑器](https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=relationship%20diagram%20editor%20with%20nodes%20connected%20by%20edges%2C%20network%20graph%20visualization%2C%20professional%20clean%20interface&image_size=landscape_16_9)
+![思维导图编辑器](./public/images/screenshot/3.png)
 
-### 4. 流程图编辑器
+### 4. 流程图图编辑器
 
-![流程图编辑器](https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flowchart%20editor%20with%20process%20steps%20connected%20by%20arrows%2C%20business%20process%20visualization%2C%20modern%20interface&image_size=landscape_16_9)
+![关系图编辑器](./public/images/screenshot/4.png)
+
+### 5. 思维导图编辑器
+
+![流程图编辑器](./public/images/screenshot/5.png)
 
 ## 安装说明
 
