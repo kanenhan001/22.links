@@ -328,6 +328,30 @@ async function initDatabase() {
             console.log('graphs 表的 backgroundImage 列可能已存在:', e.message);
         }
 
+        // 创建分组表
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS user_groups (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                userId INT,
+                name VARCHAR(255),
+                color VARCHAR(255),
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+
+        // 创建图表分组关联表
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS graph_user_groups (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                graphId INT,
+                groupId INT,
+                FOREIGN KEY (graphId) REFERENCES graphs(id) ON DELETE CASCADE,
+                FOREIGN KEY (groupId) REFERENCES user_groups(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_graph_group (graphId, groupId)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        `);
+
         // 迁移旧数据：如果 nodes/edges 的 graphId 为空，则设为默认关系图 1
         try {
             await pool.execute('UPDATE nodes SET graphId = 1 WHERE graphId IS NULL');
@@ -342,6 +366,10 @@ async function initDatabase() {
 
         console.log('表初始化完成');
         console.log('数据库初始化完成');
+
+        // 测试查询分组
+        const [testGroups] = await pool.execute('SELECT * FROM user_groups');
+        console.log('当前分组数:', testGroups.length);
 
         // 测试查询
         const [testNodes] = await pool.execute('SELECT * FROM nodes');
@@ -926,6 +954,162 @@ app.post('/api/users/:id/reset-password', async (req, res) => {
     } catch (error) {
         console.error('重置用户密码失败:', error);
         res.status(500).json({ error: '重置用户密码失败' });
+    }
+});
+
+// ==================== 分组 API ====================
+
+// 获取用户的所有分组
+app.get('/api/groups', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const [groups] = await pool.execute('SELECT id, name, color, createdAt FROM user_groups WHERE userId = ? ORDER BY createdAt DESC', [userId]);
+        res.json(groups);
+    } catch (error) {
+        console.error('获取分组失败:', error);
+        res.status(500).json({ error: '获取分组失败' });
+    }
+});
+
+// 创建分组
+app.post('/api/groups', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const { name, color } = req.body;
+        
+        if (!name || name.trim() === '') {
+            return res.status(400).json({ error: '分组名称不能为空' });
+        }
+        
+        const [result] = await pool.execute(
+            'INSERT INTO user_groups (userId, name, color) VALUES (?, ?, ?)',
+            [userId, name.trim(), color || '']
+        );
+        
+        const newGroup = await queryOne('SELECT id, name, color, createdAt FROM user_groups WHERE id = ?', [result.insertId]);
+        res.json(newGroup);
+    } catch (error) {
+        console.error('创建分组失败:', error);
+        res.status(500).json({ error: '创建分组失败' });
+    }
+});
+
+// 更新分组
+app.put('/api/groups/:id', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const groupId = parseInt(req.params.id);
+        const { name, color } = req.body;
+        
+        if (!name || name.trim() === '') {
+            return res.status(400).json({ error: '分组名称不能为空' });
+        }
+        
+        // 检查分组是否属于当前用户
+        const group = await queryOne('SELECT * FROM user_groups WHERE id = ? AND userId = ?', [groupId, userId]);
+        if (!group) {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        await pool.execute(
+            'UPDATE user_groups SET name = ?, color = ? WHERE id = ?',
+            [name.trim(), color || '', groupId]
+        );
+        
+        const updatedGroup = await queryOne('SELECT id, name, color, createdAt FROM user_groups WHERE id = ?', [groupId]);
+        res.json(updatedGroup);
+    } catch (error) {
+        console.error('更新分组失败:', error);
+        res.status(500).json({ error: '更新分组失败' });
+    }
+});
+
+// 删除分组
+app.delete('/api/groups/:id', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const groupId = parseInt(req.params.id);
+        
+        // 检查分组是否属于当前用户
+        const group = await queryOne('SELECT * FROM user_groups WHERE id = ? AND userId = ?', [groupId, userId]);
+        if (!group) {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        await pool.execute('DELETE FROM user_groups WHERE id = ?', [groupId]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('删除分组失败:', error);
+        res.status(500).json({ error: '删除分组失败' });
+    }
+});
+
+// 获取图表的分组
+app.get('/api/graphs/:id/groups', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const graphId = parseInt(req.params.id);
+        
+        // 检查图表是否属于当前用户
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const [groupIds] = await pool.execute(
+            'SELECT groupId FROM graph_user_groups WHERE graphId = ?',
+            [graphId]
+        );
+        
+        const ids = groupIds.map(item => item.groupId);
+        res.json(ids);
+    } catch (error) {
+        console.error('获取图表分组失败:', error);
+        res.status(500).json({ error: '获取图表分组失败' });
+    }
+});
+
+// 设置图表的分组
+app.put('/api/graphs/:id/groups', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const graphId = parseInt(req.params.id);
+        const { groupIds } = req.body;
+        console.log(`[Groups] Setting groups for graph ${graphId}:`, groupIds, 'by user', userId);
+        
+        // 检查图表是否属于当前用户
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [graphId, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        // 开启事务
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+            
+            // 删除现有关联
+            await connection.execute('DELETE FROM graph_user_groups WHERE graphId = ?', [graphId]);
+            
+            // 添加新关联
+            for (const groupId of groupIds) {
+                await connection.execute(
+                    'INSERT IGNORE INTO graph_user_groups (graphId, groupId) VALUES (?, ?)',
+                    [graphId, groupId]
+                );
+            }
+            
+            await connection.commit();
+            res.json({ success: true });
+        } catch (e) {
+            await connection.rollback();
+            throw e;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        console.error('设置图表分组失败:', error);
+        res.status(500).json({ error: '设置图表分组失败' });
     }
 });
 

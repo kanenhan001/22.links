@@ -465,6 +465,7 @@ async function fetchJson(url, opts) {
     document.addEventListener('DOMContentLoaded', async () => {
       await ensureLogin();
       initChartTypePanel();
+      await initGroups();
       loadGraphs();
       
       // 为管理分组按钮添加事件监听器
@@ -770,16 +771,21 @@ async function fetchJson(url, opts) {
     let currentGroupId = 'all';
 
     // 初始化分组数据
-    function initGroups() {
+    async function initGroups() {
       try {
-        const savedGroups = localStorage.getItem('graphGroups');
-        if (savedGroups) {
-          const data = JSON.parse(savedGroups);
-          groups = data.groups || [];
-          graphGroups = data.graphGroups || {};
-        } else {
-          groups = [];
-          graphGroups = {};
+        const groupsData = await fetchJson('/api/groups');
+        groups = groupsData || [];
+        
+        // 加载所有图表的分组信息
+        const graphs = await fetchJson('/api/graphs');
+        for (const graph of graphs) {
+          try {
+            const graphGroupIds = await fetchJson(`/api/graphs/${graph.id}/groups`);
+            graphGroups[graph.id] = graphGroupIds;
+          } catch (error) {
+            console.error(`加载图表 ${graph.id} 的分组失败:`, error);
+            graphGroups[graph.id] = [];
+          }
         }
       } catch (error) {
         console.error('加载分组数据失败:', error);
@@ -788,65 +794,79 @@ async function fetchJson(url, opts) {
       }
     }
 
-    // 保存分组数据
-    function saveGroups() {
-      try {
-        localStorage.setItem('graphGroups', JSON.stringify({
-          groups: groups,
-          graphGroups: graphGroups
-        }));
-      } catch (error) {
-        console.error('保存分组数据失败:', error);
-      }
-    }
-
     // 添加分组
-    function addGroup(name) {
+    async function addGroup(name) {
       if (!name || name.trim() === '') return null;
       
       const existingGroup = groups.find(g => g.name === name.trim());
       if (existingGroup) return existingGroup;
       
-      const newGroup = {
-        id: Date.now().toString(),
-        name: name.trim(),
-        color: getRandomColor()
-      };
-      
-      groups.push(newGroup);
-      saveGroups();
-      return newGroup;
+      try {
+        const color = getRandomColor();
+        const newGroup = await fetchJson('/api/groups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim(), color })
+        });
+        
+        groups.push(newGroup);
+        return newGroup;
+      } catch (error) {
+        console.error('添加分组失败:', error);
+        return null;
+      }
     }
 
     // 更新分组
-    function updateGroup(id, name) {
+    async function updateGroup(id, name) {
       if (!name || name.trim() === '') return false;
       
-      const group = groups.find(g => g.id === id);
-      if (!group) return false;
-      
-      group.name = name.trim();
-      saveGroups();
-      return true;
+      try {
+        const group = groups.find(g => g.id === id);
+        if (!group) return false;
+        
+        const updatedGroup = await fetchJson(`/api/groups/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim(), color: group.color })
+        });
+        
+        const index = groups.findIndex(g => g.id === id);
+        if (index !== -1) {
+          groups[index] = updatedGroup;
+        }
+        return true;
+      } catch (error) {
+        console.error('更新分组失败:', error);
+        return false;
+      }
     }
 
     // 删除分组
-    function deleteGroup(id) {
-      const index = groups.findIndex(g => g.id === id);
-      if (index === -1) return false;
-      
-      groups.splice(index, 1);
-      
-      // 移除所有图表与该分组的关联
-      Object.keys(graphGroups).forEach(graphId => {
-        const graphGroupIds = graphGroups[graphId];
-        if (graphGroupIds.includes(id)) {
-          graphGroups[graphId] = graphGroupIds.filter(gid => gid !== id);
+    async function deleteGroup(id) {
+      try {
+        await fetchJson(`/api/groups/${id}`, {
+          method: 'DELETE'
+        });
+        
+        const index = groups.findIndex(g => g.id === id);
+        if (index !== -1) {
+          groups.splice(index, 1);
         }
-      });
-      
-      saveGroups();
-      return true;
+        
+        // 移除所有图表与该分组的关联
+        Object.keys(graphGroups).forEach(graphId => {
+          const graphGroupIds = graphGroups[graphId];
+          if (graphGroupIds.includes(id)) {
+            graphGroups[graphId] = graphGroupIds.filter(gid => gid !== id);
+          }
+        });
+        
+        return true;
+      } catch (error) {
+        console.error('删除分组失败:', error);
+        return false;
+      }
     }
 
     // 获取随机颜色
@@ -869,27 +889,43 @@ async function fetchJson(url, opts) {
     }
 
     // 设置图表的分组
-    function setGraphGroups(graphId, groupIds) {
-      graphGroups[graphId] = groupIds;
-      saveGroups();
+    async function setGraphGroups(graphId, groupIds) {
+      try {
+        await fetchJson(`/api/graphs/${graphId}/groups`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groupIds })
+        });
+        
+        graphGroups[graphId] = groupIds;
+      } catch (error) {
+        console.error('设置图表分组失败:', error);
+      }
     }
 
     // 添加图表到分组
-    function addGraphToGroup(graphId, groupId) {
-      if (!graphGroups[graphId]) {
-        graphGroups[graphId] = [];
-      }
-      if (!graphGroups[graphId].includes(groupId)) {
-        graphGroups[graphId].push(groupId);
-        saveGroups();
+    async function addGraphToGroup(graphId, groupId) {
+      try {
+        const currentGroups = graphGroups[graphId] || [];
+        if (!currentGroups.includes(groupId)) {
+          const newGroups = [...currentGroups, groupId];
+          await setGraphGroups(graphId, newGroups);
+        }
+      } catch (error) {
+        console.error('添加图表到分组失败:', error);
       }
     }
 
     // 从分组中移除图表
-    function removeGraphFromGroup(graphId, groupId) {
-      if (graphGroups[graphId]) {
-        graphGroups[graphId] = graphGroups[graphId].filter(gid => gid !== groupId);
-        saveGroups();
+    async function removeGraphFromGroup(graphId, groupId) {
+      try {
+        const currentGroups = graphGroups[graphId] || [];
+        if (currentGroups.includes(groupId)) {
+          const newGroups = currentGroups.filter(gid => gid !== groupId);
+          await setGraphGroups(graphId, newGroups);
+        }
+      } catch (error) {
+        console.error('从分组中移除图表失败:', error);
       }
     }
 
@@ -1009,7 +1045,7 @@ async function fetchJson(url, opts) {
     }
 
     // 打开添加分组模态框
-    function openAddGroupModal() {
+    async function openAddGroupModal() {
       Swal.fire({
         title: '添加分组',
         html: `
@@ -1039,9 +1075,9 @@ async function fetchJson(url, opts) {
           }
           return { name };
         }
-      }).then((result) => {
+      }).then(async (result) => {
         if (result.isConfirmed && result.value) {
-          const newGroup = addGroup(result.value.name);
+          const newGroup = await addGroup(result.value.name);
           if (newGroup) {
             renderGroupTabs();
             renderGroupManagement();
@@ -1063,7 +1099,7 @@ async function fetchJson(url, opts) {
     }
 
     // 编辑分组
-    function editGroup(groupId) {
+    async function editGroup(groupId) {
       const group = groups.find(g => g.id === groupId);
       if (!group) return;
       
@@ -1096,9 +1132,9 @@ async function fetchJson(url, opts) {
           }
           return { name };
         }
-      }).then((result) => {
+      }).then(async (result) => {
         if (result.isConfirmed && result.value) {
-          const success = updateGroup(groupId, result.value.name);
+          const success = await updateGroup(groupId, result.value.name);
           if (success) {
             renderGroupTabs();
             renderGroupManagement();
@@ -1120,7 +1156,7 @@ async function fetchJson(url, opts) {
     }
 
     // 删除分组确认
-    function deleteGroupConfirm(groupId) {
+    async function deleteGroupConfirm(groupId) {
       const group = groups.find(g => g.id === groupId);
       if (!group) return;
       
@@ -1140,9 +1176,9 @@ async function fetchJson(url, opts) {
           confirmButton: 'swal2-btn-sm',
           cancelButton: 'swal2-btn-sm'
         }
-      }).then((result) => {
+      }).then(async (result) => {
         if (result.isConfirmed) {
-          const success = deleteGroup(groupId);
+          const success = await deleteGroup(groupId);
           if (success) {
             renderGroupTabs();
             renderGroupManagement();
@@ -1348,12 +1384,12 @@ async function fetchJson(url, opts) {
     }
 
     // 切换图表分组
-    function toggleGraphGroup(graphId, groupId) {
+    async function toggleGraphGroup(graphId, groupId) {
       const graphGroupIds = getGraphGroups(graphId);
       if (graphGroupIds.includes(groupId)) {
-        removeGraphFromGroup(graphId, groupId);
+        await removeGraphFromGroup(graphId, groupId);
       } else {
-        addGraphToGroup(graphId, groupId);
+        await addGraphToGroup(graphId, groupId);
       }
       
       // 关闭所有菜单
@@ -1371,7 +1407,7 @@ async function fetchJson(url, opts) {
       const list = await fetchJson('/api/graphs');
       renderCards(list);
       // 初始化分组功能
-      initGroups();
+      await initGroups();
       renderGroupTabs();
       filterGraphsByGroup();
     }
