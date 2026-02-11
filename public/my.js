@@ -1011,7 +1011,6 @@ async function fetchJson(url, opts) {
         groupList.innerHTML = '<div style="text-align: center; padding: 40px; color: #999; font-size: 13px;">还没有分组，点击"添加分组"创建一个吧。</div>';
         return;
       }
-      
       // 渲染分组列表
       groups.forEach(group => {
         const groupItem = document.createElement('div');
