@@ -462,6 +462,37 @@
           <div class="form-actions">
             <button class="login-button" onclick="handlePasswordLogin()">登录</button>
           </div>
+          
+          <div style="margin-top: 16px; text-align: center;">
+            <button onclick="openRegisterModal()" style="background: none; border: none; color: #667eea; font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: all 0.3s ease;">
+              注册新账号
+            </button>
+          </div>
+          
+          <!-- 注册弹窗 -->
+          <div id="register-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+            <div style="background: #fff; border-radius: 16px; padding: 32px; width: 90%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h3 style="font-size: 18px; font-weight: 600; color: #333;">用户注册</h3>
+                <button onclick="closeRegisterModal()" style="background: none; border: none; font-size: 20px; color: #999; cursor: pointer; padding: 4px;">&times;</button>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="register-username">账号</label>
+                <input type="text" id="register-username" class="form-input" placeholder="请设置账号">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="register-nickname">昵称</label>
+                <input type="text" id="register-nickname" class="form-input" placeholder="请设置昵称">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="register-password">密码</label>
+                <input type="password" id="register-password" class="form-input" placeholder="请设置密码">
+              </div>
+              <div class="form-actions" style="margin-top: 24px;">
+                <button class="login-button" onclick="handleRegister()">注册</button>
+              </div>
+            </div>
+          </div>
         </div>
         
         <div class="login-section" id="wechat-login-section">
@@ -617,6 +648,99 @@
       } catch (err) {
         Sweetalert2.fire({
           title: '登录失败',
+          text: err.message,
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+      }
+    }
+    
+    function openRegisterModal() {
+      const modal = document.getElementById('register-modal');
+      modal.style.display = 'flex';
+      // 清空表单
+      document.getElementById('register-username').value = '';
+      document.getElementById('register-nickname').value = '';
+      document.getElementById('register-password').value = '';
+    }
+    
+    function closeRegisterModal() {
+      document.getElementById('register-modal').style.display = 'none';
+    }
+    
+    async function handleRegister() {
+      const username = document.getElementById('register-username').value.trim();
+      const nickname = document.getElementById('register-nickname').value.trim();
+      const password = document.getElementById('register-password').value.trim();
+      
+      if (!username || !nickname || !password) {
+        Sweetalert2.fire({
+          title: '注册失败',
+          text: '账号、昵称和密码不能为空',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
+      if (username.length < 3 || username.length > 20) {
+        Sweetalert2.fire({
+          title: '注册失败',
+          text: '账号长度应在3-20个字符之间',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
+      if (nickname.length < 2 || nickname.length > 15) {
+        Sweetalert2.fire({
+          title: '注册失败',
+          text: '昵称长度应在2-15个字符之间',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
+      if (password.length < 6) {
+        Sweetalert2.fire({
+          title: '注册失败',
+          text: '密码长度至少为6个字符',
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        });
+        return;
+      }
+      
+      try {
+        await fetchJson('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, nickname, password })
+        });
+        
+        Sweetalert2.fire({
+          title: '注册成功',
+          text: '注册成功，请使用新账号登录',
+          icon: 'success',
+          confirmButtonColor: '#667eea',
+          width: '320px'
+        }).then(() => {
+          // 清空注册表单并关闭弹窗
+          document.getElementById('register-username').value = '';
+          document.getElementById('register-nickname').value = '';
+          document.getElementById('register-password').value = '';
+          closeRegisterModal();
+        });
+      } catch (err) {
+        Sweetalert2.fire({
+          title: '注册失败',
           text: err.message,
           icon: 'error',
           confirmButtonColor: '#667eea',

@@ -1969,7 +1969,7 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
                 this.updatePropertiesPanel();
             }
         }, true); // 使用捕获阶段，确保先触发
-        document.getElementById('propertiesContent').addEventListener('click', this.handleTaskClick.bind(this));
+
         // 键盘事件处理（Enter 保存，Esc 取消）
         document.getElementById('propertiesContent').addEventListener('keydown', (e) => {
             if (e.target.classList.contains('task-list-name-input')) {
@@ -1991,34 +1991,137 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
         });
 
         // 图片上传相关事件（使用事件委托，避免重复绑定）
-        document.getElementById('propertiesContent').addEventListener('click', async (e) => {
-            if (e.target.id === 'uploadNodeImageBtn') {
-                e.stopPropagation();
-                document.getElementById('nodeImageInput').click();
-            } else if (e.target.id === 'removeNodeImageBtn') {
-                e.stopPropagation();
-                try {
-                    // 使用新的API端点删除图片
-                    const response = await fetch(`/api/node-images?nodeId=${this.selectedNode.id}`, {
-                        method: 'DELETE'
-                    });
-                    if (response.ok) {
-                        // 更新本地节点的图片数据
-                        this.selectedNode.image = '';
-                        this.updatePropertiesPanel();
-                        this.render();
-                    } else {
-                        console.error('删除图片失败:', response.statusText);
-                        this.showStatus('删除图片失败');
+        // 先移除之前的事件监听器
+        const propertiesContent = document.getElementById('propertiesContent');
+        if (propertiesContent) {
+            // 保存对当前实例的引用
+            const self = this;
+            
+            // 移除之前的点击事件监听器
+            const newPropertiesContent = propertiesContent.cloneNode(true);
+            propertiesContent.parentNode.replaceChild(newPropertiesContent, propertiesContent);
+            
+            // 重新获取引用
+            const updatedPropertiesContent = document.getElementById('propertiesContent');
+            
+            // 添加新的点击事件监听器
+            updatedPropertiesContent.addEventListener('click', this.handleTaskClick.bind(this));
+            
+            // 添加图片上传相关的点击事件监听器
+            updatedPropertiesContent.addEventListener('click', async (e) => {
+                if (e.target.id === 'uploadNodeImageBtn') {
+                    e.stopPropagation();
+                    document.getElementById('nodeImageInput').click();
+                } else if (e.target.id === 'removeNodeImageBtn') {
+                    e.stopPropagation();
+                    try {
+                        // 使用新的API端点删除图片
+                        const response = await fetch(`/api/node-images?nodeId=${self.selectedNode.id}`, {
+                            method: 'DELETE'
+                        });
+                        if (response.ok) {
+                            // 更新本地节点的图片数据
+                            self.selectedNode.image = '';
+                            self.updatePropertiesPanel();
+                            self.render();
+                        } else {
+                            console.error('删除图片失败:', response.statusText);
+                            self.showStatus('删除图片失败');
+                        }
+                    } catch (error) {
+                        console.error('删除图片失败:', error);
+                        self.showStatus('删除图片失败');
                     }
-                } catch (error) {
-                    console.error('删除图片失败:', error);
-                    this.showStatus('删除图片失败');
+                } else if (e.target.closest('#nodeImagePreview') && !self.selectedNode.image) {
+                    document.getElementById('nodeImageInput').click();
                 }
-            } else if (e.target.closest('#nodeImagePreview') && !this.selectedNode.image) {
-                document.getElementById('nodeImageInput').click();
-            }
-        });
+            });
+            
+            // 添加其他事件监听器
+            updatedPropertiesContent.addEventListener('input', (e) => {
+                // 处理 textarea 自动高度调整
+                if (e.target.classList.contains('task-textarea')) {
+                    self.autoResizeTextarea(e.target);
+                }
+                // 只更新数据，不重新渲染，避免干扰 IME
+                self.handlePropertyInput(e);
+            });
+            
+            updatedPropertiesContent.addEventListener('change', self.handlePropertyChange.bind(self));
+            
+            updatedPropertiesContent.addEventListener('blur', (e) => {
+                // 使用 blur 事件保存数据，避免干扰 IME
+                if (e.target.dataset.taskField === 'title' || e.target.dataset.nodeTaskField === 'title') {
+                    self.handlePropertyChange(e);
+                }
+                // 保存清单名称
+                if (e.target.classList.contains('task-list-name-input')) {
+                    const newValue = e.target.value.trim();
+                    self.selectedNode.taskListName = newValue;
+                    self.saveNode(self.selectedNode);
+                    self.updatePropertiesPanel();
+                }
+            }, true); // 使用捕获阶段，确保先触发
+            
+            // 键盘事件处理（Enter 保存，Esc 取消）
+            updatedPropertiesContent.addEventListener('keydown', (e) => {
+                if (e.target.classList.contains('task-list-name-input')) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const newValue = e.target.value.trim();
+                        self.selectedNode.taskListName = newValue;
+                        self.saveNode(self.selectedNode);
+                        self.updatePropertiesPanel();
+                        self.render();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        // 恢复原始值
+                        const originalValue = e.target.dataset.originalValue || '';
+                        self.selectedNode.taskListName = originalValue;
+                        self.updatePropertiesPanel();
+                    }
+                }
+            });
+            
+            // 添加文件上传相关的 change 事件监听器
+            updatedPropertiesContent.addEventListener('change', (e) => {
+                if (e.target.id === 'nodeImageInput') {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = async (event) => {
+                            const imageData = event.target.result;
+                            try {
+                                // 使用新的API端点保存图片
+                                const response = await fetch('/api/node-images', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        nodeId: self.selectedNode.id,
+                                        imageData: imageData
+                                    })
+                                });
+                                if (response.ok) {
+                                    // 更新本地节点的图片数据
+                                    self.selectedNode.image = imageData;
+                                    self.updatePropertiesPanel();
+                                    self.render();
+                                } else {
+                                    console.error('保存图片失败:', response.statusText);
+                                    self.showStatus('保存图片失败');
+                                }
+                            } catch (error) {
+                                console.error('保存图片失败:', error);
+                                self.showStatus('保存图片失败');
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            });
+        }
 
         document.getElementById('propertiesContent').addEventListener('change', (e) => {
             if (e.target.id === 'nodeImageInput') {
@@ -4204,7 +4307,164 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
         // 更新属性面板高度（延迟执行，确保DOM更新完成）
         setTimeout(() => {
             this.updatePropertiesPanelHeight();
+            // 重新绑定事件监听器，避免重复绑定导致的问题
+            this.rebindPropertiesPanelListeners();
         }, 0);
+    }
+    
+    // 重新绑定属性面板的事件监听器，避免重复绑定
+    rebindPropertiesPanelListeners() {
+        const propertiesContent = document.getElementById('propertiesContent');
+        if (!propertiesContent) return;
+        
+        // 保存对当前实例的引用
+        const self = this;
+        
+        // 移除之前的所有事件监听器
+        const newPropertiesContent = propertiesContent.cloneNode(true);
+        propertiesContent.parentNode.replaceChild(newPropertiesContent, propertiesContent);
+        
+        // 重新获取引用
+        const updatedPropertiesContent = document.getElementById('propertiesContent');
+        
+        // 添加点击事件监听器
+        updatedPropertiesContent.addEventListener('click', function(e) {
+            // 阻止事件冒泡，避免重复触发
+            e.stopPropagation();
+            self.handleTaskClick.call(self, e);
+        });
+        
+        // 添加图片上传相关的点击事件监听器
+        updatedPropertiesContent.addEventListener('click', async (e) => {
+            // 阻止事件冒泡，避免重复触发
+            e.stopPropagation();
+            
+            if (e.target.id === 'uploadNodeImageBtn') {
+                document.getElementById('nodeImageInput').click();
+            } else if (e.target.id === 'removeNodeImageBtn') {
+                try {
+                    // 使用新的API端点删除图片
+                    const response = await fetch(`/api/node-images?nodeId=${self.selectedNode.id}`, {
+                        method: 'DELETE'
+                    });
+                    if (response.ok) {
+                        // 更新本地节点的图片数据
+                        self.selectedNode.image = '';
+                        self.updatePropertiesPanel();
+                        self.render();
+                    } else {
+                        console.error('删除图片失败:', response.statusText);
+                        self.showStatus('删除图片失败');
+                    }
+                } catch (error) {
+                    console.error('删除图片失败:', error);
+                    self.showStatus('删除图片失败');
+                }
+            } else if (e.target.closest('#nodeImagePreview') && !self.selectedNode.image) {
+                document.getElementById('nodeImageInput').click();
+            }
+        });
+        
+        // 添加输入事件监听器
+        updatedPropertiesContent.addEventListener('input', (e) => {
+            // 处理 textarea 自动高度调整
+            if (e.target.classList.contains('task-textarea')) {
+                self.autoResizeTextarea(e.target);
+            }
+            // 只更新数据，不重新渲染，避免干扰 IME
+            self.handlePropertyInput(e);
+        });
+        
+        // 添加变更事件监听器
+        updatedPropertiesContent.addEventListener('change', function(e) {
+            self.handlePropertyChange.call(self, e);
+        });
+        
+        // 添加失焦事件监听器
+        updatedPropertiesContent.addEventListener('blur', (e) => {
+            // 使用 blur 事件保存数据，避免干扰 IME
+            if (e.target.dataset.taskField === 'title' || e.target.dataset.nodeTaskField === 'title') {
+                self.handlePropertyChange(e);
+            }
+            // 保存清单名称
+            if (e.target.classList.contains('task-list-name-input')) {
+                const newValue = e.target.value.trim();
+                self.selectedNode.taskListName = newValue;
+                self.saveNode(self.selectedNode);
+                self.updatePropertiesPanel();
+            }
+        }, true); // 使用捕获阶段，确保先触发
+        
+        // 键盘事件处理（Enter 保存，Esc 取消）
+        updatedPropertiesContent.addEventListener('keydown', (e) => {
+            if (e.target.classList.contains('task-list-name-input')) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const newValue = e.target.value.trim();
+                    self.selectedNode.taskListName = newValue;
+                    self.saveNode(self.selectedNode);
+                    self.updatePropertiesPanel();
+                    self.render();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    // 恢复原始值
+                    const originalValue = e.target.dataset.originalValue || '';
+                    self.selectedNode.taskListName = originalValue;
+                    self.updatePropertiesPanel();
+                }
+            }
+        });
+        
+        // 添加文件上传相关的 change 事件监听器
+        updatedPropertiesContent.addEventListener('change', (e) => {
+            if (e.target.id === 'nodeImageInput') {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        const imageData = event.target.result;
+                        try {
+                            // 使用新的API端点保存图片
+                            const response = await fetch('/api/node-images', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    nodeId: self.selectedNode.id,
+                                    imageData: imageData
+                                })
+                            });
+                            if (response.ok) {
+                                // 更新本地节点的图片数据
+                                self.selectedNode.image = imageData;
+                                self.updatePropertiesPanel();
+                                self.render();
+                            } else {
+                                console.error('保存图片失败:', response.statusText);
+                                self.showStatus('保存图片失败');
+                            }
+                        } catch (error) {
+                            console.error('保存图片失败:', error);
+                            self.showStatus('保存图片失败');
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        });
+        
+        // 重新设置tab切换功能
+        self.setupTabSwitching(updatedPropertiesContent);
+        
+        // 重新设置任务拖拽排序功能
+        self.setupTaskDragSort(updatedPropertiesContent);
+        
+        // 重新设置文件上传功能
+        self.setupFileUpload(updatedPropertiesContent);
+        
+        // 重新设置记事本编辑功能
+        self.setupNotepadEditor(updatedPropertiesContent);
     }
 
     setupTabSwitching(panel) {

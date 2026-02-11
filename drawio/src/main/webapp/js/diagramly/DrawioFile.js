@@ -2,9 +2,6 @@
  * Copyright (c) 2006-2017, JGraph Holdings Ltd
  * Copyright (c) 2006-2017, draw.io AG
  */
-// API base URL configuration
-DrawioFile.API_BASE_URL = urlParams['apiBaseUrl'] || 'http://localhost:3000';
-
 DrawioFile = function(ui, data)
 {
 	mxEventSource.call(this);
@@ -3049,6 +3046,23 @@ DrawioFile.prototype.clearAutosave = function()
 		this.autosaveThread = null;
 	}
 };
+
+// API base URL configuration
+DrawioFile.API_BASE_URL = urlParams['apiBaseUrl'] || 'http://localhost:3000';
+
+// 确保 urlParams 存在
+if (typeof urlParams === 'undefined') {
+	var urlParams = {};
+	var search = window.location.search.substring(1);
+	var params = search.split('&');
+	for (var i = 0; i < params.length; i++) {
+		var pair = params[i].split('=');
+		urlParams[pair[0]] = decodeURIComponent(pair[1]);
+	}
+	
+	// 重新设置 API_BASE_URL
+	DrawioFile.API_BASE_URL = urlParams['apiBaseUrl'] || 'http://localhost:3000';
+}
 
 /**
  * Returns the location as a new object.

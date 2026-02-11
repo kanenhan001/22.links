@@ -8,6 +8,13 @@
  * @param {number} x X-coordinate of the point.
  * @param {number} y Y-coordinate of the point.
  */
+// 确保 DrawioFile 存在
+if (typeof DrawioFile === 'undefined') {
+	// 如果 DrawioFile 还不存在，创建一个临时占位符
+	DrawioFile = function() {}
+	DrawioFile.prototype = {}
+}
+
 LocalFile = function(ui, data, title, temp, fileHandle, desc, editable)
 {
 	DrawioFile.call(this, ui, data);
