@@ -2197,7 +2197,13 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
                     });
                     
                     if (response.ok) {
-                        // 任务更新成功，无需重新渲染面板，数据会在下次加载时自动更新
+                        // 更新本地状态，确保本地和服务器同步
+                        if (Array.isArray(this.selectedNode.tasks)) {
+                            const taskIndex = this.selectedNode.tasks.findIndex(t => t.id === taskId);
+                            if (taskIndex !== -1) {
+                                this.selectedNode.tasks[taskIndex].title = e.target.value;
+                            }
+                        }
                     } else {
                         console.error('任务更新失败:', response.statusText);
                     }
@@ -2211,7 +2217,13 @@ ${type === 'flow' ? 'graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]'
                     });
                     
                     if (response.ok) {
-                        // 任务更新成功，无需重新渲染面板，数据会在下次加载时自动更新
+                        // 更新本地状态，确保本地和服务器同步
+                        if (Array.isArray(this.selectedNode.tasks)) {
+                            const taskIndex = this.selectedNode.tasks.findIndex(t => t.id === taskId);
+                            if (taskIndex !== -1) {
+                                this.selectedNode.tasks[taskIndex].done = !!e.target.checked;
+                            }
+                        }
                     } else {
                         console.error('任务更新失败:', response.statusText);
                     }
