@@ -145,7 +145,7 @@
     <!-- 编辑器内容区 -->
     <div class="editor-content">
       <div id="mindmap-container"></div>
-      <div class="status-bar" id="statusBar">就绪</div>
+      <div class="status-bar" id="statusBar" style="display: none;">就绪</div>
       <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
       </div>
@@ -184,22 +184,15 @@
           
           // 确保 MindElixir 已加载
           if (typeof MindElixir === 'undefined') {
-            console.error('MindElixir 未加载');
             updateStatus('初始化失败：MindElixir 未加载');
             document.getElementById('loadingOverlay').style.display = 'none';
             return;
           }
           
-          // 调试信息
-          console.log('MindElixir 对象:', MindElixir);
-          console.log('MindElixir 类型:', typeof MindElixir);
-          
           // 检查 MindElixir 的实际导出方式
           const MindElixirConstructor = MindElixir.default || MindElixir;
-          console.log('使用的构造函数:', MindElixirConstructor);
           
           if (typeof MindElixirConstructor !== 'function') {
-            console.error('MindElixir 不是一个构造函数');
             updateStatus('初始化失败：MindElixir 不是一个构造函数');
             document.getElementById('loadingOverlay').style.display = 'none';
             return;
@@ -211,9 +204,7 @@
           if (graphData.code && graphData.code !== 'undefined' && graphData.code.trim() !== '') {
             try {
               mindmapData = JSON.parse(graphData.code);
-              console.log('解析的思维导图数据:', mindmapData);
             } catch (parseError) {
-              console.error('解析思维导图数据失败，使用默认数据:', parseError);
               // 使用默认数据结构
               mindmapData = {
                 nodeData: {
@@ -230,11 +221,7 @@
                 topic: '中心主题'
               }
             };
-            console.log('使用默认思维导图数据:', mindmapData);
           }
-          
-          // 检查 MindElixir.plugin
-          console.log('检查 MindElixir.plugin:', MindElixir.plugin);
           
           const options = {
             el: '#mindmap-container',
@@ -249,50 +236,31 @@
             allowUndo: true
           };
           
-          console.log('MindElixir 配置:', options);
-          
-          console.log('创建 MindElixir 实例，选项:', options);
-          
           try {
             mindElixirInstance = new MindElixirConstructor(options);
-            console.log('MindElixir 实例创建成功:', mindElixirInstance);
             
             // 初始化实例，使用加载的数据或默认数据
             if (typeof mindElixirInstance.init === 'function') {
               try {
                 mindElixirInstance.init(mindmapData);
-                console.log('MindElixir 实例初始化成功（带数据）');
+
                 
                 // 恢复之前保存的位置和缩放比例
                 if (mindmapData.position) {
-                  console.log('恢复位置和缩放比例:', mindmapData.position);
                   const { x, y, scale } = mindmapData.position;
                   const newTransform = `translate3d(${x}px, ${y}px, 0px) scale(${scale})`;
                   mindElixirInstance.map.style.transform = newTransform;
-                  console.log('应用保存的 transform 值:', newTransform);
                 }
-                
-                // 初始化后检查实例属性
-                console.log('mindElixirInstance 属性:', Object.keys(mindElixirInstance));
-                console.log('mindElixirInstance.draggable:', mindElixirInstance.draggable);
-                console.log('mindElixirInstance.bus:', mindElixirInstance.bus);
-                console.log('mindElixirInstance.dragMoveHelper:', mindElixirInstance.dragMoveHelper);
-                
                 // 尝试通过 bus 监听事件
                 if (mindElixirInstance.bus) {
-                  console.log('尝试通过 bus 监听事件');
-                  console.log('bus 方法:', Object.keys(mindElixirInstance.bus));
                   // 尝试监听拖拽相关事件
                   const dragEvents = ['dragStart', 'drag', 'dragEnd', 'drop', 'moveNode'];
                   dragEvents.forEach(eventName => {
                     try {
                       if (mindElixirInstance.bus.addListener) {
                         mindElixirInstance.bus.addListener(eventName, (data) => {
-                          console.log(`拖拽事件触发: ${eventName}`, data);
                         });
-                        console.log(`成功监听事件: ${eventName}`);
                       } else {
-                        console.log(`bus 没有 addListener 方法`);
                       }
                     } catch (error) {
                       console.log(`监听事件 ${eventName} 失败:`, error.message);
@@ -301,71 +269,40 @@
                 }
                 
                 // 尝试启用根节点拖拽
-                console.log('尝试启用根节点拖拽');
                 // 直接设置 draggable 属性
                 mindElixirInstance.draggable = true;
-                console.log('设置后 mindElixirInstance.draggable:', mindElixirInstance.draggable);
-                
-                // 检查根节点
-                console.log('检查根节点:', mindElixirInstance.nodeData);
                 
                 // 尝试修改根节点属性
                 if (mindElixirInstance.nodeData) {
                   mindElixirInstance.nodeData.draggable = true;
-                  console.log('设置根节点 draggable 属性');
                 }
-                
-                // 检查地图属性
-                console.log('检查地图属性:');
-                console.log('mindElixirInstance.map:', mindElixirInstance.map);
-                console.log('mindElixirInstance.nodes:', mindElixirInstance.nodes);
-                
-                // 尝试修改地图的拖拽行为
-                console.log('尝试修改地图的拖拽行为');
                 if (mindElixirInstance.map) {
-                  // 检查地图元素的属性
-                  console.log('地图元素属性:', mindElixirInstance.map.attributes);
                   
                   // 尝试直接在地图元素上添加拖拽事件
                   mindElixirInstance.map.addEventListener('mousedown', (e) => {
-                    console.log('地图鼠标按下事件:', e.target);
+
                     // 检查是否点击了根节点
                     const rootNode = e.target.closest('.me-node-root');
                     if (rootNode) {
-                      console.log('点击了根节点:', rootNode);
                     }
                   });
-                  
-                  console.log('添加了地图鼠标事件监听');
                 }
                 
-                // 检查拖拽相关的方法
-                console.log('检查拖拽相关的方法:');
-                console.log('mindElixirInstance.drag:', typeof mindElixirInstance.drag);
-                console.log('mindElixirInstance.startDrag:', typeof mindElixirInstance.startDrag);
-                console.log('mindElixirInstance.stopDrag:', typeof mindElixirInstance.stopDrag);
+               
                 
                 // 检查根节点元素
-                console.log('检查根节点元素');
                 const rootNodeElement = document.querySelector('.me-node-root, [data-nodeid="meroot"]');
                 if (rootNodeElement) {
-                  console.log('找到根节点元素:', rootNodeElement);
-                  console.log('根节点元素类名:', rootNodeElement.className);
-                  console.log('根节点元素样式:', rootNodeElement.style);
-                  console.log('根节点元素属性:', rootNodeElement.attributes);
                   
                   // 检查并修改 draggable 属性
-                  console.log('根节点 draggable 属性:', rootNodeElement.getAttribute('draggable'));
                   if (rootNodeElement.getAttribute('draggable') === 'false') {
                     rootNodeElement.setAttribute('draggable', 'true');
-                    console.log('修改根节点 draggable 属性为 true');
                   }
                   
                   // 尝试修改根节点元素的其他属性
                   rootNodeElement.style.cursor = 'move';
                   rootNodeElement.style.userSelect = 'none';
                   rootNodeElement.style.pointerEvents = 'auto';
-                  console.log('修改了根节点元素的样式');
                   
                   // 尝试直接添加拖拽事件
                   let isDragging = false;
@@ -373,14 +310,12 @@
                   let startTranslateX = 0, startTranslateY = 0;
                   
                   rootNodeElement.addEventListener('mousedown', (e) => {
-                    console.log('根节点鼠标按下事件:', e);
                     isDragging = true;
                     startX = e.clientX;
                     startY = e.clientY;
                     
                     // 获取当前的 transform 值
                     const currentTransform = mindElixirInstance.map.style.transform;
-                    console.log('当前地图 transform:', currentTransform);
                     
                     // 阻止默认行为
                     e.preventDefault();
@@ -389,16 +324,13 @@
                   
                   document.addEventListener('mousemove', (e) => {
                     if (isDragging) {
-                      console.log('鼠标移动事件:', e);
                       const dx = e.clientX - startX;
                       const dy = e.clientY - startY;
-                      console.log('鼠标移动距离:', dx, dy);
                       
                       // 尝试修改地图的 transform 来移动根节点
                       if (mindElixirInstance.map) {
                         // 获取当前的 transform 值
                         const currentTransform = mindElixirInstance.map.style.transform;
-                        console.log('当前地图 transform:', currentTransform);
                         
                         // 解析当前的 transform 值
                         let translateX = 0, translateY = 0, scale = 1;
@@ -407,13 +339,11 @@
                           translateX = parseFloat(transformMatch[1]);
                           translateY = parseFloat(transformMatch[2]);
                           scale = parseFloat(transformMatch[4]);
-                          console.log('解析出的 transform 值:', { translateX, translateY, scale });
                         }
                         
                         // 考虑缩放比例，使移动速度与鼠标一致
                         const adjustedDx = dx / scale;
                         const adjustedDy = dy / scale;
-                        console.log('调整后的移动距离:', adjustedDx, adjustedDy);
                         
                         // 计算新的 transform 值
                         const newTranslateX = translateX + adjustedDx;
@@ -422,7 +352,6 @@
                         
                         // 应用新的 transform 值
                         mindElixirInstance.map.style.transform = newTransform;
-                        console.log('应用新的 transform 值:', newTransform);
                         
                         // 更新起始位置，以便下次移动计算
                         startX = e.clientX;
@@ -433,25 +362,16 @@
                   
                   document.addEventListener('mouseup', (e) => {
                     if (isDragging) {
-                      console.log('鼠标释放事件:', e);
                       isDragging = false;
                     }
                   });
-                  
-                  console.log('添加了根节点拖拽事件监听');
                 } else {
-                  console.log('未找到根节点元素');
                 }
                 
                 // 尝试修改地图的方向配置
-                console.log('尝试修改地图的方向配置');
                 if (mindElixirInstance) {
-                  // 检查当前方向
-                  console.log('当前方向:', mindElixirInstance.direction);
-                  
                   // 尝试修改方向为两侧分布
                   // 注意：这可能需要重新初始化
-                  console.log('提示：可以尝试修改 direction 配置为 3（两侧分布）来解决空间问题');
                 }
                 
               } catch (initError) {
@@ -464,13 +384,6 @@
                       topic: '中心主题'
                     }
                   });
-                  console.log('MindElixir 实例初始化成功（带默认数据）');
-                  
-                  // 初始化后检查拖拽相关属性
-                  console.log('初始化后检查拖拽属性:');
-                  console.log('mindElixirInstance.draggable:', mindElixirInstance.draggable);
-                  console.log('mindElixirInstance.dragMode:', mindElixirInstance.dragMode);
-                  
                 } catch (initError2) {
                   console.error('带默认数据初始化失败:', initError2);
                   // 放弃初始化，显示错误信息
@@ -478,7 +391,6 @@
                 }
               }
             } else {
-              console.error('MindElixir 实例没有 init 方法');
               updateStatus('初始化失败：MindElixir 实例没有 init 方法');
               document.getElementById('loadingOverlay').style.display = 'none';
               return;
@@ -610,7 +522,6 @@
             position.scale = parseFloat(transformMatch[4]);
           }
         }
-        console.log('保存位置和缩放比例:', position);
         
         // 将位置和缩放比例添加到数据中
         mindmapData.position = position;
@@ -629,6 +540,11 @@
         .then(function(response) {
           updateStatus(isAutoSave ? '自动保存成功' : '保存成功');
           
+          // 手动保存时显示保存成功提示
+          if (!isAutoSave) {
+            showSaveSuccessMessage();
+          }
+          
           // 3 秒后恢复状态
           setTimeout(() => {
             updateStatus('就绪');
@@ -644,6 +560,51 @@
         updateStatus('保存失败');
         isSaving = false;
       }
+    }
+    
+    // 显示保存成功提示
+    function showSaveSuccessMessage() {
+      // 创建提示元素
+      const messageElement = document.createElement('div');
+      messageElement.className = 'save-success-message';
+      messageElement.textContent = '保存成功';
+      
+      // 添加样式
+      Object.assign(messageElement.style, {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        backgroundColor: 'rgba(76, 175, 80, 0.9)',
+        color: 'white',
+        padding: '16px 24px',
+        borderRadius: '8px',
+        fontSize: '16px',
+        fontWeight: 'bold',
+        zIndex: '1000',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        textAlign: 'center',
+        opacity: '0',
+        transition: 'opacity 0.3s ease'
+      });
+      
+      // 添加到页面
+      document.body.appendChild(messageElement);
+      
+      // 显示提示
+      setTimeout(() => {
+        messageElement.style.opacity = '1';
+      }, 100);
+      
+      // 3秒后隐藏并移除
+      setTimeout(() => {
+        messageElement.style.opacity = '0';
+        setTimeout(() => {
+          if (messageElement.parentNode) {
+            messageElement.parentNode.removeChild(messageElement);
+          }
+        }, 300);
+      }, 2000);
     }
     
     // 生成缩略图
@@ -678,7 +639,7 @@
         // 如果有保存的位置数据，直接映射根节点位置
         if (actualData && actualData.position) {
           const { x, y, scale } = actualData.position;
-          console.log('缩略图使用位置数据:', { x, y, scale });
+
           
           // 直接映射实际位置到缩略图位置
           const positionScale = 0.1;
@@ -692,9 +653,9 @@
           rootX = Math.max(50, Math.min(200, rootX)); // 限制在左侧区域
           rootY = Math.max(50, Math.min(250, rootY));
           
-          console.log('调整后根节点位置:', { rootX, rootY });
+
         } else {
-          console.log('使用默认根节点位置:', { rootX, rootY });
+
         }
         
         // 为了兼容性，设置中心位置为根节点位置
@@ -704,34 +665,26 @@
         // 如果有实际数据，使用实际数据生成缩略图
         if (actualData && actualData.nodeData) {
           rootTopic = actualData.nodeData.topic || '中心主题';
-          console.log('使用实际数据生成缩略图，根节点:', rootTopic);
-          console.log('实际数据结构:', JSON.stringify(actualData.nodeData, null, 2));
+
           
           // 为根节点设置 level 属性
           const rootNode = JSON.parse(JSON.stringify(actualData.nodeData));
           rootNode.level = 0;
           
           // 检查子节点
-          if (rootNode.children && rootNode.children.length > 0) {
-            console.log('根节点有', rootNode.children.length, '个子节点');
-            rootNode.children.forEach((child, index) => {
-              console.log('子节点', index + 1, ':', child.topic);
-            });
-          } else {
-            console.log('根节点没有子节点');
+          if (!rootNode.children) {
             // 添加默认子节点，以便测试
             rootNode.children = [
               { topic: '分支1' },
               { topic: '分支2' },
               { topic: '分支3' }
             ];
-            console.log('添加了默认子节点');
           }
           
           // 直接使用实际数据结构绘制
           drawMindmapFromData(ctx, rootNode, centerX, centerY, 150);
         } else {
-          console.log('使用默认数据生成缩略图');
+
           // 使用默认数据
           const defaultData = {
             topic: rootTopic,
@@ -755,7 +708,7 @@
               }
             ]
           };
-          console.log('默认数据结构:', JSON.stringify(defaultData, null, 2));
+
           drawMindmapFromData(ctx, defaultData, centerX, centerY, 150);
         }
         
@@ -770,7 +723,6 @@
     // 根据实际数据绘制思维导图
     function drawMindmapFromData(ctx, node, x, y, maxWidth) {
       try {
-        console.log('开始绘制节点:', node.topic, '位置:', { x, y });
         
         // 定义配置
         const config = {
@@ -830,28 +782,26 @@
         
         // 绘制子节点
         if (node.children && node.children.length > 0) {
-          console.log('绘制子节点，数量:', node.children.length);
           
           // 计算子节点的位置
           const childCount = node.children.length;
           const totalHeight = (childCount - 1) * config.siblingSpacing;
           const nodeStartY = y - totalHeight / 2;
-          console.log('子节点起始位置:', nodeStartY);
           
           // 为每个子节点设置层级并绘制
           node.children.forEach((child, index) => {
             child.level = node.level + 1;
-            console.log('处理子节点:', child.topic, '索引:', index);
+
             
             // 计算子节点位置
             const childX = x + config.levelSpacing;
             const childY = nodeStartY + index * config.siblingSpacing;
-            console.log('子节点位置:', { childX, childY });
+
             
             // 确保子节点在画布范围内
             const clampedChildX = Math.max(100, Math.min(380, childX));
             const clampedChildY = Math.max(30, Math.min(270, childY));
-            console.log('调整后子节点位置:', { clampedChildX, clampedChildY });
+
             
             // 只绘制到二级节点，三级及以下不显示
             if (child.level < 2) {
@@ -864,31 +814,26 @@
               // 从当前节点的右侧中间开始
               const startX = x + width / 2;
               const lineStartY = y;
-              console.log('连接线起点:', { startX, lineStartY });
               
               // 到子节点的左侧中间结束
               const endX = clampedChildX - config.childWidth / 2;
               const endY = clampedChildY;
-              console.log('连接线终点:', { endX, endY });
               
               // 使用贝塞尔曲线连接
               ctx.moveTo(startX, lineStartY);
               ctx.bezierCurveTo(startX + 30, lineStartY, endX - 30, endY, endX, endY);
               ctx.stroke();
-              console.log('连接线绘制完成');
               
               // 递归绘制子节点
               drawMindmapFromData(ctx, child, clampedChildX, clampedChildY, maxWidth - config.levelSpacing);
-            } else {
-              console.log('跳过三级及以下节点:', child.topic);
-              // 不绘制连接线，避免多余的线条
             }
+            // 不绘制三级及以下节点和连接线
           });
         }
         
-        console.log('节点绘制完成:', node.topic);
+
       } catch (error) {
-        console.error('绘制节点失败:', error);
+        // 忽略错误，确保生成缩略图的过程不会中断
       }
     }
     
