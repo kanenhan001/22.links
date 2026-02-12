@@ -1511,6 +1511,49 @@ app.post('/api/graphs/:id/duplicate', async (req, res) => {
     }
 });
 
+// 共享图表到模板广场
+app.post('/api/graphs/:id/share', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const id = parseInt(req.params.id);
+
+        // 检查是否有权限
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        // 标记图表为共享
+        await run('UPDATE graphs SET shared = TRUE WHERE id = ?', [id]);
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('共享图表失败:', e);
+        res.status(500).json({ error: '共享图表失败' });
+    }
+});
+
+// 获取所有共享的图表
+app.get('/api/graphs/shared', async (req, res) => {
+    try {
+        console.log('[API] 收到获取共享图表的请求:', {
+            url: req.url,
+            method: req.method,
+            headers: req.headers,
+            session: req.session
+        });
+
+        // 获取所有标记为共享的图表
+        const sharedGraphs = await queryAll('SELECT * FROM graphs WHERE shared = TRUE ORDER BY createdAt DESC');
+        console.log('[API] 查询到的共享图表数量:', sharedGraphs.length);
+
+        res.json(sharedGraphs);
+    } catch (e) {
+        console.error('获取共享图表失败:', e);
+        res.status(500).json({ error: '获取共享图表失败' });
+    }
+});
+
 // 获取关系图详情
 app.get('/api/graphs/:id', async (req, res) => {
     try {
@@ -1546,41 +1589,6 @@ app.get('/api/graphs/:id', async (req, res) => {
     } catch (e) {
         console.error('获取关系图详情失败:', e);
         res.status(500).json({ error: '获取关系图详情失败' });
-    }
-});
-
-// 共享图表到模板广场
-app.post('/api/graphs/:id/share', async (req, res) => {
-    try {
-        const userId = getAuthedUserId(req);
-        const id = parseInt(req.params.id);
-
-        // 检查是否有权限
-        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
-        if (!graph) {
-            return res.status(403).json({ error: '无权限' });
-        }
-
-        // 标记图表为共享
-        await run('UPDATE graphs SET shared = TRUE WHERE id = ?', [id]);
-
-        res.json({ success: true });
-    } catch (e) {
-        console.error('共享图表失败:', e);
-        res.status(500).json({ error: '共享图表失败' });
-    }
-});
-
-// 获取所有共享的图表
-app.get('/api/graphs/shared', async (req, res) => {
-    try {
-        // 获取所有标记为共享的图表
-        const sharedGraphs = await queryAll('SELECT * FROM graphs WHERE shared = TRUE ORDER BY createdAt DESC');
-
-        res.json(sharedGraphs);
-    } catch (e) {
-        console.error('获取共享图表失败:', e);
-        res.status(500).json({ error: '获取共享图表失败' });
     }
 });
 
