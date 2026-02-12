@@ -841,6 +841,79 @@
     function exportMindmap() {
       if (!mindElixirInstance) return;
       
+      // 找到导出按钮
+      const exportButton = document.querySelector('.btn[onclick="exportMindmap()"]');
+      if (!exportButton) return;
+      
+      // 检查是否已存在下拉菜单
+      const existingMenu = document.getElementById('exportDropdownMenu');
+      if (existingMenu) {
+        existingMenu.remove();
+        return;
+      }
+      
+      // 获取导出按钮的位置
+      const rect = exportButton.getBoundingClientRect();
+      
+      // 创建下拉菜单
+      const dropdownMenu = document.createElement('div');
+      dropdownMenu.id = 'exportDropdownMenu';
+      dropdownMenu.style.cssText = `
+        position: fixed;
+        top: ${rect.bottom + window.scrollY + 5}px;
+        right: ${window.innerWidth - rect.right + window.scrollX}px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        min-width: 160px;
+        padding: 8px 0;
+        margin: 0;
+        list-style: none;
+      `;
+      
+      dropdownMenu.innerHTML = `
+        <button onclick="exportAsJson()" style="display: block; width: 100%; padding: 10px 16px; text-align: left; border: none; background: transparent; cursor: pointer; font-size: 14px; color: #333;">
+          导出为 JSON
+        </button>
+        <button onclick="exportAsImage()" style="display: block; width: 100%; padding: 10px 16px; text-align: left; border: none; background: transparent; cursor: pointer; font-size: 14px; color: #333;">
+          导出为图片
+        </button>
+        <div style="height: 1px; background: #f0f0f0; margin: 4px 0;"></div>
+        <button onclick="document.getElementById('exportDropdownMenu').remove()" style="display: block; width: 100%; padding: 10px 16px; text-align: left; border: none; background: transparent; cursor: pointer; font-size: 14px; color: #666;">
+          取消
+        </button>
+      `;
+      
+      // 添加点击事件监听器，使菜单项在鼠标悬停时高亮
+      const menuItems = dropdownMenu.querySelectorAll('button');
+      menuItems.forEach(item => {
+        item.addEventListener('mouseenter', function() {
+          this.style.backgroundColor = '#f5f5f5';
+        });
+        item.addEventListener('mouseleave', function() {
+          this.style.backgroundColor = 'transparent';
+        });
+      });
+      
+      // 添加到页面
+      document.body.appendChild(dropdownMenu);
+      
+      // 点击页面其他地方关闭菜单
+      setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+          if (!dropdownMenu.contains(e.target) && e.target !== exportButton) {
+            dropdownMenu.remove();
+            document.removeEventListener('click', closeMenu);
+          }
+        });
+      }, 100);
+    }
+    
+    // 导出为 JSON
+    function exportAsJson() {
+      if (!mindElixirInstance) return;
+      
       const mindmapData = mindElixirInstance.getData();
       const dataStr = JSON.stringify(mindmapData, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -851,6 +924,174 @@
       link.download = `${document.getElementById('graphTitle').textContent}.json`;
       link.click();
       URL.revokeObjectURL(url);
+      
+      // 关闭下拉菜单
+      const dropdownMenu = document.getElementById('exportDropdownMenu');
+      if (dropdownMenu) dropdownMenu.remove();
+    }
+    
+    // 导出为图片
+    function exportAsImage() {
+      if (!mindElixirInstance) return;
+      
+      try {
+        // 尝试使用 toSvg 方法
+        if (mindElixirInstance.toSvg) {
+          const svg = mindElixirInstance.toSvg();
+          // 移除可能包含的工具栏元素
+          const cleanedSvg = svg.replace(/<g[^>]*class="?toolbar"?[^>]*>.*?<\/g>/g, '');
+          const svgBlob = new Blob([cleanedSvg], { type: 'image/svg+xml;charset=utf-8' });
+          const svgUrl = URL.createObjectURL(svgBlob);
+          
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            
+            canvas.toBlob(function(blob) {
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${document.getElementById('graphTitle').textContent}.png`;
+              link.click();
+              URL.revokeObjectURL(url);
+              URL.revokeObjectURL(svgUrl);
+              
+              // 关闭下拉菜单
+              const dropdownMenu = document.getElementById('exportDropdownMenu');
+              if (dropdownMenu) dropdownMenu.remove();
+            }, 'image/png');
+          };
+          img.onerror = function() {
+            // 如果 toSvg 失败，使用 html2canvas
+            useHtml2Canvas();
+          };
+          img.src = svgUrl;
+        } else {
+          // 如果没有 toSvg 方法，使用 html2canvas
+          useHtml2Canvas();
+        }
+      } catch (error) {
+        console.error('导出图片失败:', error);
+        // 如果出错，使用 html2canvas
+        useHtml2Canvas();
+      }
+    }
+    
+    // 使用 html2canvas 导出图片
+    function useHtml2Canvas() {
+      // 检查是否已加载 html2canvas
+      if (typeof html2canvas === 'undefined') {
+        // 动态加载 html2canvas
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        script.onload = function() {
+          captureWithHtml2Canvas();
+        };
+        script.onerror = function() {
+          alert('加载 html2canvas 失败，请稍后再试');
+          // 关闭下拉菜单
+          const dropdownMenu = document.getElementById('exportDropdownMenu');
+          if (dropdownMenu) dropdownMenu.remove();
+        };
+        document.head.appendChild(script);
+      } else {
+        captureWithHtml2Canvas();
+      }
+    }
+    
+    // 使用 html2canvas 捕获思维导图
+    function captureWithHtml2Canvas() {
+      const container = document.getElementById('mindmap-container');
+      if (!container) {
+        alert('找不到思维导图容器');
+        // 关闭对话框
+        const dialog = document.querySelector('div[style*="position: fixed; top: 50%; left: 50%;"]');
+        if (dialog) dialog.remove();
+        return;
+      }
+      
+      // 找到思维导图的核心内容元素（通常是 .map-canvas 或类似元素）
+      let captureElement = container;
+      const mapCanvas = container.querySelector('.map-canvas');
+      const meNodes = container.querySelector('me-nodes');
+      
+      // 优先选择更具体的核心内容元素
+      if (mapCanvas) {
+        captureElement = mapCanvas;
+      } else if (meNodes) {
+        captureElement = meNodes;
+      }
+      
+      // 保存原始样式
+      const originalOverflow = captureElement.style.overflow;
+      const originalWidth = captureElement.style.width;
+      const originalHeight = captureElement.style.height;
+      
+      // 临时隐藏工具栏
+      const toolbars = container.querySelectorAll('[class*="toolbar"], [class*="control"], [class*="zoom"]');
+      const originalToolbarStyles = [];
+      toolbars.forEach((toolbar, index) => {
+        originalToolbarStyles[index] = toolbar.style.display;
+        toolbar.style.display = 'none';
+      });
+      
+      // 设置容器样式以确保完整捕获
+      captureElement.style.overflow = 'visible';
+      captureElement.style.width = 'auto';
+      captureElement.style.height = 'auto';
+      
+      // 使用 html2canvas 捕获
+      html2canvas(captureElement, {
+        backgroundColor: '#ffffff',
+        scale: 2, // 提高清晰度
+        useCORS: true,
+        logging: false
+      }).then(function(canvas) {
+        // 恢复原始样式
+        captureElement.style.overflow = originalOverflow;
+        captureElement.style.width = originalWidth;
+        captureElement.style.height = originalHeight;
+        
+        // 恢复工具栏显示
+        toolbars.forEach((toolbar, index) => {
+          toolbar.style.display = originalToolbarStyles[index];
+        });
+        
+        // 导出图片
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${document.getElementById('graphTitle').textContent}.png`;
+        link.click();
+        
+        // 关闭下拉菜单
+        const dropdownMenu = document.getElementById('exportDropdownMenu');
+        if (dropdownMenu) dropdownMenu.remove();
+      }).catch(function(error) {
+        console.error('捕获图片失败:', error);
+        alert('导出图片失败，请稍后再试');
+        
+        // 恢复原始样式
+        captureElement.style.overflow = originalOverflow;
+        captureElement.style.width = originalWidth;
+        captureElement.style.height = originalHeight;
+        
+        // 恢复工具栏显示
+        toolbars.forEach((toolbar, index) => {
+          toolbar.style.display = originalToolbarStyles[index];
+        });
+        
+        // 关闭下拉菜单
+        const dropdownMenu = document.getElementById('exportDropdownMenu');
+        if (dropdownMenu) dropdownMenu.remove();
+      });
     }
     
     // 返回我的图表页面
