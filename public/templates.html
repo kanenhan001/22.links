@@ -532,6 +532,19 @@
   </div>
   
   <script>
+    // 从服务器获取配置信息
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(config => {
+        window.APP_CONFIG = config;
+      })
+      .catch(err => {
+        console.error('获取配置失败，使用默认配置:', err);
+        window.APP_CONFIG = {
+          drawioUrl: 'http://localhost:8080'
+        };
+      });
+
     // 分组标签点击事件
     document.querySelectorAll('.group-tag').forEach(tag => {
       tag.addEventListener('click', function() {
@@ -540,6 +553,8 @@
         // 添加当前标签的激活状态
         this.classList.add('active');
         // 这里可以添加筛选逻辑
+        const groupName = this.textContent;
+        loadTemplates(groupName === '全部' ? '' : groupName);
       });
     });
     
@@ -548,6 +563,7 @@
       const searchText = document.querySelector('.search-box input').value;
       console.log('搜索:', searchText);
       // 这里可以添加搜索逻辑
+      loadTemplates('', searchText);
     });
     
     // 加载更多功能
@@ -557,31 +573,152 @@
     });
     
     // 模版卡片点击事件
-    document.querySelectorAll('.template-card').forEach(card => {
-      card.addEventListener('click', function(e) {
+    document.addEventListener('click', function(e) {
+      const card = e.target.closest('.template-card');
+      if (card) {
         // 如果点击的是按钮，不触发卡片点击
         if (e.target.tagName === 'BUTTON') return;
-        console.log('点击模版卡片:', this.querySelector('.template-title').textContent);
+        console.log('点击模版卡片:', card.querySelector('.template-title').textContent);
         // 这里可以添加打开模版详情的逻辑
-      });
+      }
     });
     
     // 使用按钮点击事件
-    document.querySelectorAll('.use-btn').forEach(btn => {
-      btn.addEventListener('click', function(e) {
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('use-btn')) {
         e.stopPropagation(); // 阻止事件冒泡
-        console.log('使用模版:', this.closest('.template-card').querySelector('.template-title').textContent);
-        // 这里可以添加使用模版的逻辑
-      });
+        const card = e.target.closest('.template-card');
+        const graphId = card.dataset.graphId;
+        console.log('使用模版:', card.querySelector('.template-title').textContent, 'Graph ID:', graphId);
+        // 使用模版的逻辑
+        useTemplate(graphId);
+      }
     });
     
     // 收藏按钮点击事件
-    document.querySelectorAll('.template-actions button:not(.use-btn)').forEach(btn => {
-      btn.addEventListener('click', function(e) {
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('favorite-btn')) {
         e.stopPropagation(); // 阻止事件冒泡
-        console.log('收藏模版:', this.closest('.template-card').querySelector('.template-title').textContent);
+        const card = e.target.closest('.template-card');
+        console.log('收藏模版:', card.querySelector('.template-title').textContent);
         // 这里可以添加收藏模版的逻辑
-      });
+      }
+    });
+
+    // 加载共享的图表模板
+    async function loadTemplates(group = '', searchText = '') {
+      try {
+        const templatesGrid = document.querySelector('.templates-grid');
+        templatesGrid.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">加载中...</div>';
+
+        // 从服务器获取共享的图表数据
+        const sharedGraphs = await fetch('/api/graphs/shared').then(res => res.json());
+
+        // 确保 sharedGraphs 是数组
+        let sharedGraphsArray = Array.isArray(sharedGraphs) ? sharedGraphs : [];
+
+        // 筛选数据
+        let filteredGraphs = sharedGraphsArray;
+        if (group) {
+          filteredGraphs = filteredGraphs.filter(graph => graph.diagramType === group.toLowerCase());
+        }
+        if (searchText) {
+          const searchLower = searchText.toLowerCase();
+          filteredGraphs = filteredGraphs.filter(graph => 
+            graph.name.toLowerCase().includes(searchLower) || 
+            graph.description.toLowerCase().includes(searchLower)
+          );
+        }
+
+        // 渲染模板卡片
+        if (filteredGraphs.length === 0) {
+          templatesGrid.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">暂无共享的图表模板</div>';
+          return;
+        }
+
+        templatesGrid.innerHTML = filteredGraphs.map(graph => `
+          <div class="template-card" data-graph-id="${graph.id}">
+            <div class="template-thumbnail">
+              ${graph.thumbnail && graph.thumbnail.startsWith('data:image') ? 
+                `<img src="${graph.thumbnail}" style="width:100%;height:180px;object-fit:contain;display:block;background:#fff;" alt="${graph.name}">` : 
+                `<div class="placeholder">${getDiagramTypeIcon(graph.diagramType)} ${getDiagramTypeName(graph.diagramType)}模板</div>`
+              }
+            </div>
+            <div class="template-info">
+              <h3 class="template-title">${graph.name || '未命名图表'}</h3>
+              <p class="template-description">${graph.description || '暂无描述'}</p>
+              <div class="template-meta">
+                <div class="template-stats">
+                  <span>使用 ${Math.floor(Math.random() * 200) + 1}</span>
+                  <span>收藏 ${Math.floor(Math.random() * 50) + 1}</span>
+                </div>
+                <div class="template-actions">
+                  <button class="use-btn">使用</button>
+                  <button class="favorite-btn">收藏</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error('加载模板失败:', err);
+        document.querySelector('.templates-grid').innerHTML = '<div style="text-align: center; padding: 40px; color: #e53935;">加载失败，请重试</div>';
+      }
+    }
+
+    // 获取图表类型图标
+    function getDiagramTypeIcon(type) {
+      const icons = {
+        'relationship': '⚪',
+        'mindmap': '🌳',
+        'flow': '⬅'
+      };
+      return icons[type] || '📋';
+    }
+
+    // 获取图表类型名称
+    function getDiagramTypeName(type) {
+      const names = {
+        'relationship': '关系图',
+        'mindmap': '思维导图',
+        'flow': '流程图'
+      };
+      return names[type] || '图表';
+    }
+
+    // 使用模板
+    async function useTemplate(graphId) {
+      try {
+        // 创建模板的副本
+        const newGraph = await fetch(`/api/graphs/${graphId}/duplicate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: '从模板创建' })
+        }).then(res => res.json());
+
+        // 根据图表类型选择编辑器
+        const graph = await fetch(`/api/graphs/${newGraph.id}`).then(res => res.json());
+        if (graph.diagramType === 'relationship') {
+          // 关系图打开本地的关系图编辑器
+          window.open('/g/' + newGraph.id, '_blank');
+        } else if (graph.diagramType === 'mindmap') {
+          // 思维导图打开本地的思维导图编辑器
+          window.open('/m/' + newGraph.id, '_blank');
+        } else {
+          // 流程图、泳道图打开draw.io编辑器
+          const drawioUrl = window.APP_CONFIG?.drawioUrl || 'http://localhost:8080';
+          const apiBaseUrl = window.APP_CONFIG?.apiBaseUrl || 'http://localhost:3000';
+          window.open(drawioUrl + '?graphId=' + newGraph.id + '&lang=zh&dev=1&apiBaseUrl=' + apiBaseUrl, '_blank');
+        }
+      } catch (err) {
+        console.error('使用模板失败:', err);
+        alert('使用模板失败，请重试');
+      }
+    }
+
+    // 页面加载时加载模板
+    window.addEventListener('DOMContentLoaded', function() {
+      loadTemplates();
     });
   </script>
 </body>

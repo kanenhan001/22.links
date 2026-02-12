@@ -527,6 +527,8 @@ async function fetchJson(url, opts) {
         const thumbHtml = (g.thumbnail && g.thumbnail.startsWith('data:image'))
           ? `<img src="${g.thumbnail}" style="width:100%;height:180px;object-fit:contain;display:block;background:#fff;" alt="">`
           : `<div class="thumb">${first}</div>`;
+        // 检查是否已共享
+        const isShared = g.isShared || g.shared;
         card.innerHTML = `
           ${thumbHtml}
           <!-- 拖拽手柄 -->
@@ -543,6 +545,14 @@ async function fetchJson(url, opts) {
               <circle cx="12" cy="18" r="2"/>
             </svg>
           </button>
+          ${isShared ? `
+            <div class="share-badge">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+              </svg>
+              <span>已共享</span>
+            </div>
+          ` : ''}
           <div class="card-body">
             <div class="name" title="${g.name || '未命名关系图'}">${g.name || '未命名关系图'}</div>
             <div class="meta">创建时间：${fmtTime(g.createdAt)}</div>
@@ -1226,6 +1236,12 @@ async function fetchJson(url, opts) {
             </svg>
             复制
           </div>
+          <div class="dropdown-item" onclick="event.stopPropagation(); handleShareToTemplate(${graphId})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+            </svg>
+            共享到模版广场
+          </div>
           <div class="dropdown-item dropdown-with-select" onclick="event.stopPropagation();">
             <div class="dropdown-select-wrapper">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1551,7 +1567,60 @@ async function fetchJson(url, opts) {
       });
     };
 
-
+    // 共享到模版广场函数
+    window.handleShareToTemplate = async function(graphId) {
+      closeMenu();
+      try {
+        await fetchJson('/api/graphs/' + graphId + '/share', {
+          method: 'POST'
+        });
+        
+        // 更新卡片显示共享标识
+        const card = document.querySelector(`.card[data-graph-id="${graphId}"]`);
+        if (card) {
+          // 检查是否已有共享标识
+          if (!card.querySelector('.share-badge')) {
+            // 添加共享标识
+            const shareBadge = document.createElement('div');
+            shareBadge.className = 'share-badge';
+            shareBadge.innerHTML = `
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+              </svg>
+              <span>已共享</span>
+            `;
+            card.appendChild(shareBadge);
+          }
+        }
+        
+        // 显示成功提示
+        Swal.fire({
+          title: '共享成功',
+          text: '图表已共享到模版广场',
+          icon: 'success',
+          confirmButtonColor: '#667eea',
+          width: '280px',
+          customClass: {
+            title: 'swal2-title-sm',
+            content: 'swal2-content-sm',
+            confirmButton: 'swal2-btn-sm'
+          }
+        });
+      } catch (err) {
+        Swal.fire({
+          title: '共享失败',
+          text: err.message,
+          icon: 'error',
+          confirmButtonColor: '#667eea',
+          width: '280px',
+          customClass: {
+            title: 'swal2-title-sm',
+            content: 'swal2-content-sm',
+            confirmButton: 'swal2-btn-sm'
+          }
+        });
+      }
+    };
 
     // 全局菜单操作处理函数
     window.handleMenuAction = function(action, graphId) {

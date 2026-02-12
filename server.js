@@ -18,7 +18,7 @@ const PORT = 3000;
 // 中间件
 // 日志中间件，用于记录请求体大小和内容
 app.use(cors({
-    origin: DB_CONFIG.drawioUrl,
+    origin: '*',
     credentials: true
 }));
 // 增加请求体大小限制，解决PayloadTooLargeError
@@ -331,6 +331,14 @@ async function initDatabase() {
             console.log('成功为 graphs 表添加 backgroundImage 列');
         } catch (e) {
             console.log('graphs 表的 backgroundImage 列可能已存在:', e.message);
+        }
+
+        // 为 graphs 表添加共享字段
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN shared BOOLEAN DEFAULT FALSE');
+            console.log('成功为 graphs 表添加 shared 列');
+        } catch (e) {
+            console.log('graphs 表的 shared 列可能已存在:', e.message);
         }
 
         // 创建分组表
@@ -1124,7 +1132,7 @@ app.put('/api/graphs/:id/groups', async (req, res) => {
 app.get('/api/graphs', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
-        const sql = 'SELECT id, name, description, sort_order, createdAt, thumbnail, diagramType FROM graphs WHERE userId = ? ORDER BY sort_order ASC, id DESC';
+        const sql = 'SELECT id, name, description, sort_order, createdAt, thumbnail, diagramType, shared FROM graphs WHERE userId = ? ORDER BY sort_order ASC, id DESC';
         console.log(`[SQL] ${sql} - params: [${userId}]`);
         const [graphs] = await pool.execute(sql, [userId]);
         // console.log('关系图列表:', graphs);
@@ -1532,11 +1540,47 @@ app.get('/api/graphs/:id', async (req, res) => {
             canvasHeight: graph.canvasHeight,
             showNodeInfo: graph.showNodeInfo,
             backgroundImage: graph.backgroundImage,
-            diagramType: graph.diagramType
+            diagramType: graph.diagramType,
+            shared: graph.shared
         });
     } catch (e) {
         console.error('获取关系图详情失败:', e);
         res.status(500).json({ error: '获取关系图详情失败' });
+    }
+});
+
+// 共享图表到模板广场
+app.post('/api/graphs/:id/share', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const id = parseInt(req.params.id);
+
+        // 检查是否有权限
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        // 标记图表为共享
+        await run('UPDATE graphs SET shared = TRUE WHERE id = ?', [id]);
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('共享图表失败:', e);
+        res.status(500).json({ error: '共享图表失败' });
+    }
+});
+
+// 获取所有共享的图表
+app.get('/api/graphs/shared', async (req, res) => {
+    try {
+        // 获取所有标记为共享的图表
+        const sharedGraphs = await queryAll('SELECT * FROM graphs WHERE shared = TRUE ORDER BY createdAt DESC');
+
+        res.json(sharedGraphs);
+    } catch (e) {
+        console.error('获取共享图表失败:', e);
+        res.status(500).json({ error: '获取共享图表失败' });
     }
 });
 
