@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模版广场 - 脉图</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* 全局样式重置 - 优先级最高 */
+    html, body {
+      height: auto !important;
+      overflow: auto !important;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+    }
+    
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px !important;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    
+    /* 容器样式重置 */
+    .container {
+      height: auto !important;
+      max-height: none !important;
+    }
+    
+    .page {
+      height: auto !important;
+      overflow: visible !important;
+    }
+    
+    .main-content {
+      height: auto !important;
+      overflow: visible !important;
+    }
+    
+    /* 模版广场样式 */
+    .templates-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      min-height: calc(100vh - 40px);
+    }
+    
+    /* 顶部导航栏 */
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding: 20px 0;
+    }
+    
+    .top-nav-left h1 {
+      margin: 0;
+      color: #333;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #4a6fa5, #6b8cce);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .top-nav-right .back-btn {
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #4a6fa5;
+      border: 2px solid #4a6fa5;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .top-nav-right .back-btn:hover {
+      background: #4a6fa5;
+      color: white;
+      box-shadow: 0 4px 12px rgba(74, 111, 165, 0.4);
+      transform: translateY(-2px);
+    }
+    
+    /* 搜索区域 */
+    .search-section {
+      background: transparent;
+      padding: 20px 0;
+      margin-bottom: 30px;
+      text-align: center;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .search-section:hover {
+      transform: translateY(-2px);
+    }
+    
+    .search-box {
+      display: flex;
+      max-width: 650px;
+      margin: 0 auto;
+      gap: 12px;
+      align-items: center;
+    }
+    
+    .search-box input {
+      flex: 1;
+      padding: 16px 20px;
+      border: 3px solid rgba(74, 111, 165, 0.2);
+      border-radius: 12px;
+      font-size: 16px;
+      background: rgba(255, 255, 255, 0.9);
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .search-box input::placeholder {
+      color: #999;
+      font-style: italic;
+    }
+    
+    .search-box input:focus {
+      outline: none;
+      border-color: #4a6fa5;
+      background: rgba(255, 255, 255, 1);
+      box-shadow: 0 0 0 4px rgba(74, 111, 165, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
+      transform: translateY(-1px);
+    }
+    
+    .search-box button {
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #4a6fa5, #6b8cce);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 16px rgba(74, 111, 165, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .search-box button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+    
+    .search-box button:hover::before {
+      left: 100%;
+    }
+    
+    .search-box button:hover {
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+      transform: translateY(-2px);
+    }
+    
+    .search-box button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* 分组区域 */
+    .groups-section {
+      margin-bottom: 30px;
+    }
+    
+    .groups-section h2 {
+      margin: 0 0 20px 0;
+      color: #333;
+      font-size: 20px;
+    }
+    
+    .groups-list {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    
+    .group-tag {
+      padding: 8px 16px;
+      background: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .group-tag:hover,
+    .group-tag.active {
+      background: #4a6fa5;
+      color: white;
+      border-color: #4a6fa5;
+    }
+    
+    /* 模版列表 */
+    .templates-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    
+    .template-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
+    }
+    
+    .template-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    
+    .template-thumbnail {
+      width: 100%;
+      height: 180px;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .template-thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .template-thumbnail .placeholder {
+      font-size: 14px;
+      color: #999;
+    }
+    
+    .template-info {
+      padding: 16px;
+    }
+    
+    .template-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin: 0 0 8px 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .template-description {
+      font-size: 14px;
+      color: #666;
+      margin: 0 0 12px 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .template-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #999;
+    }
+    
+    .template-stats {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .template-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .template-actions button {
+      padding: 6px 12px;
+      background: #f0f0f0;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    
+    .template-actions button:hover {
+      background: #e0e0e0;
+    }
+    
+    .template-actions .use-btn {
+      background: #4a6fa5;
+      color: white;
+    }
+    
+    .template-actions .use-btn:hover {
+      background: #3d5a80;
+    }
+    
+    /* 加载更多 */
+    .load-more {
+      text-align: center;
+      margin-top: 40px;
+    }
+    
+    .load-more button {
+      padding: 12px 24px;
+      background: white;
+      border: 2px solid #4a6fa5;
+      color: #4a6fa5;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .load-more button:hover {
+      background: #4a6fa5;
+      color: white;
+    }
+    
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      .templates-container {
+        padding: 10px;
+      }
+      
+      .search-section {
+        padding: 20px;
+      }
+      
+      .search-box {
+        flex-direction: column;
+      }
+      
+      .templates-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="templates-container">
+    <!-- 顶部导航栏 -->
+    <div class="top-nav">
+      <!-- <div class="top-nav-left">
+        <h1>模版广场</h1>
+      </div> -->
+      <div class="top-nav-right">
+        <button class="back-btn" onclick="window.location.href='/my.html'">
+          ← 我的图表
+        </button>
+      </div>
+    </div>
+    
+    <!-- 搜索区域 -->
+    <div class="search-section">
+      <div class="search-box">
+        <input type="text" placeholder="搜索模版...">
+        <button>搜索</button>
+      </div>
+    </div>
+    
+    <!-- 分组区域 -->
+    <div class="groups-section">
+      <!-- <h2>分类浏览</h2> -->
+      <div class="groups-list">
+        <div class="group-tag active">全部</div>
+        <div class="group-tag">思维导图</div>
+        <div class="group-tag">关系图</div>
+        <div class="group-tag">流程图</div>
+        <div class="group-tag">组织架构</div>
+        <div class="group-tag">项目管理</div>
+        <div class="group-tag">学习笔记</div>
+        <div class="group-tag">商业分析</div>
+      </div>
+    </div>
+    
+    <!-- 模版列表 -->
+    <div class="templates-grid">
+      <!-- 模版卡片 1 -->
+      <div class="template-card">
+        <div class="template-thumbnail">
+          <div class="placeholder">思维导图模版</div>
+        </div>
+        <div class="template-info">
+          <h3 class="template-title">项目规划思维导图</h3>
+          <p class="template-description">用于项目初期规划，包含项目目标、时间线、资源分配等关键要素</p>
+          <div class="template-meta">
+            <div class="template-stats">
+              <span>使用 128</span>
+              <span>收藏 36</span>
+            </div>
+            <div class="template-actions">
+              <button class="use-btn">使用</button>
+              <button>收藏</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 模版卡片 2 -->
+      <div class="template-card">
+        <div class="template-thumbnail">
+          <div class="placeholder">关系图模版</div>
+        </div>
+        <div class="template-info">
+          <h3 class="template-title">产品功能关系图</h3>
+          <p class="template-description">展示产品各功能模块之间的关联关系，帮助产品经理梳理功能逻辑</p>
+          <div class="template-meta">
+            <div class="template-stats">
+              <span>使用 95</span>
+              <span>收藏 28</span>
+            </div>
+            <div class="template-actions">
+              <button class="use-btn">使用</button>
+              <button>收藏</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 模版卡片 3 -->
+      <div class="template-card">
+        <div class="template-thumbnail">
+          <div class="placeholder">流程图模版</div>
+        </div>
+        <div class="template-info">
+          <h3 class="template-title">用户注册流程图</h3>
+          <p class="template-description">标准的用户注册流程，包含验证、激活等关键步骤</p>
+          <div class="template-meta">
+            <div class="template-stats">
+              <span>使用 156</span>
+              <span>收藏 42</span>
+            </div>
+            <div class="template-actions">
+              <button class="use-btn">使用</button>
+              <button>收藏</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 模版卡片 4 -->
+      <div class="template-card">
+        <div class="template-thumbnail">
+          <div class="placeholder">组织架构模版</div>
+        </div>
+        <div class="template-info">
+          <h3 class="template-title">公司组织架构图</h3>
+          <p class="template-description">标准的公司组织架构模板，包含管理层、各部门及岗位设置</p>
+          <div class="template-meta">
+            <div class="template-stats">
+              <span>使用 87</span>
+              <span>收藏 24</span>
+            </div>
+            <div class="template-actions">
+              <button class="use-btn">使用</button>
+              <button>收藏</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 模版卡片 5 -->
+      <div class="template-card">
+        <div class="template-thumbnail">
+          <div class="placeholder">思维导图模版</div>
+        </div>
+        <div class="template-info">
+          <h3 class="template-title">学习笔记思维导图</h3>
+          <p class="template-description">用于整理学习内容，包含知识点、重点、难点等内容的层级结构</p>
+          <div class="template-meta">
+            <div class="template-stats">
+              <span>使用 112</span>
+              <span>收藏 31</span>
+            </div>
+            <div class="template-actions">
+              <button class="use-btn">使用</button>
+              <button>收藏</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 模版卡片 6 -->
+      <div class="template-card">
+        <div class="template-thumbnail">
+          <div class="placeholder">流程图模版</div>
+        </div>
+        <div class="template-info">
+          <h3 class="template-title">请假审批流程图</h3>
+          <p class="template-description">标准的企业请假审批流程，包含申请、审批、归档等步骤</p>
+          <div class="template-meta">
+            <div class="template-stats">
+              <span>使用 76</span>
+              <span>收藏 19</span>
+            </div>
+            <div class="template-actions">
+              <button class="use-btn">使用</button>
+              <button>收藏</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 加载更多 -->
+    <div class="load-more">
+      <button>加载更多</button>
+    </div>
+  </div>
+  
+  <script>
+    // 分组标签点击事件
+    document.querySelectorAll('.group-tag').forEach(tag => {
+      tag.addEventListener('click', function() {
+        // 移除所有标签的激活状态
+        document.querySelectorAll('.group-tag').forEach(t => t.classList.remove('active'));
+        // 添加当前标签的激活状态
+        this.classList.add('active');
+        // 这里可以添加筛选逻辑
+      });
+    });
+    
+    // 搜索功能
+    document.querySelector('.search-box button').addEventListener('click', function() {
+      const searchText = document.querySelector('.search-box input').value;
+      console.log('搜索:', searchText);
+      // 这里可以添加搜索逻辑
+    });
+    
+    // 加载更多功能
+    document.querySelector('.load-more button').addEventListener('click', function() {
+      console.log('加载更多模版');
+      // 这里可以添加加载更多逻辑
+    });
+    
+    // 模版卡片点击事件
+    document.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', function(e) {
+        // 如果点击的是按钮，不触发卡片点击
+        if (e.target.tagName === 'BUTTON') return;
+        console.log('点击模版卡片:', this.querySelector('.template-title').textContent);
+        // 这里可以添加打开模版详情的逻辑
+      });
+    });
+    
+    // 使用按钮点击事件
+    document.querySelectorAll('.use-btn').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // 阻止事件冒泡
+        console.log('使用模版:', this.closest('.template-card').querySelector('.template-title').textContent);
+        // 这里可以添加使用模版的逻辑
+      });
+    });
+    
+    // 收藏按钮点击事件
+    document.querySelectorAll('.template-actions button:not(.use-btn)').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // 阻止事件冒泡
+        console.log('收藏模版:', this.closest('.template-card').querySelector('.template-title').textContent);
+        // 这里可以添加收藏模版的逻辑
+      });
+    });
+  </script>
+</body>
+</html>
