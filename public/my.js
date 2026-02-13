@@ -461,6 +461,16 @@ async function fetchJson(url, opts) {
       }
     }
     
+    // 拖拽排序相关变量
+    let draggedGraphId = null;
+    let draggedElement = null;
+    let originalGraphs = [];
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let currentIndicator = null;
+    let insertBeforeId = null;
+
     // 页面加载时检查登录状态
     document.addEventListener('DOMContentLoaded', async () => {
       await ensureLogin();
@@ -474,16 +484,6 @@ async function fetchJson(url, opts) {
         btnManageGroups.addEventListener('click', openGroupManagementModal);
       }
     });
-
-    // 拖拽排序相关变量
-    let draggedGraphId = null;
-    let draggedElement = null;
-    let originalGraphs = [];
-    let isDragging = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let currentIndicator = null;
-    let insertBeforeId = null;
 
     function renderCards(list) {
       const grid = document.getElementById('grid');
@@ -1219,6 +1219,24 @@ async function fetchJson(url, opts) {
       const btn = button || document.querySelector('.card-more[data-graph-id="' + graphId + '"]');
       if (!btn) return;
       
+      // 获取图表的共享状态
+      let isShared = false;
+      
+      // 方法1：从originalGraphs中获取
+      const graph = originalGraphs.find(g => g.id === graphId);
+      if (graph) {
+        isShared = graph.isShared || graph.shared;
+      } else {
+        // 方法2：从卡片元素中检查是否有共享标识
+        const card = document.querySelector(`.card[data-graph-id="${graphId}"]`);
+        if (card) {
+          const shareBadge = card.querySelector('.share-badge');
+          isShared = !!shareBadge;
+        }
+      }
+      
+      console.log('图表共享状态:', graphId, isShared);
+      
       // 创建菜单
       const container = document.getElementById('dropdownMenuContainer');
       container.innerHTML = `
@@ -1240,7 +1258,7 @@ async function fetchJson(url, opts) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
             </svg>
-            共享到模版广场
+            ${isShared ? '取消共享' : '共享到模版广场'}
           </div>
           <div class="dropdown-item dropdown-with-select" onclick="event.stopPropagation();">
             <div class="dropdown-select-wrapper">
@@ -1570,45 +1588,93 @@ async function fetchJson(url, opts) {
     // 共享到模版广场函数
     window.handleShareToTemplate = async function(graphId) {
       closeMenu();
+      
+      // 获取图表的当前共享状态
+      const graph = originalGraphs.find(g => g.id === graphId);
+      const isShared = graph && (graph.isShared || graph.shared);
+      
       try {
-        await fetchJson('/api/graphs/' + graphId + '/share', {
-          method: 'POST'
-        });
-        
-        // 更新卡片显示共享标识
-        const card = document.querySelector(`.card[data-graph-id="${graphId}"]`);
-        if (card) {
-          // 检查是否已有共享标识
-          if (!card.querySelector('.share-badge')) {
-            // 添加共享标识
-            const shareBadge = document.createElement('div');
-            shareBadge.className = 'share-badge';
-            shareBadge.innerHTML = `
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
-              </svg>
-              <span>已共享</span>
-            `;
-            card.appendChild(shareBadge);
+        if (isShared) {
+          // 取消共享
+          await fetchJson('/api/graphs/' + graphId + '/unshare', {
+            method: 'POST'
+          });
+          
+          // 更新卡片，移除共享标识
+          const card = document.querySelector(`.card[data-graph-id="${graphId}"]`);
+          if (card) {
+            const shareBadge = card.querySelector('.share-badge');
+            if (shareBadge) {
+              shareBadge.remove();
+            }
           }
+          
+          // 更新originalGraphs中的数据
+          if (graph) {
+            graph.shared = false;
+            graph.isShared = false;
+          }
+          
+          // 显示成功提示
+          Swal.fire({
+            title: '取消共享成功',
+            text: '图表已从模版广场移除',
+            icon: 'success',
+            confirmButtonColor: '#667eea',
+            width: '280px',
+            customClass: {
+              title: 'swal2-title-sm',
+              content: 'swal2-content-sm',
+              confirmButton: 'swal2-btn-sm'
+            }
+          });
+        } else {
+          // 共享图表
+          await fetchJson('/api/graphs/' + graphId + '/share', {
+            method: 'POST'
+          });
+          
+          // 更新卡片显示共享标识
+          const card = document.querySelector(`.card[data-graph-id="${graphId}"]`);
+          if (card) {
+            // 检查是否已有共享标识
+            if (!card.querySelector('.share-badge')) {
+              // 添加共享标识
+              const shareBadge = document.createElement('div');
+              shareBadge.className = 'share-badge';
+              shareBadge.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+                </svg>
+                <span>已共享</span>
+              `;
+              card.appendChild(shareBadge);
+            }
+          }
+          
+          // 更新originalGraphs中的数据
+          if (graph) {
+            graph.shared = true;
+            graph.isShared = true;
+          }
+          
+          // 显示成功提示
+          Swal.fire({
+            title: '共享成功',
+            text: '图表已共享到模版广场',
+            icon: 'success',
+            confirmButtonColor: '#667eea',
+            width: '280px',
+            customClass: {
+              title: 'swal2-title-sm',
+              content: 'swal2-content-sm',
+              confirmButton: 'swal2-btn-sm'
+            }
+          });
         }
-        
-        // 显示成功提示
-        Swal.fire({
-          title: '共享成功',
-          text: '图表已共享到模版广场',
-          icon: 'success',
-          confirmButtonColor: '#667eea',
-          width: '280px',
-          customClass: {
-            title: 'swal2-title-sm',
-            content: 'swal2-content-sm',
-            confirmButton: 'swal2-btn-sm'
-          }
-        });
       } catch (err) {
         Swal.fire({
-          title: '共享失败',
+          title: isShared ? '取消共享失败' : '共享失败',
           text: err.message,
           icon: 'error',
           confirmButtonColor: '#667eea',

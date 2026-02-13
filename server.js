@@ -1533,6 +1533,28 @@ app.post('/api/graphs/:id/share', async (req, res) => {
     }
 });
 
+// 取消共享图表
+app.post('/api/graphs/:id/unshare', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const id = parseInt(req.params.id);
+
+        // 检查是否有权限
+        const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
+        if (!graph) {
+            return res.status(403).json({ error: '无权限' });
+        }
+
+        // 取消标记图表为共享
+        await run('UPDATE graphs SET shared = FALSE WHERE id = ?', [id]);
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('取消共享图表失败:', e);
+        res.status(500).json({ error: '取消共享图表失败' });
+    }
+});
+
 // 获取所有共享的图表
 app.get('/api/graphs/shared', async (req, res) => {
     try {
