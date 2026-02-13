@@ -532,6 +532,22 @@
   </div>
   
   <script>
+    // 检查用户登录状态
+    async function ensureLogin() {
+      try {
+        const s = await fetch('/api/auth/status').then(res => res.json());
+        if (!s.loggedIn) {
+          window.location.href = '/login';
+          return null;
+        }
+        return s.user;
+      } catch (err) {
+        console.error('检查登录状态失败:', err);
+        window.location.href = '/login';
+        return null;
+      }
+    }
+
     // 从服务器获取配置信息
     fetch('/api/config')
       .then(res => res.json())
@@ -717,7 +733,8 @@
     }
 
     // 页面加载时加载模板
-    window.addEventListener('DOMContentLoaded', function() {
+    window.addEventListener('DOMContentLoaded', async function() {
+      await ensureLogin();
       loadTemplates();
     });
   </script>
