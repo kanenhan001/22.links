@@ -17,18 +17,46 @@ const PORT = 3000;
 
 // 中间件
 // 日志中间件，用于记录请求体大小和内容
+// 从配置中获取允许的域名
+const getAllowedOrigins = () => {
+    const origins = [];
+    
+    // 添加 API 基础 URL
+    if (DB_CONFIG.apiBaseUrl) {
+        try {
+            const url = new URL(DB_CONFIG.apiBaseUrl);
+            origins.push(`${url.protocol}//${url.host}`);
+        } catch (e) {
+            console.error('Invalid apiBaseUrl:', e);
+        }
+    }
+    
+    // 添加 Draw.io URL
+    if (DB_CONFIG.drawioUrl) {
+        try {
+            const url = new URL(DB_CONFIG.drawioUrl);
+            origins.push(`${url.protocol}//${url.host}`);
+        } catch (e) {
+            console.error('Invalid drawioUrl:', e);
+        }
+    }
+    
+    // 添加默认值作为后备
+    if (origins.length === 0) {
+        origins.push('http://localhost:3000');
+        origins.push('http://localhost:8080');
+    }
+    
+    return origins;
+};
+
+const allowedOrigins = getAllowedOrigins();
+console.log('Allowed CORS origins:', allowedOrigins);
+
 app.use(cors({
     origin: function (origin, callback) {
         // 允许没有 origin 的请求（比如移动应用、curl等）
         if (!origin) return callback(null, true);
-        
-        // 允许的域名列表
-        const allowedOrigins = [
-            'http://localhost:3000',
-            'http://localhost:8080',
-            'http://127.0.0.1:3000',
-            'http://127.0.0.1:8080'
-        ];
         
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
