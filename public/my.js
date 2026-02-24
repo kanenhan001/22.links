@@ -1629,10 +1629,21 @@ async function fetchJson(url, opts) {
             }
           });
         } else {
-          // 共享图表
-          await fetchJson('/api/graphs/' + graphId + '/share', {
-            method: 'POST'
+          console.log('[共享] 开始生成高清大图, graphId:', graphId);
+          
+          // 生成高清大图
+          const highResThumbnail = await generateHighResThumbnail(graphId);
+          
+          console.log('[共享] 高清大图生成结果:', highResThumbnail ? '成功 (长度: ' + highResThumbnail.length + ')' : '失败 (null)');
+          
+          // 共享图表，包含高清大图
+          const response = await fetchJson('/api/graphs/' + graphId + '/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ highResThumbnail })
           });
+          
+          console.log('[共享] 服务器响应:', response);
           
           // 更新卡片显示共享标识
           const card = document.querySelector(`.card[data-graph-id="${graphId}"]`);
@@ -1687,6 +1698,310 @@ async function fetchJson(url, opts) {
         });
       }
     };
+
+    // 生成高清大图
+    async function generateHighResThumbnail(graphId) {
+      try {
+        console.log('[高清大图] 开始生成, graphId:', graphId);
+        
+        // 获取图表详情
+        const graph = await fetchJson('/api/graphs/' + graphId);
+        console.log('[高清大图] 图表类型:', graph.diagramType);
+        
+        // 如果是流程图，生成高清大图
+        if (graph.diagramType === 'flow') {
+          console.log('[高清大图] 流程图，开始生成高清大图');
+          return await generateFlowHighResThumbnail(graph.code);
+        }
+        
+        // 获取关系图数据
+        const [nodes, edges] = await Promise.all([
+          fetchJson('/api/nodes?graphId=' + graphId),
+          fetchJson('/api/edges?graphId=' + graphId)
+        ]);
+
+        console.log('[高清大图] 获取到数据:', { nodesCount: nodes.length, edgesCount: edges.length });
+
+        if (nodes.length === 0) {
+          console.log('[高清大图] 没有节点，返回null');
+          return null;
+        }
+
+        // 创建高清画布
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 计算画布范围
+        let minX = 50, minY = 50, maxX = 800, maxY = 600;
+        if (nodes.length > 0) {
+          minX = Math.min(...nodes.map(n => n.x - (n.radius || 20))) - 50;
+          minY = Math.min(...nodes.map(n => n.y - (n.radius || 20))) - 50;
+          maxX = Math.max(...nodes.map(n => n.x + (n.radius || 20))) + 50;
+          maxY = Math.max(...nodes.map(n => n.y + (n.radius || 20))) + 50;
+        }
+        
+        console.log('[高清大图] 画布范围:', { minX, minY, maxX, maxY });
+        
+        // 设置高清尺寸
+        const width = Math.max(1920, maxX - minX);
+        const height = Math.max(1080, maxY - minY);
+        canvas.width = width;
+        canvas.height = height;
+
+        console.log('[高清大图] 画布尺寸:', { width, height });
+
+        // 填充白色背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        // 缩放和平移
+        ctx.translate(-minX, -minY);
+
+        // 绘制边
+        edges.forEach(edge => {
+          const source = nodes.find(n => n.id === edge.sourceId);
+          const target = nodes.find(n => n.id === edge.targetId);
+          if (source && target) {
+            ctx.beginPath();
+            ctx.moveTo(source.x, source.y);
+            const bendPoints = Array.isArray(edge.bendPoints) ? edge.bendPoints : [];
+            bendPoints.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.lineTo(target.x, target.y);
+            ctx.strokeStyle = edge.color || '#999';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 绘制标签
+            if (edge.label) {
+              ctx.font = 'bold 16px sans-serif';
+              ctx.fillStyle = edge.color || '#666';
+              const midX = bendPoints.length > 0 ? bendPoints[0].x : (source.x + target.x) / 2;
+              const midY = bendPoints.length > 0 ? bendPoints[0].y : (source.y + target.y) / 2;
+              ctx.fillText(edge.label, midX - 20, midY - 5);
+            }
+          }
+        });
+
+        // 绘制节点
+        nodes.forEach(node => {
+          const radius = (node.radius || 30) * 1.5;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = node.color || '#667eea';
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          // 绘制文字
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 20px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText((node.name || '').slice(0, 8), node.x, node.y);
+        });
+
+        // 导出高清图片
+        const dataUrl = canvas.toDataURL('image/png', 1.0);
+        console.log('[高清大图] 生成完成, dataUrl长度:', dataUrl.length);
+        return dataUrl;
+      } catch (err) {
+        console.error('[高清大图] 生成失败:', err);
+        return null;
+      }
+    }
+
+    // 生成流程图高清大图
+    async function generateFlowHighResThumbnail(xmlCode) {
+      try {
+        console.log('[流程图高清大图] 开始生成');
+        
+        if (!xmlCode) {
+          console.log('[流程图高清大图] XML代码为空');
+          return null;
+        }
+        
+        // 检查 html2canvas 是否已加载
+        if (typeof html2canvas === 'undefined') {
+          console.error('[流程图高清大图] html2canvas 未加载');
+          return null;
+        }
+        
+        // 创建隐藏的iframe来加载Draw.io
+        const drawioUrl = window.APP_CONFIG?.drawioUrl || 'http://localhost:8080';
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '1920px';
+        iframe.style.height = '1080px';
+        iframe.style.border = 'none';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+        
+        console.log('[流程图高清大图] 创建iframe，等待加载...');
+        
+        // 等待iframe加载
+        await new Promise((resolve, reject) => {
+          iframe.onload = resolve;
+          iframe.onerror = reject;
+          iframe.src = drawioUrl + '?dev=1&ui=min';
+        });
+        
+        // 等待Draw.io初始化
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        
+        console.log('[流程图高清大图] Draw.io已加载，开始加载XML...');
+        
+        // 加载XML数据
+        iframe.contentWindow.postMessage({
+          action: 'load',
+          xml: xmlCode,
+          format: 'xml'
+        }, new URL(drawioUrl).origin);
+        
+        // 等待数据加载完成
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        console.log('[流程图高清大图] 请求SVG...');
+        
+        // 请求SVG
+        const result = await new Promise((resolve, reject) => {
+          const handleMessage = async (event) => {
+            if (event.origin !== new URL(drawioUrl).origin) return;
+            
+            if (event.data && event.data.svg) {
+              console.log('[流程图高清大图] 收到SVG，开始生成高清大图...');
+              
+              try {
+                // 创建临时div来容纳SVG
+                const tempDiv = document.createElement('div');
+                tempDiv.style.position = 'absolute';
+                tempDiv.style.left = '-9999px';
+                tempDiv.style.top = '0';
+                tempDiv.style.backgroundColor = '#ffffff';
+                tempDiv.style.padding = '20px';
+                tempDiv.innerHTML = event.data.svg;
+                document.body.appendChild(tempDiv);
+                
+                // 使用html2canvas生成高清图片
+                const canvas = await html2canvas(tempDiv, {
+                  backgroundColor: '#ffffff',
+                  scale: 3, // 3倍缩放，提高清晰度
+                  logging: false,
+                  useCORS: true,
+                  allowTaint: true
+                });
+                
+                // 移除临时div
+                document.body.removeChild(tempDiv);
+                
+                // 转换为base64
+                const dataUrl = canvas.toDataURL('image/png', 1.0);
+                console.log('[流程图高清大图] 生成完成, dataUrl长度:', dataUrl.length);
+                
+                // 清理
+                window.removeEventListener('message', handleMessage);
+                document.body.removeChild(iframe);
+                
+                resolve(dataUrl);
+              } catch (err) {
+                console.error('[流程图高清大图] 生成失败:', err);
+                window.removeEventListener('message', handleMessage);
+                document.body.removeChild(iframe);
+                resolve(null);
+              }
+            }
+            
+            if (event.data && event.data.error) {
+              console.error('[流程图高清大图] Draw.io错误:', event.data.error);
+              window.removeEventListener('message', handleMessage);
+              document.body.removeChild(iframe);
+              resolve(null);
+            }
+          };
+          
+          window.addEventListener('message', handleMessage);
+          
+          // 发送获取SVG的请求
+          iframe.contentWindow.postMessage({ action: 'getSvg' }, new URL(drawioUrl).origin);
+          
+          // 设置超时
+          setTimeout(() => {
+            window.removeEventListener('message', handleMessage);
+            document.body.removeChild(iframe);
+            console.error('[流程图高清大图] 生成超时');
+            resolve(null);
+          }, 30000);
+        });
+        
+        // 如果Draw.io方法失败，使用备选方案：放大现有缩略图
+        if (!result) {
+          console.log('[流程图高清大图] Draw.io方法失败，使用备选方案');
+          return await upscaleThumbnail(xmlCode);
+        }
+        
+        return result;
+      } catch (err) {
+        console.error('[流程图高清大图] 生成失败:', err);
+        return null;
+      }
+    }
+    
+    // 备选方案：放大现有缩略图
+    async function upscaleThumbnail(xmlCode) {
+      try {
+        console.log('[流程图高清大图] 备选方案：解析XML生成缩略图');
+        
+        // 创建临时div来容纳SVG
+        const tempDiv = document.createElement('div');
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        tempDiv.style.top = '0';
+        tempDiv.style.backgroundColor = '#ffffff';
+        tempDiv.style.padding = '20px';
+        
+        // 从XML中提取SVG
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlCode, 'text/xml');
+        const svgElement = xmlDoc.querySelector('svg');
+        
+        if (!svgElement) {
+          console.error('[流程图高清大图] XML中没有SVG元素');
+          return null;
+        }
+        
+        // 设置SVG尺寸
+        svgElement.setAttribute('width', '1920');
+        svgElement.setAttribute('height', '1080');
+        svgElement.style.width = '1920px';
+        svgElement.style.height = '1080px';
+        
+        tempDiv.appendChild(svgElement);
+        document.body.appendChild(tempDiv);
+        
+        // 使用html2canvas生成高清图片
+        const canvas = await html2canvas(tempDiv, {
+          backgroundColor: '#ffffff',
+          scale: 1, // SVG已经设置了尺寸，不需要额外缩放
+          logging: false,
+          useCORS: true,
+          allowTaint: true
+        });
+        
+        // 移除临时div
+        document.body.removeChild(tempDiv);
+        
+        // 转换为base64
+        const dataUrl = canvas.toDataURL('image/png', 1.0);
+        console.log('[流程图高清大图] 备选方案生成完成, dataUrl长度:', dataUrl.length);
+        
+        return dataUrl;
+      } catch (err) {
+        console.error('[流程图高清大图] 备选方案失败:', err);
+        return null;
+      }
+    }
 
     // 全局菜单操作处理函数
     window.handleMenuAction = function(action, graphId) {

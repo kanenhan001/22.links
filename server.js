@@ -18,7 +18,24 @@ const PORT = 3000;
 // 中间件
 // 日志中间件，用于记录请求体大小和内容
 app.use(cors({
-    origin: '*',
+    origin: function (origin, callback) {
+        // 允许没有 origin 的请求（比如移动应用、curl等）
+        if (!origin) return callback(null, true);
+        
+        // 允许的域名列表
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'http://localhost:8080',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:8080'
+        ];
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 // 增加请求体大小限制，解决PayloadTooLargeError
@@ -339,6 +356,14 @@ async function initDatabase() {
             console.log('成功为 graphs 表添加 shared 列');
         } catch (e) {
             console.log('graphs 表的 shared 列可能已存在:', e.message);
+        }
+
+        // 为 graphs 表添加高清缩略图字段
+        try {
+            await pool.execute('ALTER TABLE graphs ADD COLUMN highResThumbnail TEXT');
+            console.log('成功为 graphs 表添加 highResThumbnail 列');
+        } catch (e) {
+            console.log('graphs 表的 highResThumbnail 列可能已存在:', e.message);
         }
 
         // 创建分组表
@@ -1516,6 +1541,14 @@ app.post('/api/graphs/:id/share', async (req, res) => {
     try {
         const userId = getAuthedUserId(req);
         const id = parseInt(req.params.id);
+        const { highResThumbnail } = req.body;
+
+        console.log('[共享API] 收到共享请求:', {
+            graphId: id,
+            userId,
+            hasHighResThumbnail: !!highResThumbnail,
+            thumbnailLength: highResThumbnail ? highResThumbnail.length : 0
+        });
 
         // 检查是否有权限
         const graph = await queryOne('SELECT * FROM graphs WHERE id = ? AND userId = ?', [id, userId]);
@@ -1523,12 +1556,19 @@ app.post('/api/graphs/:id/share', async (req, res) => {
             return res.status(403).json({ error: '无权限' });
         }
 
-        // 标记图表为共享
-        await run('UPDATE graphs SET shared = TRUE WHERE id = ?', [id]);
+        // 标记图表为共享，并存储高清大图
+        if (highResThumbnail) {
+            console.log('[共享API] 更新数据库，包含高清大图');
+            await run('UPDATE graphs SET shared = TRUE, highResThumbnail = ? WHERE id = ?', [highResThumbnail, id]);
+        } else {
+            console.log('[共享API] 更新数据库，不包含高清大图');
+            await run('UPDATE graphs SET shared = TRUE WHERE id = ?', [id]);
+        }
 
+        console.log('[共享API] 共享成功');
         res.json({ success: true });
     } catch (e) {
-        console.error('共享图表失败:', e);
+        console.error('[共享API] 共享图表失败:', e);
         res.status(500).json({ error: '共享图表失败' });
     }
 });
