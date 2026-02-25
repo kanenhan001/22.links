@@ -1,4 +1,11 @@
-// 模拟数据
+// 图表类型映射
+const chartTypeMap = {
+  relationship: { name: '关系图', icon: '⚪' },
+  flow: { name: '流程图', icon: '⬅' },
+  mindmap: { name: '思维导图', icon: '🌳' }
+};
+
+// 模拟数据（当API不可用时使用）
 const mockData = {
   users: [
     { id: 1, name: '用户1', graphs: 5 },
@@ -35,22 +42,100 @@ const mockData = {
   ]
 };
 
-// 图表类型映射
-const chartTypeMap = {
-  relationship: { name: '关系图', icon: '⚪' },
-  flow: { name: '流程图', icon: '⬅' },
-  mindmap: { name: '思维导图', icon: '🌳' }
-};
-
 // 初始化页面
 async function initStats() {
   try {
-    // 模拟加载数据
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // 显示加载状态
+    document.getElementById('userStatsLoading').style.display = 'flex';
+    document.getElementById('chartTypeStatsLoading').style.display = 'flex';
+    document.getElementById('userStatsList').style.display = 'none';
+    document.getElementById('chartTypeStats').style.display = 'none';
+    document.getElementById('userStatsEmpty').style.display = 'none';
+    document.getElementById('chartTypeStatsEmpty').style.display = 'none';
     
-    // 使用模拟数据
-    const users = mockData.users;
-    const graphs = mockData.graphs;
+    // 尝试从API获取真实数据
+    let usersData, graphsData;
+    try {
+      const [usersResponse, graphsResponse] = await Promise.all([
+        fetch('/api/users', {
+          credentials: 'include' // 包含cookie，用于身份验证
+        }),
+        // 获取全部图表数据，而不只是当前用户的
+        fetch('/api/graphs/all', {
+          credentials: 'include' // 包含cookie，用于身份验证
+        })
+      ]);
+      
+      if (usersResponse.status === 403 || graphsResponse.status === 403) {
+        // 403错误表示未登录或登录会话过期，跳转到登录页面
+        window.location.href = '/login';
+        return;
+      }
+      
+      if (!usersResponse.ok || !graphsResponse.ok) {
+        throw new Error('API响应失败');
+      }
+      
+      usersData = await usersResponse.json();
+      graphsData = await graphsResponse.json();
+      
+      // 添加日志：打印原始API数据
+      console.log('原始用户数据:', usersData);
+      console.log('原始图表数据:', graphsData);
+    } catch (error) {
+      console.warn('API请求失败，使用模拟数据:', error);
+      // 使用模拟数据作为备用
+      usersData = mockData.users;
+      graphsData = mockData.graphs;
+      
+      // 添加日志：打印模拟数据
+      console.log('使用模拟用户数据:', usersData);
+      console.log('使用模拟图表数据:', graphsData);
+    }
+    
+    // 处理用户数据，计算每个用户的图表数量
+    const users = usersData.map(user => {
+      if (user.graphs !== undefined) {
+        // 如果用户数据已经包含图表数量（模拟数据）
+        return {
+          id: user.id,
+          name: user.name,
+          graphs: user.graphs
+        };
+      } else {
+        // 计算用户的图表数量（真实数据）
+        // 尝试不同的字段名匹配用户ID
+        let userGraphs = [];
+        
+        // 尝试使用userId字段匹配
+        userGraphs = graphsData.filter(graph => graph.userId === user.id);
+        
+        // 如果没有匹配到，尝试使用user_id字段匹配
+        if (userGraphs.length === 0) {
+          userGraphs = graphsData.filter(graph => graph.user_id === user.id);
+        }
+        
+        // 如果没有匹配到，尝试使用user字段匹配
+        if (userGraphs.length === 0) {
+          userGraphs = graphsData.filter(graph => graph.user === user.id);
+        }
+        
+        // 添加日志：打印用户ID和匹配的图表数量
+        console.log(`用户ID: ${user.id}, 匹配的图表数量: ${userGraphs.length}`);
+        
+        return {
+          id: user.id,
+          name: user.nickname || user.username || `用户${user.id}`,
+          graphs: userGraphs.length
+        };
+      }
+    });
+    
+    // 添加日志：打印处理后的用户数据
+    console.log('处理后的用户数据:', users);
+    
+    // 使用原始图表数据
+    const graphs = graphsData;
     
     // 计算总用户数
     const totalUsers = users.length;
@@ -74,6 +159,12 @@ async function initStats() {
     await initUserInfo();
   } catch (error) {
     console.error('加载统计数据失败:', error);
+    
+    // 显示错误状态
+    document.getElementById('userStatsLoading').style.display = 'none';
+    document.getElementById('chartTypeStatsLoading').style.display = 'none';
+    document.getElementById('userStatsEmpty').style.display = 'flex';
+    document.getElementById('chartTypeStatsEmpty').style.display = 'flex';
   }
 }
 
@@ -99,6 +190,9 @@ function displayUserStats(users) {
     const topUsers = [...users]
       .sort((a, b) => b.graphs - a.graphs)
       .slice(0, 5);
+    
+    // 添加日志：打印排行榜用户数据
+    console.log('排行榜用户数据:', topUsers);
     
     // 添加用户数据
     topUsers.forEach((user, index) => {
@@ -133,49 +227,84 @@ function displayChartTypeStats(graphs) {
     emptyElement.style.display = 'none';
     statsElement.style.display = 'grid';
     
-    // 统计各类型图表数量
+    // 计算各类型图表数量
     const typeCounts = {};
     graphs.forEach(graph => {
-      typeCounts[graph.type] = (typeCounts[graph.type] || 0) + 1;
+      // 尝试不同的字段名获取图表类型
+      let type = 'unknown';
+      
+      // 尝试使用diagramtype字段
+      if (graph.diagramtype) {
+        type = graph.diagramtype;
+      }
+      // 尝试使用type字段
+      else if (graph.type) {
+        type = graph.type;
+      }
+      // 尝试使用chartType字段
+      else if (graph.chartType) {
+        type = graph.chartType;
+      }
+      // 尝试使用graphType字段
+      else if (graph.graphType) {
+        type = graph.graphType;
+      }
+      
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+      
+      // 添加日志：打印每个图表的类型
+      console.log(`图表ID: ${graph.id}, 图表类型: ${type}`);
     });
+    
+    // 添加日志：打印图表类型统计
+    console.log('图表类型统计:', typeCounts);
     
     // 清空统计区域
     statsElement.innerHTML = '';
     
     // 添加各类型统计卡片
-        Object.entries(typeCounts).forEach(([type, count]) => {
-          const typeInfo = chartTypeMap[type] || { name: type, icon: '📊' };
-          const card = document.createElement('div');
-          card.className = 'chart-type-card';
-          card.innerHTML = `
-            <div class="chart-type-icon ${type}">
-              ${typeInfo.icon}
-            </div>
-            <div class="chart-type-info">
-              <div class="chart-type-name">${typeInfo.name}</div>
-              <div class="chart-type-count">${count}</div>
-            </div>
-          `;
-          statsElement.appendChild(card);
-        });
-        
-        // 添加所有类型
-        Object.entries(chartTypeMap).forEach(([type, info]) => {
-          if (!typeCounts[type]) {
-            const card = document.createElement('div');
-            card.className = 'chart-type-card';
-            card.innerHTML = `
-              <div class="chart-type-icon ${type}">
-                ${info.icon}
-              </div>
-              <div class="chart-type-info">
-                <div class="chart-type-name">${info.name}</div>
-                <div class="chart-type-count">0</div>
-              </div>
-            `;
-            statsElement.appendChild(card);
-          }
-        });
+    Object.entries(typeCounts).forEach(([type, count]) => {
+      // 映射图表类型名称
+      let typeName = type;
+      let typeIcon = '📊';
+      
+      // 检查是否是已知的图表类型
+      if (chartTypeMap[type]) {
+        typeName = chartTypeMap[type].name;
+        typeIcon = chartTypeMap[type].icon;
+      }
+      
+      const card = document.createElement('div');
+      card.className = 'chart-type-card';
+      card.innerHTML = `
+        <div class="chart-type-icon ${type}">
+          ${typeIcon}
+        </div>
+        <div class="chart-type-info">
+          <div class="chart-type-name">${typeName}</div>
+          <div class="chart-type-count">${count}</div>
+        </div>
+      `;
+      statsElement.appendChild(card);
+    });
+    
+    // 添加所有类型
+    Object.entries(chartTypeMap).forEach(([type, info]) => {
+      if (!typeCounts[type]) {
+        const card = document.createElement('div');
+        card.className = 'chart-type-card';
+        card.innerHTML = `
+          <div class="chart-type-icon ${type}">
+            ${info.icon}
+          </div>
+          <div class="chart-type-info">
+            <div class="chart-type-name">${info.name}</div>
+            <div class="chart-type-count">0</div>
+          </div>
+        `;
+        statsElement.appendChild(card);
+      }
+    });
   }
 }
 
@@ -185,7 +314,20 @@ async function initUserInfo() {
   const avatarElement = document.getElementById('avatar');
   
   try {
-    const response = await fetch('/api/auth/status');
+    const response = await fetch('/api/auth/status', {
+      credentials: 'include' // 包含cookie，用于身份验证
+    });
+    
+    if (response.status === 403) {
+      // 403错误表示未登录或登录会话过期，跳转到登录页面
+      window.location.href = '/login';
+      return;
+    }
+    
+    if (!response.ok) {
+      throw new Error('获取用户信息失败');
+    }
+    
     const data = await response.json();
     
     if (data.loggedIn && data.user) {

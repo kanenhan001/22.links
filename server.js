@@ -1195,7 +1195,25 @@ app.get('/api/graphs', async (req, res) => {
         res.status(500).json({ error: '获取关系图失败' });
     }
 });
-
+// 获取所有关系图（仅管理员）
+app.get('/api/graphs/all', async (req, res) => {
+    try {
+        const userId = getAuthedUserId(req);
+        const currentUser = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+        
+        if (!currentUser || currentUser.username !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        
+        const sql = 'SELECT id, userId, name, description, sort_order, createdAt, thumbnail, diagramType, shared FROM graphs ORDER BY id DESC';
+        console.log(`[SQL] ${sql}`);
+        const [graphs] = await pool.execute(sql);
+        res.json(graphs);
+    } catch (e) {
+        console.error('获取所有图表失败:', e);
+        res.status(500).json({ error: '获取所有图表失败' });
+    }
+});
 // 创建关系图
 app.post('/api/graphs', async (req, res) => {
     try {
