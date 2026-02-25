@@ -307,7 +307,6 @@ async function initUserInfo() {
     if (!response.ok) {
       throw new Error('获取用户信息失败');
     }
-    
     const data = await response.json();
     
     if (data.loggedIn && data.user) {
