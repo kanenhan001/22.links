@@ -78,19 +78,11 @@ async function initStats() {
       
       usersData = await usersResponse.json();
       graphsData = await graphsResponse.json();
-      
-      // 添加日志：打印原始API数据
-      console.log('原始用户数据:', usersData);
-      console.log('原始图表数据:', graphsData);
     } catch (error) {
-      console.warn('API请求失败，使用模拟数据:', error);
+      // API请求失败，使用模拟数据
       // 使用模拟数据作为备用
       usersData = mockData.users;
       graphsData = mockData.graphs;
-      
-      // 添加日志：打印模拟数据
-      console.log('使用模拟用户数据:', usersData);
-      console.log('使用模拟图表数据:', graphsData);
     }
     
     // 处理用户数据，计算每个用户的图表数量
@@ -120,9 +112,6 @@ async function initStats() {
           userGraphs = graphsData.filter(graph => graph.user === user.id);
         }
         
-        // 添加日志：打印用户ID和匹配的图表数量
-        console.log(`用户ID: ${user.id}, 匹配的图表数量: ${userGraphs.length}`);
-        
         return {
           id: user.id,
           name: user.nickname || user.username || `用户${user.id}`,
@@ -130,9 +119,6 @@ async function initStats() {
         };
       }
     });
-    
-    // 添加日志：打印处理后的用户数据
-    console.log('处理后的用户数据:', users);
     
     // 使用原始图表数据
     const graphs = graphsData;
@@ -158,9 +144,8 @@ async function initStats() {
     // 初始化用户信息
     await initUserInfo();
   } catch (error) {
-    console.error('加载统计数据失败:', error);
-    
-    // 显示错误状态
+    // 加载统计数据失败
+    // 显示错误信息
     document.getElementById('userStatsLoading').style.display = 'none';
     document.getElementById('chartTypeStatsLoading').style.display = 'none';
     document.getElementById('userStatsEmpty').style.display = 'flex';
@@ -190,9 +175,6 @@ function displayUserStats(users) {
     const topUsers = [...users]
       .sort((a, b) => b.graphs - a.graphs)
       .slice(0, 5);
-    
-    // 添加日志：打印排行榜用户数据
-    console.log('排行榜用户数据:', topUsers);
     
     // 添加用户数据
     topUsers.forEach((user, index) => {
@@ -233,8 +215,12 @@ function displayChartTypeStats(graphs) {
       // 尝试不同的字段名获取图表类型
       let type = 'unknown';
       
-      // 尝试使用diagramtype字段
-      if (graph.diagramtype) {
+      // 尝试使用diagramType字段（驼峰命名，正确的字段名）
+      if (graph.diagramType) {
+        type = graph.diagramType;
+      }
+      // 尝试使用diagramtype字段（全小写）
+      else if (graph.diagramtype) {
         type = graph.diagramtype;
       }
       // 尝试使用type字段
@@ -251,13 +237,7 @@ function displayChartTypeStats(graphs) {
       }
       
       typeCounts[type] = (typeCounts[type] || 0) + 1;
-      
-      // 添加日志：打印每个图表的类型
-      console.log(`图表ID: ${graph.id}, 图表类型: ${type}`);
     });
-    
-    // 添加日志：打印图表类型统计
-    console.log('图表类型统计:', typeCounts);
     
     // 清空统计区域
     statsElement.innerHTML = '';
@@ -349,8 +329,7 @@ async function initUserInfo() {
       }
     }
   } catch (error) {
-    console.error('获取用户信息失败:', error);
-    
+    // 获取用户信息失败
     // 从本地存储获取用户信息（备用方案）
     const userInfo = localStorage.getItem('userInfo');
     if (userInfo) {
@@ -368,7 +347,7 @@ async function initUserInfo() {
           document.body.classList.add('admin-user');
         }
       } catch (error) {
-        console.error('解析用户信息失败:', error);
+        // 解析用户信息失败
       }
     }
   }
