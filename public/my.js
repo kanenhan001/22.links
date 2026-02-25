@@ -1297,24 +1297,43 @@ async function fetchJson(url, opts) {
         const menu = document.getElementById('menu-' + graphId);
         const rect = btn.getBoundingClientRect();
         
-        // 获取屏幕宽度
+        // 获取屏幕宽度和高度
         const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
         
-        // 估算菜单的宽度（约200px）
-        const estimatedMenuWidth = 200;
+        // 先设置菜单的初始位置，以便获取实际的尺寸
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        menu.style.visibility = 'hidden';
+        
+        // 获取菜单的实际尺寸
+        const menuWidth = menu.offsetWidth || 200;
+        const menuHeight = menu.offsetHeight || 240;
+        
+        menu.style.visibility = 'visible';
         
         // 检查右侧是否有足够空间
         let left;
-        if (rect.right + estimatedMenuWidth < screenWidth) {
+        if (rect.right + menuWidth < screenWidth) {
           // 如果有足够空间，在按钮右侧显示菜单
-          left = rect.right - estimatedMenuWidth + 'px';
+          left = rect.right - menuWidth + 'px';
         } else {
           // 如果右侧空间不足，在按钮左侧显示菜单
-          left = rect.left - estimatedMenuWidth + 'px';
+          left = rect.left - menuWidth + 'px';
+        }
+        
+        // 检查底部是否有足够空间
+        let top;
+        if (rect.bottom + menuHeight < screenHeight) {
+          // 如果底部有足够空间，在按钮下方显示菜单
+          top = rect.bottom + 5 + 'px';
+        } else {
+          // 如果底部空间不足，在按钮上方显示菜单
+          top = rect.top - menuHeight - 5 + 'px';
         }
         
         menu.style.left = left;
-        menu.style.top = rect.bottom + 5 + 'px';
+        menu.style.top = top;
         activeMenuId = graphId;
         activeMenuButton = btn;
     }
@@ -1327,8 +1346,9 @@ async function fetchJson(url, opts) {
       // 计算当前菜单的位置
       const rect = btn.getBoundingClientRect();
       
-      // 获取屏幕宽度
+      // 获取屏幕宽度和高度
       const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
       
       // 找到当前打开的主菜单
       const currentMenu = document.querySelector('.dropdown-menu.show');
@@ -1338,18 +1358,41 @@ async function fetchJson(url, opts) {
         // 如果有主菜单，计算菜单位置
         const menuRect = currentMenu.getBoundingClientRect();
         
-        // 估算二级菜单的宽度（约180px，比主菜单小）
-        const estimatedMenuWidth = 180;
+        // 先创建菜单元素，以便获取实际的尺寸
+        const container = document.getElementById('dropdownMenuContainer');
+        container.insertAdjacentHTML('beforeend', `
+          <div class="dropdown-menu show" id="group-menu-${graphId}" style="visibility: hidden;">
+            <div class="dropdown-item">创建新分组</div>
+            <div class="dropdown-divider"></div>
+            ${groups.map(group => `<div class="dropdown-item">${group.name}</div>`).join('')}
+          </div>
+        `);
+        
+        // 获取菜单的实际尺寸
+        const tempMenu = document.getElementById('group-menu-' + graphId);
+        const menuWidth = tempMenu.offsetWidth || 180;
+        const menuHeight = tempMenu.offsetHeight || 180;
+        
+        // 移除临时菜单
+        tempMenu.remove();
         
         // 检查右侧是否有足够空间
-        if (menuRect.right + estimatedMenuWidth + 5 < screenWidth) {
+        if (menuRect.right + menuWidth + 5 < screenWidth) {
           // 如果有足够空间，在主菜单的右侧显示二级菜单
           left = menuRect.right + 5;
         } else {
           // 如果右侧空间不足，在主菜单的左侧显示二级菜单
-          left = menuRect.left - estimatedMenuWidth + 12 ;
+          left = menuRect.left - menuWidth + 12 ;
         }
-        top = menuRect.top;
+        
+        // 检查底部是否有足够空间
+        if (menuRect.top + menuHeight < screenHeight) {
+          // 如果底部有足够空间，在主菜单的顶部对齐显示二级菜单
+          top = menuRect.top;
+        } else {
+          // 如果底部空间不足，在主菜单的顶部上方显示二级菜单
+          top = menuRect.top - menuHeight;
+        }
       } else {
         // 如果没有主菜单，在按钮下方显示
         left = rect.left;
@@ -1510,24 +1553,43 @@ async function fetchJson(url, opts) {
         const menu = document.getElementById('menu-' + graphId);
         const rect = btn.getBoundingClientRect();
         
-        // 获取屏幕宽度
+        // 获取屏幕宽度和高度
         const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
         
-        // 估算菜单的宽度（约200px）
-        const estimatedMenuWidth = 200;
+        // 先设置菜单的初始位置，以便获取实际的尺寸
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        menu.style.visibility = 'hidden';
+        
+        // 获取菜单的实际尺寸
+        const menuWidth = menu.offsetWidth || 200;
+        const menuHeight = menu.offsetHeight || 200;
+        
+        menu.style.visibility = 'visible';
         
         // 检查右侧是否有足够空间
         let left;
-        if (rect.right + estimatedMenuWidth < screenWidth) {
+        if (rect.right + menuWidth < screenWidth) {
           // 如果有足够空间，在按钮右侧显示菜单
-          left = rect.right - estimatedMenuWidth + 'px';
+          left = rect.right - menuWidth + 'px';
         } else {
           // 如果右侧空间不足，在按钮左侧显示菜单
-          left = rect.left - estimatedMenuWidth + 'px';
+          left = rect.left - menuWidth + 'px';
+        }
+        
+        // 检查底部是否有足够空间
+        let top;
+        if (rect.bottom + menuHeight < screenHeight) {
+          // 如果底部有足够空间，在按钮下方显示菜单
+          top = rect.bottom + 5 + 'px';
+        } else {
+          // 如果底部空间不足，在按钮上方显示菜单
+          top = rect.top - menuHeight - 5 + 'px';
         }
         
         menu.style.left = left;
-        menu.style.top = rect.bottom + 5 + 'px';
+        menu.style.top = top;
         activeMenuId = graphId;
         activeMenuButton = btn;
       }
